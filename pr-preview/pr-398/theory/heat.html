@@ -1,0 +1,2311 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="sediment.html">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Heat Transport and Atmospheric Coupling - RDycore: A River / Flooding dynamical core for E3SM</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#shallow-water-equations-coupled-with-the-heat-equation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-header__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            RDycore: A River / Flooding dynamical core for E3SM
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Heat Transport and Atmospheric Coupling
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="RDycore: A River / Flooding dynamical core for E3SM" class="md-nav__button md-logo" aria-label="RDycore: A River / Flooding dynamical core for E3SM" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    RDycore: A River / Flooding dynamical core for E3SM
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/RDycore/RDycore" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/input.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    YAML Input Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/mms.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MMS Driver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDycore Example Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    RDycore Example Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/example-cases.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/dam-break/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Idealized dam break problem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_5_3" id="__nav_2_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hurricane Harvey
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hurricane Harvey
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/harvey-flooding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/critical-outflow-bc/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    With MRMS rainfall and outflow BC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/harvey-flooding/ocean-bc/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    With average rainfall and ocean BC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E3SM-RDycore Example Cases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    E3SM-RDycore Example Cases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/example-cases/e3sm-cases/harvey-flooding/e3sm_harvey.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hurricane Harvey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/development.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/organization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Structure and Organization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/style.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Style Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/tools.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/ceed.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SWE implementation using libCEED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Theory Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="swe.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shallow Water Equations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="muscl.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Second-Order MUSCL Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sediment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sediment Transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heat Transport and Atmospheric Coupling
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="heat.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heat Transport and Atmospheric Coupling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#governing-equations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Governing equations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Governing equations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depth-averaged-shallow-water-equations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Depth-averaged shallow water equations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prognostic-heat-variable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prognostic heat variable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transport-with-surface-energy-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transport with surface energy exchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#net-surface-heat-flux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net surface heat flux
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Net surface heat flux">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wetting-and-drying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wetting and drying
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operator-splitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator splitting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-discretization-of-the-heat-flux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spatial discretization of the heat flux
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-with-the-method-of-manufactured-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification with the Method of Manufactured Solutions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verification with the Method of Manufactured Solutions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-manufactured-heat-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The manufactured heat source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-correction-is-allocated-across-the-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the correction is allocated across the split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reported-error-norms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reported error norms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rates-timestep-refinement-and-self-convergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rates, timestep refinement, and self-convergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#governing-equations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Governing equations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Governing equations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depth-averaged-shallow-water-equations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Depth-averaged shallow water equations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prognostic-heat-variable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prognostic heat variable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transport-with-surface-energy-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transport with surface energy exchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#net-surface-heat-flux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net surface heat flux
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Net surface heat flux">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wetting-and-drying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wetting and drying
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operator-splitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator splitting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-discretization-of-the-heat-flux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spatial discretization of the heat flux
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-with-the-method-of-manufactured-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification with the Method of Manufactured Solutions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verification with the Method of Manufactured Solutions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-manufactured-heat-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The manufactured heat source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-correction-is-allocated-across-the-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the correction is allocated across the split
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reported-error-norms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reported error norms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test cases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rates-timestep-refinement-and-self-convergence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rates, timestep refinement, and self-convergence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="shallow-water-equations-coupled-with-the-heat-equation">Shallow Water Equations Coupled with the Heat Equation</h1>
+<p>RDycore can carry a depth-averaged water temperature alongside the
+<a href="swe.html">shallow water equations</a>. The temperature is advected by the flow and
+exchanges energy with the atmosphere through the water surface. The two
+processes are advanced with an operator split: a transport solve that advances
+the flow and carries the heat content as a passive tracer, followed by a source
+solve that holds the flow fixed and applies the surface energy exchange.</p>
+<h2 id="governing-equations">Governing equations</h2>
+<h3 id="depth-averaged-shallow-water-equations">Depth-averaged shallow water equations</h3>
+<p>The flow is governed by the two-dimensional shallow water equations in
+conservative form,</p>
+<div class="arithmatex">\[
+\frac{\partial \mathbf{U}_{\text{sw}}}{\partial t}
++ \frac{\partial \mathbf{E}_{\text{sw}}}{\partial x}
++ \frac{\partial \mathbf{G}_{\text{sw}}}{\partial y}
+= \mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f,
+\tag{1}
+\]</div>
+<p>with the flow solution vector and flux vectors</p>
+<div class="arithmatex">\[
+\mathbf{U}_{\text{sw}} = \begin{bmatrix} h \\[.4em] hu \\[.4em] hv \end{bmatrix},
+\qquad
+\mathbf{E}_{\text{sw}} = \begin{bmatrix} hu \\[.4em] hu^2 + \tfrac{1}{2}gh^2 \\[.4em] huv \end{bmatrix},
+\qquad
+\mathbf{G}_{\text{sw}} = \begin{bmatrix} hv \\[.4em] huv \\[.4em] hv^2 + \tfrac{1}{2}gh^2 \end{bmatrix},
+\tag{2}
+\]</div>
+<p>and the source vectors representing net runoff production, the bed elevation
+slope, and bed friction,</p>
+<div class="arithmatex">\[
+\mathbf{S}_r = \begin{bmatrix} Q_r \\[.4em] 0 \\[.4em] 0 \end{bmatrix},
+\qquad
+\mathbf{S}_b = \begin{bmatrix} 0 \\[.4em] -gh\dfrac{\partial z}{\partial x} \\[.6em] -gh\dfrac{\partial z}{\partial y} \end{bmatrix},
+\qquad
+\mathbf{S}_f = \begin{bmatrix} 0 \\[.4em] -C_D\,u\sqrt{u^2 + v^2} \\[.4em] -C_D\,v\sqrt{u^2 + v^2} \end{bmatrix}.
+\tag{3}
+\]</div>
+<p>Here <span class="arithmatex">\(h\)</span> [m] is the flow depth, <span class="arithmatex">\(\vec{u} = (u, v)\)</span> [m s⁻¹] is the
+depth-averaged velocity, <span class="arithmatex">\(g\)</span> is the acceleration due to gravity, <span class="arithmatex">\(z\)</span> is the bed
+elevation, <span class="arithmatex">\(Q_r\)</span> is the net runoff production expressed as water height per unit
+time, and <span class="arithmatex">\(C_D = g n^2 h^{-1/3}\)</span> is the drag coefficient formed from the Manning
+roughness coefficient <span class="arithmatex">\(n\)</span>. The <a href="swe.html">shallow water equations</a> page derives
+this system, its finite-volume discretization, and the Roe solver used to
+evaluate the fluxes; everything below takes it as given.</p>
+<h3 id="prognostic-heat-variable">Prognostic heat variable</h3>
+<p>The prognostic heat variable is the conservative quantity <span class="arithmatex">\(hT\)</span>, the product of
+the water depth <span class="arithmatex">\(h\)</span> [m] and the depth-averaged water temperature <span class="arithmatex">\(T\)</span> [°C], with
+units of m·°C. It is appended to <span class="arithmatex">\((2)\)</span> as a trailing tracer component, with the
+corresponding advective entries appended to the flux vectors:</p>
+<div class="arithmatex">\[
+\mathbf{U} = \begin{bmatrix} h \\[.4em] hu \\[.4em] hv \\[.4em] hT \end{bmatrix},
+\qquad
+\mathbf{E} = \begin{bmatrix} hu \\[.4em] hu^2 + \tfrac{1}{2}gh^2 \\[.4em] huv \\[.4em] huT \end{bmatrix},
+\qquad
+\mathbf{G} = \begin{bmatrix} hv \\[.4em] huv \\[.4em] hv^2 + \tfrac{1}{2}gh^2 \\[.4em] hvT \end{bmatrix}.
+\tag{4}
+\]</div>
+<p>When sediment classes or salinity are also active, their components precede <span class="arithmatex">\(hT\)</span>
+in the solution vector; the heat component is always the last tracer.</p>
+<h3 id="transport-with-surface-energy-exchange">Transport with surface energy exchange</h3>
+<p>The depth-integrated heat equation is</p>
+<div class="arithmatex">\[
+\frac{\partial (hT)}{\partial t} + \vec{\nabla}\cdot\left(hT\,\vec{u}\right)
+= \frac{Q_{\text{net}}}{\rho_w c_w},
+\tag{5}
+\]</div>
+<p>where <span class="arithmatex">\(\vec{u} = (u, v)\)</span> is the depth-averaged flow velocity, <span class="arithmatex">\(\rho_w\)</span> is the
+density of water, <span class="arithmatex">\(c_w\)</span> is the specific heat capacity of water, and
+<span class="arithmatex">\(Q_{\text{net}}\)</span> [W m⁻²] is the net heat flux through the water surface, taken
+positive into the water. Dividing the surface flux by <span class="arithmatex">\(\rho_w c_w\)</span> converts it
+to a tendency of <span class="arithmatex">\(hT\)</span>; note that it is independent of <span class="arithmatex">\(h\)</span>, because the flux is
+applied to the water column as a whole rather than per unit depth.</p>
+<p>The model neglects horizontal diffusion of heat, heat exchange with the bed,
+and any heat carried by runoff or by lateral inflows: the only non-advective
+term in <span class="arithmatex">\((5)\)</span> is the surface exchange.</p>
+<h3 id="net-surface-heat-flux">Net surface heat flux</h3>
+<p><span class="arithmatex">\(Q_{\text{net}}\)</span> is the sum of four contributions,</p>
+<div class="arithmatex">\[
+Q_{\text{net}}(T) = Q_{\text{sw}} + Q_{\text{lw}}(T) + Q_{\text{sh}}(T) + Q_{e}(T),
+\tag{6}
+\]</div>
+<p>which are, respectively, the absorbed shortwave radiation, the net longwave
+radiation, the sensible heat flux, and the latent heat flux:</p>
+<div class="arithmatex">\[
+\begin{aligned}
+Q_{\text{sw}} &amp;= (1 - \alpha)\, S^{\downarrow}, \\[.5em]
+Q_{\text{lw}} &amp;= L^{\downarrow} - \varepsilon\,\sigma\,T_K^4, \\[.5em]
+Q_{\text{sh}} &amp;= \rho_a\, c_{p,a}\, C_H \left(T_a - T\right), \\[.5em]
+Q_{e} &amp;= \rho_a\, L_v\, C_H \left(q_a - q_{\text{sat}}(T)\right).
+\end{aligned}
+\tag{7}
+\]</div>
+<p>Here <span class="arithmatex">\(T_K = T + T_0\)</span> is the water temperature in kelvin, and the five
+atmospheric forcing variables, supplied per cell, are</p>
+<ul>
+<li><span class="arithmatex">\(S^{\downarrow}\)</span>, the downwelling shortwave radiation [W m⁻²]</li>
+<li><span class="arithmatex">\(L^{\downarrow}\)</span>, the downwelling longwave radiation [W m⁻²]</li>
+<li><span class="arithmatex">\(U_w\)</span>, the wind speed [m s⁻¹]</li>
+<li><span class="arithmatex">\(T_a\)</span>, the air temperature [°C]</li>
+<li><span class="arithmatex">\(q_a\)</span>, the specific humidity of the air [kg kg⁻¹].</li>
+</ul>
+<p>The turbulent fluxes <span class="arithmatex">\(Q_{\text{sh}}\)</span> and <span class="arithmatex">\(Q_e\)</span> are parameterized with a bulk
+transfer velocity (the reciprocal of an aerodynamic resistance) that increases
+linearly with wind speed,</p>
+<div class="arithmatex">\[
+C_H = 0.2 + 0.1\, U_w \qquad [\text{m s}^{-1}],
+\tag{8}
+\]</div>
+<p>with the constants carrying the units needed to make <span class="arithmatex">\(C_H\)</span> a velocity.</p>
+<p>The saturation specific humidity at the water surface follows from the
+Magnus–Tetens approximation to the saturation vapor pressure <span class="arithmatex">\(e_{\text{sat}}\)</span>
+[Pa]:</p>
+<div class="arithmatex">\[
+e_{\text{sat}}(T) = 611.2 \exp\!\left(\frac{17.67\,T}{T + 243.5}\right),
+\qquad
+q_{\text{sat}}(T) = \frac{\epsilon_v\, e_{\text{sat}}(T)}{p_0 - (1 - \epsilon_v)\, e_{\text{sat}}(T)},
+\tag{9}
+\]</div>
+<p>where <span class="arithmatex">\(T\)</span> is in degrees Celsius.</p>
+<h4 id="constants">Constants</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Value</th>
+<th>Units</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="arithmatex">\(\alpha\)</span></td>
+<td>0.08</td>
+<td>—</td>
+<td>albedo of water</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\varepsilon\)</span></td>
+<td>0.97</td>
+<td>—</td>
+<td>emissivity of water</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\sigma\)</span></td>
+<td><span class="arithmatex">\(5.670374419\times10^{-8}\)</span></td>
+<td>W m⁻² K⁻⁴</td>
+<td>Stefan–Boltzmann constant</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\rho_a\)</span></td>
+<td>1.225</td>
+<td>kg m⁻³</td>
+<td>density of air</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(c_{p,a}\)</span></td>
+<td>1005</td>
+<td>J kg⁻¹ K⁻¹</td>
+<td>specific heat of air at constant pressure</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(L_v\)</span></td>
+<td><span class="arithmatex">\(2.5\times10^{6}\)</span></td>
+<td>J kg⁻¹</td>
+<td>latent heat of vaporization</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\rho_w\)</span></td>
+<td>1000</td>
+<td>kg m⁻³</td>
+<td>density of water</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(c_w\)</span></td>
+<td>4186</td>
+<td>J kg⁻¹ K⁻¹</td>
+<td>specific heat of water</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(p_0\)</span></td>
+<td>101325</td>
+<td>Pa</td>
+<td>standard air pressure</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(\epsilon_v\)</span></td>
+<td>0.622</td>
+<td>—</td>
+<td>ratio of molar masses of water vapor and dry air</td>
+</tr>
+<tr>
+<td><span class="arithmatex">\(T_0\)</span></td>
+<td>273.15</td>
+<td>K</td>
+<td>Celsius-to-kelvin offset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="wetting-and-drying">Wetting and drying</h3>
+<p>The surface exchange acts only on cells holding water. Writing <span class="arithmatex">\(h_{\min}\)</span> for
+the wet/dry threshold <code>physics.flow.tiny_h</code>, the source term in <span class="arithmatex">\((5)\)</span> is applied
+as</p>
+<div class="arithmatex">\[
+\frac{\partial (hT)}{\partial t}\bigg|_{\text{source}} =
+\begin{cases}
+\dfrac{Q_{\text{net}}(hT/h)}{\rho_w c_w}, &amp; h \ge h_{\min} \\[1em]
+0, &amp; h &lt; h_{\min}.
+\end{cases}
+\tag{10}
+\]</div>
+<p>Below the threshold the heat content of the cell is frozen, so no temperature is
+derived from a vanishing depth.</p>
+<h2 id="operator-splitting">Operator splitting</h2>
+<p>Over one coupling interval <span class="arithmatex">\([t^n, t^{n+1}]\)</span> of length <span class="arithmatex">\(\Delta t\)</span>, RDycore
+advances <span class="arithmatex">\((5)\)</span> with a first-order Lie split into a transport step and a source
+step.</p>
+<p><strong>Step 1 — transport.</strong> The full shallow water system <span class="arithmatex">\((4)\)</span> is advanced by the
+flow <code>TS</code>, with <span class="arithmatex">\(hT\)</span> carried as a passive tracer and no surface exchange:</p>
+<div class="arithmatex">\[
+\frac{\partial \mathbf{U}}{\partial t} + \frac{\partial \mathbf{E}}{\partial x}
++ \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f,
+\qquad \mathbf{U}(t^n) = \mathbf{U}^n
+\;\;\longrightarrow\;\; \mathbf{U}^{*}.
+\tag{11}
+\]</div>
+<p>The shallow water source terms <span class="arithmatex">\(\mathbf{S}_r\)</span>, <span class="arithmatex">\(\mathbf{S}_b\)</span>, and
+<span class="arithmatex">\(\mathbf{S}_f\)</span> are those defined in the <a href="swe.html">shallow water equations</a>; the
+heat component of the external source vector is zero in this step. The flow
+<code>TS</code> may take several internal timesteps within the coupling interval.</p>
+<p><strong>Step 2 — surface exchange.</strong> The flow state is held fixed and only <span class="arithmatex">\(hT\)</span>
+evolves, according to the cell-local ordinary differential equation</p>
+<div class="arithmatex">\[
+\frac{d (hT)}{d t} = \frac{Q_{\text{net}}\!\left(hT/h\right)}{\rho_w c_w},
+\qquad (hT)(t^n) = (hT)^{*}
+\;\;\longrightarrow\;\; (hT)^{n+1}.
+\tag{12}
+\]</div>
+<p>This step runs on its own <code>TS</code> (options prefix <code>heat_</code>), which by default takes
+a single backward Euler step across the whole coupling interval. The <code>TS</code>
+operates on the complete state vector, with the implicit residual</p>
+<div class="arithmatex">\[
+\mathbf{F}(\mathbf{U}, \dot{\mathbf{U}}) =
+\begin{cases}
+\dot{U}_c - \dfrac{Q_{\text{net}}\!\left(U_{hT}/h\right)}{\rho_w c_w},
+  &amp; c = hT \text{ and } h \ge h_{\min} \\[1em]
+\dot{U}_c, &amp; \text{otherwise,}
+\end{cases}
+\tag{13}
+\]</div>
+<p>so that every component other than <span class="arithmatex">\(hT\)</span> carries the trivial residual
+<span class="arithmatex">\(\dot{U}_c = 0\)</span> and is left unchanged by the solve.</p>
+<p>Because <span class="arithmatex">\(Q_{\text{net}}\)</span> depends on <span class="arithmatex">\(T\)</span> alone, and <span class="arithmatex">\(T\)</span> is cell-local, the
+residual <span class="arithmatex">\((13)\)</span> is pointwise and its Jacobian is exactly diagonal. With <span class="arithmatex">\(\varsigma\)</span>
+the <code>TS</code> shift <span class="arithmatex">\(\partial\dot{\mathbf{U}}/\partial\mathbf{U}\)</span>, the diagonal entry
+of the heat DOF is</p>
+<div class="arithmatex">\[
+J_{hT,hT} = \varsigma - \frac{1}{\rho_w c_w\, h}\,\frac{d Q_{\text{net}}}{d T},
+\tag{14}
+\]</div>
+<p>where the factor <span class="arithmatex">\(1/h\)</span> comes from <span class="arithmatex">\(\partial T/\partial (hT) = 1/h\)</span>, and</p>
+<div class="arithmatex">\[
+\frac{d Q_{\text{net}}}{d T} =
+-4\,\varepsilon\,\sigma\,T_K^3
+- \rho_a\, c_{p,a}\, C_H
+- \rho_a\, L_v\, C_H \, \frac{d q_{\text{sat}}}{d T},
+\tag{15}
+\]</div>
+<div class="arithmatex">\[
+\frac{d q_{\text{sat}}}{d T} =
+\frac{\epsilon_v\, p_0}{\left[p_0 - (1-\epsilon_v)\, e_{\text{sat}}\right]^2}\;
+\frac{d e_{\text{sat}}}{d T},
+\qquad
+\frac{d e_{\text{sat}}}{d T} = \frac{17.67 \cdot 243.5}{\left(T + 243.5\right)^2}\, e_{\text{sat}}.
+\tag{16}
+\]</div>
+<p>Every term in <span class="arithmatex">\((15)\)</span> is negative, so the surface exchange is unconditionally
+damping in <span class="arithmatex">\(T\)</span> and the implicit solve is well conditioned. All remaining
+diagonal entries are <span class="arithmatex">\(\varsigma\)</span>. Because the Jacobian is diagonal, it is
+preallocated with a one-entry-per-row COO pattern rather than the wider
+finite-volume stencil, which also lets the libCEED backend assemble it on the
+device with <code>MatSetValuesCOO()</code>.</p>
+<p>The split is first-order accurate in <span class="arithmatex">\(\Delta t\)</span> irrespective of the accuracy of
+either sub-step, since the transport and source vector fields do not commute in
+general.</p>
+<h2 id="spatial-discretization-of-the-heat-flux">Spatial discretization of the heat flux</h2>
+<p>The heat flux terms in <span class="arithmatex">\((4)\)</span> are discretized exactly like any other passive
+tracer. At a face between cells <span class="arithmatex">\(i\)</span> and <span class="arithmatex">\(j\)</span> the Roe eigen-system of the shallow
+water equations is extended by one contact wave per tracer, travelling at the
+Roe-averaged normal velocity <span class="arithmatex">\(\hat{u}_\parallel\)</span>, with the Roe-averaged
+temperature</p>
+<div class="arithmatex">\[
+\hat{T} = \frac{\sqrt{h_i}\,T_i + \sqrt{h_j}\,T_j}{\sqrt{h_i} + \sqrt{h_j}}
+\tag{17}
+\]</div>
+<p>and wave strength <span class="arithmatex">\(\Delta(hT) - \hat{T}\,\Delta h\)</span>. The heat component of the
+left and right physical fluxes is <span class="arithmatex">\(h\,u_\parallel T\)</span> evaluated on each side, and
+the numerical flux is assembled as in the <a href="swe.html">shallow water equations</a>.
+Setting <code>numerics.riemann: upwind_roe</code> selects a variant that keeps the Roe flux
+for the flow components but takes the heat component from the upwind side, as
+determined by the sign of the Roe mass flux. Faces where both sides are dry carry
+zero flux in every component.</p>
+<p>Boundary conditions for heat are prescribed as a Dirichlet water temperature on
+the boundary face, from which the boundary value of <span class="arithmatex">\(hT\)</span> is formed using the
+boundary depth. Second-order MUSCL reconstruction is not supported when heat (or
+any other tracer) is active.</p>
+<h2 id="verification-with-the-method-of-manufactured-solutions">Verification with the Method of Manufactured Solutions</h2>
+<p>The heat coupling is verified with the
+<a href="../common/mms.html">Method of Manufactured Solutions</a> using the <code>rdycore_mms</code>
+driver. The manufactured solution supplies <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(u\)</span>, <span class="arithmatex">\(v\)</span>, <span class="arithmatex">\(z\)</span>, <span class="arithmatex">\(n\)</span> (in the <code>swe</code>
+subsection of the input) and <span class="arithmatex">\(T\)</span> together with its partial derivatives (in the
+<code>temperature</code> subsection).</p>
+<h3 id="the-manufactured-heat-source">The manufactured heat source</h3>
+<p>Substituting the manufactured <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(u\)</span>, <span class="arithmatex">\(v\)</span>, and <span class="arithmatex">\(T\)</span> into <span class="arithmatex">\((5)\)</span> leaves a
+residual that is installed as a prescribed per-cell surface flux,</p>
+<div class="arithmatex">\[
+Q_{\text{mms}}(x, y, t) = \rho_w c_w \left[
+\frac{\partial (hT)}{\partial t} + \frac{\partial (huT)}{\partial x}
++ \frac{\partial (hvT)}{\partial y} \right],
+\tag{18}
+\]</div>
+<p>expanded with the product rule into the quantities the input file provides:</p>
+<div class="arithmatex">\[
+\begin{aligned}
+Q_{\text{mms}} = \rho_w c_w \Big[\;
+&amp; h\,T_t + T\,h_t \\
+&amp;+ h\,u\,T_x + T\,h\,u_x + T\,u\,h_x \\
+&amp;+ h\,v\,T_y + T\,h\,v_y + T\,v\,h_y \;\Big].
+\end{aligned}
+\tag{19}
+\]</div>
+<p>In this mode the heat solve takes <span class="arithmatex">\(Q_{\text{mms}}\)</span> in place of
+<span class="arithmatex">\(Q_{\text{net}}(T)\)</span>: the prescribed source <strong>replaces</strong> the atmospheric
+parameterization rather than correcting it.</p>
+<h3 id="how-the-correction-is-allocated-across-the-split">How the correction is allocated across the split</h3>
+<p>The unsplit manufactured correction for the heat equation is the complete
+conservative residual in <span class="arithmatex">\((18)\)</span>. Consistency requires the two sub-steps to
+contribute that residual exactly once between them, so RDycore allocates it as</p>
+<ul>
+<li><strong>transport step</strong>: the full manufactured <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(hu\)</span>, and <span class="arithmatex">\(hv\)</span> sources, and
+  <em>nothing</em> for heat — so the numerical tracer flux performs the whole <span class="arithmatex">\(hT\)</span>
+  transport rather than having it cancelled analytically;</li>
+<li><strong>heat step</strong>: the complete residual <span class="arithmatex">\(Q_{\text{mms}}\)</span>, consumed by the
+  prescribed-source branch.</li>
+</ul>
+<p>To leading order the composite update is then</p>
+<div class="arithmatex">\[
+(hT)^{n+1} = (hT)^{n} + \Delta t\,\frac{\partial (hT)}{\partial t}
++ \Delta t \left[ \mathcal{D}(hT) - \mathcal{D}_h(hT) \right] + O(\Delta t^2),
+\tag{20}
+\]</div>
+<p>with <span class="arithmatex">\(\mathcal{D}\)</span> the analytic flux divergence and <span class="arithmatex">\(\mathcal{D}_h\)</span> its discrete
+counterpart, so the measured error is exactly the spatial truncation error of the
+tracer flux plus the temporal and splitting error. Installing a heat source in
+the transport step as well would count <span class="arithmatex">\(\partial (hT)/\partial t\)</span> twice and halve
+the observed order; the MMS driver asserts that the heat component of the
+transport external source vector is identically zero.</p>
+<p>The source is sampled with the quadrature matching the heat <code>TS</code>: the right
+endpoint <span class="arithmatex">\(Q_{\text{mms}}(t^{n+1})\)</span> for backward Euler, and the endpoint average
+<span class="arithmatex">\(\tfrac{1}{2}\left[Q_{\text{mms}}(t^n) + Q_{\text{mms}}(t^{n+1})\right]\)</span> for
+Crank–Nicolson.</p>
+<h3 id="reported-error-norms">Reported error norms</h3>
+<p>Heat-enabled MMS runs report two rows:</p>
+<ul>
+<li><code>hT</code>, the error in the conservative variable the solver actually advances;</li>
+<li><code>T</code>, the error in the derived temperature <span class="arithmatex">\(hT/h\)</span>, guarded by <span class="arithmatex">\(h_{\min}\)</span>
+  exactly as the operators guard it, and compared against the manufactured <span class="arithmatex">\(T\)</span>
+  at the same cell centroids.</li>
+</ul>
+<p>The derived temperature combines — and can partially cancel — the errors in <span class="arithmatex">\(h\)</span>
+and <span class="arithmatex">\(hT\)</span>, so it generally converges at a slightly different rate and carries its
+own <code>expected_rates</code> entry. The two coincide only when <span class="arithmatex">\(h \equiv 1\)</span>.</p>
+<p>The driver also reports <code>Max-|Q_mms|-inf</code>, the running maximum of
+<span class="arithmatex">\(\|Q_{\text{mms}}\|_\infty\)</span>, so that a manufactured construction intended to be
+source-free can be checked directly rather than inferred from the final error.</p>
+<h3 id="test-cases">Test cases</h3>
+<p>The cases in <code>driver/tests/heat/</code> are built so that each isolates one source of
+error.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Input</th>
+<th>Flow</th>
+<th>Temperature</th>
+<th>What it verifies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code>heat_ts_mms.yaml</code></td>
+<td>at rest, <span class="arithmatex">\(h \equiv 1\)</span></td>
+<td><span class="arithmatex">\(T = R + A\sin(Kx)\sin(Ky)e^{t/\tau}\)</span></td>
+<td>The source quadrature in isolation: no transport, so the spatial error is identically zero. Convergence in <span class="arithmatex">\(\Delta t\)</span> on a fixed mesh is <span class="arithmatex">\(O(\Delta t)\)</span> for backward Euler and <span class="arithmatex">\(O(\Delta t^2)\)</span> for Crank–Nicolson. Because <span class="arithmatex">\(h \equiv 1\)</span>, the <code>hT</code> and <code>T</code> errors coincide.</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>heat_mms_moving_transport.yaml</code></td>
+<td>uniform, flat bed, <span class="arithmatex">\(n = 0\)</span></td>
+<td><span class="arithmatex">\(T = R + A\sin(K(x - Ut))\sin(K(y - Vt))\)</span></td>
+<td>Passive transport alone. The wave translates with the water, so <span class="arithmatex">\((hT)_t + \nabla\cdot(hT\vec{u}) = 0\)</span> and <span class="arithmatex">\(Q_{\text{mms}}\)</span> is zero to roundoff; there is no source field and hence no splitting error.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>heat_mms_moving_source.yaml</code></td>
+<td>uniform, flat bed, <span class="arithmatex">\(n = 0\)</span></td>
+<td><span class="arithmatex">\(T = R + A e^{\Lambda t}\sin(K(x - Ut))\sin(K(y - Vt))\)</span></td>
+<td>Transport plus a genuinely nonzero source. The phase-advection terms cancel analytically and <span class="arithmatex">\(Q_{\text{mms}} = \rho_w c_w H \Lambda A e^{\Lambda t}\sin(K(x-Ut))\sin(K(y-Vt))\)</span>, which varies in space — so the source and transport fields no longer commute and this is the first case with a splitting error.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>heat_mms_conv_study.yaml</code></td>
+<td>spatially varying <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(u\)</span>, <span class="arithmatex">\(v\)</span>, <span class="arithmatex">\(z\)</span>, <span class="arithmatex">\(n\)</span></td>
+<td><span class="arithmatex">\(T = A(1 + \sin(Kx)\sin(Ky))e^{t/\tau}\)</span></td>
+<td>The complete coupled system: manufactured SWE sources in the transport step and the full conservative heat residual in the heat step, on both backends.</td>
+</tr>
+</tbody>
+</table>
+<p>Case 1 requires <span class="arithmatex">\(n = 0\)</span> rather than merely benefiting from it: bed friction is
+discretized semi-implicitly against the partially updated momentum, so it does
+not cancel the analytic <span class="arithmatex">\(C_D \vec{u}|\vec{u}|\)</span> that the manufactured source
+installs. Both are identically zero only when <span class="arithmatex">\(n = 0\)</span>, which is what lets the
+uniform flow be preserved to roundoff.</p>
+<p>Two further tests run through the production driver rather than the MMS driver.
+<code>heat_coupling_interval.yaml</code> holds a lake at rest under a constant prescribed
+surface flux, for which <span class="arithmatex">\((12)\)</span> integrates exactly to
+<span class="arithmatex">\(\Delta T = Q\,\Delta t / (\rho_w c_w h)\)</span>, and checks that increment while the
+transport timestep is shorter than the coupling interval — so that the heat solve
+is confirmed to advance over the full interval rather than over one transport
+step. <code>heat_coupling_interval_atmospheric.yaml</code> drives the same configuration
+with the five-parameter forcing of <span class="arithmatex">\((7)\)</span>, exercising <span class="arithmatex">\(Q_{\text{net}}(T)\)</span> and the
+nonlinear Jacobian <span class="arithmatex">\((14)\)</span>–<span class="arithmatex">\((16)\)</span> on both backends; because <span class="arithmatex">\(Q_{\text{net}}(T)\)</span> is
+nonlinear there is no closed-form final temperature to assert against, so that
+one is a smoke test.</p>
+<h3 id="rates-timestep-refinement-and-self-convergence">Rates, timestep refinement, and self-convergence</h3>
+<p>Both the tracer discretization and the default forward Euler transport
+integrator are first order, so with <span class="arithmatex">\(\Delta t \propto \Delta x\)</span> the error behaves
+as <span class="arithmatex">\(E \sim C_x \Delta x + C_t \Delta t = (C_x + K C_t)\Delta x\)</span>. What the studies
+report is therefore a <strong>joint space-time rate</strong> near 1, not an isolated spatial
+rate; the <code>timestep_refinement_exponent</code> input controls this coupling. Case 1
+also recovers an isolated spatial rate by raising the transport integrator to
+RK4, which is legitimate there only because that case has neither a splitting
+error nor a manufactured SWE source.</p>
+<p>Refining <span class="arithmatex">\(\Delta t\)</span> on a fixed mesh does <strong>not</strong> drive the error against the
+exact solution to zero once transport is active: the solution converges to the
+semi-discrete solution, whose distance from the exact solution is the <span class="arithmatex">\(O(\Delta x)\)</span>
+spatial truncation error, so such a study plateaus on that floor and reports a
+rate near zero. Case 2 therefore measures the temporal-plus-splitting order by
+self-convergence against a same-mesh, fine-timestep reference solution
+(<code>-mms_save_final_state</code> and <code>-mms_reference_solution</code>), which cancels the
+spatial floor exactly. The measured result is first order for <em>both</em> backward
+Euler and Crank–Nicolson: Lie splitting is first order however accurately the
+source step is integrated, so Crank–Nicolson lowers the error constant without
+raising the order.</p>
+<h3 id="scope">Scope</h3>
+<p>The MMS path drives the heat solve through the prescribed-source branch, which
+replaces <span class="arithmatex">\(Q_{\text{net}}(T)\)</span>. These cases therefore verify passive transport of
+<span class="arithmatex">\(hT\)</span>, the manufactured source quadrature, and the Lie composition of the two
+solves — but they do <strong>not</strong> verify the atmospheric parameterization <span class="arithmatex">\((6)\)</span>–<span class="arithmatex">\((9)\)</span>
+or its analytic Jacobian <span class="arithmatex">\((14)\)</span>–<span class="arithmatex">\((16)\)</span>. A consequence of the same substitution is
+that in this path the heat residual has no state dependence, so every consistent
+one-step method produces the same update and the heat <code>TS</code> type selects only
+which manufactured quadrature is sampled.</p>
+<h2 id="references">References</h2>
+<ul>
+<li>
+<p><a href="https://ascelibrary.org/doi/10.1061/%28ASCE%290733-9429%282002%29128%3A3%28289%29">Bradford, S. F., &amp; Sanders, B. F. (2002). Finite-volume model for shallow-water flooding of arbitrary topography. Journal of hydraulic engineering, 128(3), 289-298.</a></p>
+</li>
+<li>
+<p><a href="https://doi.org/10.1115/1.1436090">Roache, P. J. (2002). Code verification by the method of manufactured solutions. Journal of Fluids Engineering, 124(1), 4-10.</a></p>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.indices", "navigation.instant", "navigation.sections", "navigation.top"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascript/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
