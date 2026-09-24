@@ -164,23 +164,95 @@ where $T$ is in degrees Celsius.
 | $\epsilon_v$ | 0.622 | — | ratio of molar masses of water vapor and dry air |
 | $T_0$ | 273.15 | K | Celsius-to-kelvin offset |
 
-### Wetting and drying
+### Evaporative mass and momentum exchange
 
-The surface exchange acts only on cells holding water. Writing $h_{\min}$ for
-the wet/dry threshold `physics.flow.tiny_h`, the source term in $(5)$ is applied
-as
+The latent flux $Q_e$ moves water as well as energy: the mass it carries across
+the surface leaves the water column. Written as a rate of change of depth,
 
 $$
-\frac{\partial (hT)}{\partial t}\bigg|_{\text{source}} =
-\begin{cases}
-\dfrac{Q_{\text{net}}(hT/h)}{\rho_w c_w}, & h \ge h_{\min} \\[1em]
-0, & h < h_{\min}.
-\end{cases}
+\dot{h}_e = \frac{Q_e}{\rho_w L_v},
 \tag{10}
 $$
 
-Below the threshold the heat content of the cell is frozen, so no temperature is
-derived from a vanishing depth.
+which is negative while the cell evaporates and positive under condensation. In
+the more familiar form, the evaporation rate is
+$E = -\dot{h}_e = \rho_a C_H\left(q_{\text{sat}}(T) - q_a\right)/\rho_w$.
+
+This adds a source vector to the coupled system, alongside the $\mathbf{S}_r$,
+$\mathbf{S}_b$, and $\mathbf{S}_f$ of $(3)$:
+
+$$
+\mathbf{S}_e =
+\begin{bmatrix} \dot{h}_e \\[.4em] u\,\dot{h}_e \\[.4em] v\,\dot{h}_e \\[.4em] 0 \end{bmatrix}.
+\tag{11}
+$$
+
+The momentum entries carry the mass away at the local flow velocity, which
+leaves $u = hu/h$ and $v = hv/h$ unchanged: evaporation thins the water column
+without accelerating or retarding it. Omitting them would hold $hu$ fixed while
+$h$ fell, spuriously accelerating a drying cell. RDycore uses the same
+convention under condensation, taking the arriving vapor to join the flow at its
+velocity rather than at rest.
+
+The heat entry is zero, so $hT$ is conserved under the mass exchange and the
+water that remains carries the heat of the water that left — $T = hT/h$ rises as
+the cell thins. (The alternative convention removes the sensible enthalpy of the
+departing vapor as well, adding $-T\dot{h}_e$ to the heat row and making $T$
+independent of the mass loss; RDycore does not do this.) Sediment and salinity
+are treated the same way, and so concentrate as water evaporates.
+
+### Capping evaporation in shallow water
+
+Over an implicit step of length $\Delta t$ the depth changes by
+$Q_e\Delta t/(\rho_w L_v)$, so an evaporative demand exceeding the water present
+would drive $h$ negative — and a negative depth propagates immediately into
+$T = hT/h$ and into the next flow solve. RDycore therefore bounds the latent flux
+below by the water available above the wet/dry threshold $h_{\min}$:
+
+$$
+Q_e \;\longleftarrow\; \max\!\left(Q_e,\; -\frac{\left(h - h_{\min}\right)\rho_w L_v}{\Delta t}\right).
+\tag{12}
+$$
+
+The bound is non-positive and vanishes at $h = h_{\min}$, so condensation is
+never limited. It applies to the energy budget as well as the mass budget —
+latent heat is removed only for water that actually leaves — so a capped cell
+also cools more slowly than the unlimited parameterization would have it.
+
+Because the bound is enforced implicitly, a capped cell approaches $h_{\min}$
+without reaching it. Substituting the bound, evaluated at the new state, into a
+backward Euler step gives $h^{n+1} = h^{n} - \left(h^{n+1} - h_{\min}\right)$, so
+
+$$
+h^{n+1} = \tfrac{1}{2}\left(h^{n} + h_{\min}\right).
+\tag{13}
+$$
+
+The excess over $h_{\min}$ halves on each capped step and the cell stays strictly
+wet. The cap is not smooth where it activates, so Newton may need an extra
+iteration on a cell that crosses it.
+
+### Wetting and drying
+
+The surface exchange acts only on cells holding water. Writing $h_{\min}$ for
+the wet/dry threshold `physics.flow.tiny_h`, both the heat source of $(5)$ and the
+mass and momentum sinks of $(11)$ are applied as
+
+$$
+\left(\frac{\partial \mathbf{U}}{\partial t}\right)_{\text{surface}} =
+\begin{cases}
+\mathbf{S}_e + \dfrac{Q_{\text{net}}(hT/h)}{\rho_w c_w}\,\mathbf{e}_{hT}, & h \ge h_{\min} \\[1em]
+\mathbf{0}, & h < h_{\min},
+\end{cases}
+\tag{14}
+$$
+
+where $\mathbf{e}_{hT}$ is the unit vector selecting the heat component. Below the
+threshold the cell exchanges nothing at all: its depth and heat content are both
+frozen, so no temperature is derived from a vanishing depth and no water is drawn
+from a cell that has none. This branch makes the residual discontinuous at
+$h = h_{\min}$, which is worth knowing when comparing an analytic Jacobian against
+finite differences near the threshold.
 
 ## Operator splitting
 
@@ -196,7 +268,7 @@ $$
 + \frac{\partial \mathbf{G}}{\partial y} = \mathbf{S}_r + \mathbf{S}_b + \mathbf{S}_f,
 \qquad \mathbf{U}(t^n) = \mathbf{U}^n
 \;\;\longrightarrow\;\; \mathbf{U}^{*}.
-\tag{11}
+\tag{15}
 $$
 
 The shallow water source terms $\mathbf{S}_r$, $\mathbf{S}_b$, and
@@ -204,15 +276,27 @@ $\mathbf{S}_f$ are those defined in the [shallow water equations](swe.md); the
 heat component of the external source vector is zero in this step. The flow
 `TS` may take several internal timesteps within the coupling interval.
 
-**Step 2 — surface exchange.** The flow state is held fixed and only $hT$
-evolves, according to the cell-local ordinary differential equation
+**Step 2 — surface exchange.** The transported state is corrected by the surface
+exchange, which introduces no spatial coupling and changes each cell through the
+cell-local system
 
 $$
-\frac{d (hT)}{d t} = \frac{Q_{\text{net}}\!\left(hT/h\right)}{\rho_w c_w},
-\qquad (hT)(t^n) = (hT)^{*}
-\;\;\longrightarrow\;\; (hT)^{n+1}.
-\tag{12}
+\frac{d}{dt}
+\begin{bmatrix} h \\[.4em] hu \\[.4em] hv \\[.4em] hT \end{bmatrix}
+=
+\begin{bmatrix}
+\dot{h}_e \\[.4em] u\,\dot{h}_e \\[.4em] v\,\dot{h}_e \\[.4em] Q_{\text{net}}\!\left(hT/h\right)/(\rho_w c_w)
+\end{bmatrix},
+\qquad \mathbf{U}(t^n) = \mathbf{U}^{*}
+\;\;\longrightarrow\;\; \mathbf{U}^{n+1}.
+\tag{16}
 $$
+
+Note that this step is not confined to the heat DOF: because evaporation removes
+water, it also moves $h$, $hu$, and $hv$. When the surface flux is instead
+prescribed directly — the production `heat_flux` input, or the manufactured
+source used by the MMS driver — there is no latent component to separate out, so
+only the $hT$ row is active and the flow is left untouched.
 
 This step runs on its own `TS` (options prefix `heat_`), which by default takes
 a single backward Euler step across the whole coupling interval. The `TS`
@@ -221,34 +305,91 @@ operates on the complete state vector, with the implicit residual
 $$
 \mathbf{F}(\mathbf{U}, \dot{\mathbf{U}}) =
 \begin{cases}
-\dot{U}_c - \dfrac{Q_{\text{net}}\!\left(U_{hT}/h\right)}{\rho_w c_w},
-  & c = hT \text{ and } h \ge h_{\min} \\[1em]
-\dot{U}_c, & \text{otherwise,}
+\dot{\mathbf{U}} - \mathbf{S}_e - \dfrac{Q_{\text{net}}\!\left(U_{hT}/h\right)}{\rho_w c_w}\,\mathbf{e}_{hT},
+  & h \ge h_{\min} \\[1em]
+\dot{\mathbf{U}}, & h < h_{\min},
 \end{cases}
-\tag{13}
+\tag{17}
 $$
 
-so that every component other than $hT$ carries the trivial residual
-$\dot{U}_c = 0$ and is left unchanged by the solve.
+so that every component named by neither $\mathbf{S}_e$ nor $\mathbf{e}_{hT}$ —
+the sediment and salinity tracers — carries the trivial residual $\dot{U}_c = 0$
+and is left unchanged by the solve.
 
-Because $Q_{\text{net}}$ depends on $T$ alone, and $T$ is cell-local, the
-residual $(13)$ is pointwise and its Jacobian is exactly diagonal. With $\varsigma$
-the `TS` shift $\partial\dot{\mathbf{U}}/\partial\mathbf{U}$, the diagonal entry
-of the heat DOF is
-
-$$
-J_{hT,hT} = \varsigma - \frac{1}{\rho_w c_w\, h}\,\frac{d Q_{\text{net}}}{d T},
-\tag{14}
-$$
-
-where the factor $1/h$ comes from $\partial T/\partial (hT) = 1/h$, and
+One property of $(17)$ is worth recording, because it is exactly what makes the
+momentum rows safe. Backward Euler on the first two rows gives
+$(hu)^{n+1} = (hu)^{*} + \Delta t\,u^{n+1}\dot{h}_e$ with $u^{n+1} = (hu)^{n+1}/h^{n+1}$,
+and since $\Delta t\,\dot{h}_e = h^{n+1} - h^{*}$ the bracket collapses to
+$h^{*}/h^{n+1}$, leaving
 
 $$
-\frac{d Q_{\text{net}}}{d T} =
--4\,\varepsilon\,\sigma\,T_K^3
-- \rho_a\, c_{p,a}\, C_H
-- \rho_a\, L_v\, C_H \, \frac{d q_{\text{sat}}}{d T},
-\tag{15}
+u^{n+1} = u^{*}
+$$
+
+exactly, for any $\dot{h}_e$ and so independently of the parameterization that
+produced it. The discrete scheme inherits the continuous statement that
+evaporation does not accelerate the flow.
+
+### Jacobian
+
+The residual $(17)$ is pointwise, so its Jacobian is block diagonal with one dense
+block per cell. It is no longer a scalar diagonal, though: evaporation couples the
+$h$, $hu$, $hv$, and $hT$ rows, both through $T = hT/h$ and through the depth
+dependence of the cap. With $\varsigma$ the `TS` shift
+$\partial\dot{\mathbf{U}}/\partial\mathbf{U}$, the nonzero entries are
+
+$$
+\begin{aligned}
+\frac{\partial F_h}{\partial h} &= \varsigma - \frac{1}{\rho_w L_v}\frac{\partial Q_e}{\partial h},
+&\qquad
+\frac{\partial F_h}{\partial (hT)} &= -\frac{1}{\rho_w L_v}\frac{\partial Q_e}{\partial (hT)}, \\[.6em]
+\frac{\partial F_{hu}}{\partial h} &= \frac{u}{\rho_w L_v}\left(\frac{Q_e}{h} - \frac{\partial Q_e}{\partial h}\right),
+&\qquad
+\frac{\partial F_{hu}}{\partial (hu)} &= \varsigma - \frac{Q_e}{\rho_w L_v\,h}, \\[.6em]
+\frac{\partial F_{hu}}{\partial (hT)} &= -\frac{u}{\rho_w L_v}\frac{\partial Q_e}{\partial (hT)},
+&\qquad
+\frac{\partial F_{hT}}{\partial h} &= -\frac{1}{\rho_w c_w}\frac{\partial Q_{\text{net}}}{\partial h}, \\[.6em]
+\frac{\partial F_{hT}}{\partial (hT)} &= \varsigma - \frac{1}{\rho_w c_w}\frac{\partial Q_{\text{net}}}{\partial (hT)},
+&&
+\end{aligned}
+\tag{18}
+$$
+
+with the $hv$ row following the $hu$ row under $u \rightarrow v$, and every other
+diagonal entry equal to $\varsigma$.
+
+The two branches of the cap enter only through the derivatives of $Q_e$, which is
+why the net flux is carried in the code as a latent piece plus a non-latent
+remainder $Q_{\text{nl}} = Q_{\text{sw}} + Q_{\text{lw}} + Q_{\text{sh}}$. Using
+$\partial T/\partial h = -T/h$ and $\partial T/\partial (hT) = 1/h$,
+
+$$
+\begin{aligned}
+\text{uncapped:} &\quad
+\frac{\partial Q_e}{\partial h} = -\frac{T}{h}\frac{d Q_e}{d T},
+&\qquad
+\frac{\partial Q_e}{\partial (hT)} &= \frac{1}{h}\frac{d Q_e}{d T}, \\[.6em]
+\text{capped:} &\quad
+\frac{\partial Q_e}{\partial h} = -\frac{\rho_w L_v}{\Delta t},
+&\qquad
+\frac{\partial Q_e}{\partial (hT)} &= 0,
+\end{aligned}
+\tag{19}
+$$
+
+the capped branch being linear in $h$ alone, so the temperature derivative drops
+out of it entirely. In both branches
+$\partial Q_{\text{net}}/\partial h = -(T/h)\,dQ_{\text{nl}}/dT + \partial Q_e/\partial h$
+and
+$\partial Q_{\text{net}}/\partial (hT) = (1/h)\,dQ_{\text{nl}}/dT + \partial Q_e/\partial (hT)$,
+with the component derivatives
+
+$$
+\frac{d Q_{\text{nl}}}{d T} =
+-4\,\varepsilon\,\sigma\,T_K^3 - \rho_a\, c_{p,a}\, C_H,
+\qquad
+\frac{d Q_e}{d T} = -\rho_a\, L_v\, C_H \, \frac{d q_{\text{sat}}}{d T},
+\tag{20}
 $$
 
 $$
@@ -257,15 +398,15 @@ $$
 \frac{d e_{\text{sat}}}{d T},
 \qquad
 \frac{d e_{\text{sat}}}{d T} = \frac{17.67 \cdot 243.5}{\left(T + 243.5\right)^2}\, e_{\text{sat}}.
-\tag{16}
+\tag{21}
 $$
 
-Every term in $(15)$ is negative, so the surface exchange is unconditionally
-damping in $T$ and the implicit solve is well conditioned. All remaining
-diagonal entries are $\varsigma$. Because the Jacobian is diagonal, it is
-preallocated with a one-entry-per-row COO pattern rather than the wider
-finite-volume stencil, which also lets the libCEED backend assemble it on the
-device with `MatSetValuesCOO()`.
+Every term in $(20)$ is negative, so the surface exchange is unconditionally
+damping in $T$ and the implicit solve is well conditioned. Because the Jacobian is
+block diagonal, it is preallocated with a COO pattern of one dense block per cell
+rather than the wider finite-volume stencil, which also lets the libCEED backend
+compute the blocks on the device and hand them to `MatSetValuesCOO()` without a
+host round trip.
 
 The split is first-order accurate in $\Delta t$ irrespective of the accuracy of
 either sub-step, since the transport and source vector fields do not commute in
@@ -281,7 +422,7 @@ temperature
 
 $$
 \hat{T} = \frac{\sqrt{h_i}\,T_i + \sqrt{h_j}\,T_j}{\sqrt{h_i} + \sqrt{h_j}}
-\tag{17}
+\tag{22}
 $$
 
 and wave strength $\Delta(hT) - \hat{T}\,\Delta h$. The heat component of the
@@ -314,7 +455,7 @@ $$
 Q_{\text{mms}}(x, y, t) = \rho_w c_w \left[
 \frac{\partial (hT)}{\partial t} + \frac{\partial (huT)}{\partial x}
 + \frac{\partial (hvT)}{\partial y} \right],
-\tag{18}
+\tag{23}
 $$
 
 expanded with the product rule into the quantities the input file provides:
@@ -326,7 +467,7 @@ Q_{\text{mms}} = \rho_w c_w \Big[\;
 &+ h\,u\,T_x + T\,h\,u_x + T\,u\,h_x \\
 &+ h\,v\,T_y + T\,h\,v_y + T\,v\,h_y \;\Big].
 \end{aligned}
-\tag{19}
+\tag{24}
 $$
 
 In this mode the heat solve takes $Q_{\text{mms}}$ in place of
@@ -336,7 +477,7 @@ parameterization rather than correcting it.
 ### How the correction is allocated across the split
 
 The unsplit manufactured correction for the heat equation is the complete
-conservative residual in $(18)$. Consistency requires the two sub-steps to
+conservative residual in $(23)$. Consistency requires the two sub-steps to
 contribute that residual exactly once between them, so RDycore allocates it as
 
 * **transport step**: the full manufactured $h$, $hu$, and $hv$ sources, and
@@ -350,7 +491,7 @@ To leading order the composite update is then
 $$
 (hT)^{n+1} = (hT)^{n} + \Delta t\,\frac{\partial (hT)}{\partial t}
 + \Delta t \left[ \mathcal{D}(hT) - \mathcal{D}_h(hT) \right] + O(\Delta t^2),
-\tag{20}
+\tag{25}
 $$
 
 with $\mathcal{D}$ the analytic flux divergence and $\mathcal{D}_h$ its discrete
@@ -402,15 +543,26 @@ uniform flow be preserved to roundoff.
 
 Two further tests run through the production driver rather than the MMS driver.
 `heat_coupling_interval.yaml` holds a lake at rest under a constant prescribed
-surface flux, for which $(12)$ integrates exactly to
+surface flux, for which $(16)$ integrates exactly to
 $\Delta T = Q\,\Delta t / (\rho_w c_w h)$, and checks that increment while the
 transport timestep is shorter than the coupling interval — so that the heat solve
 is confirmed to advance over the full interval rather than over one transport
 step. `heat_coupling_interval_atmospheric.yaml` drives the same configuration
 with the five-parameter forcing of $(7)$, exercising $Q_{\text{net}}(T)$ and the
-nonlinear Jacobian $(14)$–$(16)$ on both backends; because $Q_{\text{net}}(T)$ is
+nonlinear Jacobian $(18)$–$(21)$ on both backends; because $Q_{\text{net}}(T)$ is
 nonlinear there is no closed-form final temperature to assert against, so that
 one is a smoke test.
+
+`heat_evaporation.yaml` covers the mass and momentum sinks and the cap. It calls
+`RDyHeatAdvance()` directly rather than `RDyAdvance()`, writing the state it wants
+beforehand, so the transport solve never runs and every change in $h$, $hu$, and
+$hv$ is attributable to the surface exchange alone. That isolation is what lets it
+assert the two exact identities derived above rather than regression values: that
+deep water evaporating into dry air leaves $u$ and $v$ unchanged to roundoff, and
+that a film holding $10^{-6}$ m above $h_{\min}$ against a demand three orders of
+magnitude larger lands on $(13)$ exactly and stays strictly wet. Removing the
+momentum rows breaks the first; removing the cap drives $h$ negative and the
+nonlinear solve diverges outright.
 
 ### Rates, timestep refinement, and self-convergence
 
@@ -441,10 +593,17 @@ The MMS path drives the heat solve through the prescribed-source branch, which
 replaces $Q_{\text{net}}(T)$. These cases therefore verify passive transport of
 $hT$, the manufactured source quadrature, and the Lie composition of the two
 solves — but they do **not** verify the atmospheric parameterization $(6)$–$(9)$
-or its analytic Jacobian $(14)$–$(16)$. A consequence of the same substitution is
+or its analytic Jacobian $(18)$–$(21)$. A consequence of the same substitution is
 that in this path the heat residual has no state dependence, so every consistent
 one-step method produces the same update and the heat `TS` type selects only
 which manufactured quadrature is sampled.
+
+The evaporative mass and momentum sinks are outside the MMS path for the same
+reason: a prescribed net flux has no latent component to separate, so
+$\mathbf{S}_e$ is identically zero there and the manufactured solution never has
+to account for it. The manufactured source $(23)$ is consistent as it stands, and
+the sinks are covered by the separate tests described below rather than by a
+convergence study.
 
 ## References
 

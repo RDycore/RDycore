@@ -21,15 +21,17 @@ typedef struct {
 typedef struct {
   CeedOperator ifunction_prescribed_op;   // implicit residual with a prescribed net heat flux
   CeedOperator ifunction_atmospheric_op;  // implicit residual with the atmospheric Q_net parameterization
-  CeedOperator ijacobian_op;              // (diagonal) implicit Jacobian for the atmospheric case
+  CeedOperator ijacobian_op;              // block-diagonal implicit Jacobian for the atmospheric case
 
   CeedVector u;         // wraps the PETSc state vector during operator application
   CeedVector u_dot;     // wraps the PETSc state time derivative
   CeedVector residual;  // wraps the PETSc residual vector
-  CeedVector diagonal;  // CEED-owned: the Jacobian diagonal, read directly by MatSetValuesCOO()
+  CeedVector jacobian;  // CEED-owned: one dense num_comp x num_comp block per cell, read directly by MatSetValuesCOO()
   CeedVector forcing;   // owned: per-cell atmospheric forcing, refreshed by UpdateCeedHeatForcing()
 
-  CeedContextFieldLabel shift_label;  // "time shift" on ijacobian_op
+  CeedContextFieldLabel shift_label;         // "time shift" on ijacobian_op
+  CeedContextFieldLabel ifunction_dt_label;  // "time step" on ifunction_atmospheric_op
+  CeedContextFieldLabel ijacobian_dt_label;  // "time step" on ijacobian_op
 } RDyHeatCeed;
 
 struct _RDyHeat {

@@ -27,6 +27,7 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_mms_conv_study.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_coupling_interval.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/heat_coupling_interval_atmospheric.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/heat_evaporation.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      ${MESH_DIR}/DamBreak_grid5x10.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
@@ -157,5 +158,19 @@ foreach(np 1 2)
       add_test(heat_coupling_interval_atmospheric_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np}
                ${rdycore_${lang}_driver} heat_coupling_interval_atmospheric.yaml ${${config}_args})
     endforeach()
+  endforeach()
+endforeach()
+
+# Evaporative mass/momentum sinks and the cap that keeps a drying cell at or above
+# tiny_h. Unlike the two tests above, this one bypasses RDyAdvance() and drives
+# RDyHeatAdvance() directly, so the transport solve cannot contribute to the depth
+# and momentum changes being asserted; see test_heat_evaporation.c for the two exact
+# identities it checks.
+add_executable(test_heat_evaporation test_heat_evaporation.c)
+target_link_libraries(test_heat_evaporation PRIVATE rdycore_c)
+foreach(np 1 2)
+  foreach(config basic ceed)
+    add_test(heat_evaporation_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np}
+             ${CMAKE_CURRENT_BINARY_DIR}/test_heat_evaporation heat_evaporation.yaml ${${config}_args})
   endforeach()
 endforeach()

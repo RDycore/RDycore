@@ -19,6 +19,7 @@ typedef struct HeatContext_ *HeatContext;
 struct HeatContext_ {
   CeedScalar tiny_h;                    // water height below which dry conditions are assumed
   CeedScalar shift;                     // TS shift (dU/dUdot) supplied to the IJacobian callback
+  CeedScalar dt;                        // step size the heat TS is attempting; bounds the evaporative mass loss
   CeedScalar water_albedo;              //
   CeedScalar water_emissivity;          //
   CeedScalar stefan_boltzmann;          // [W/m^2/K^4]

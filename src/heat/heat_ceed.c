@@ -45,6 +45,7 @@ static PetscErrorCode CreateHeatQFunctionContext(Ceed ceed, RDy rdy, CeedQFuncti
 
   heat_ctx->tiny_h                   = rdy->config.physics.flow.tiny_h;
   heat_ctx->shift                    = 0.0;
+  heat_ctx->dt                       = 0.0;
   heat_ctx->water_albedo             = WATER_ALBEDO;
   heat_ctx->water_emissivity         = WATER_EMISSIVITY;
   heat_ctx->stefan_boltzmann         = STEFAN_BOLTZMANN;
@@ -65,6 +66,8 @@ static PetscErrorCode CreateHeatQFunctionContext(Ceed ceed, RDy rdy, CeedQFuncti
 
   PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "time shift", offsetof(struct HeatContext_, shift), 1,
                                                    "Shift dU/dUdot supplied by the TS to its IJacobian callback"));
+  PetscCallCEED(CeedQFunctionContextRegisterDouble(*qf_context, "time step", offsetof(struct HeatContext_, dt), 1,
+                                                   "Step size the heat TS is attempting, which bounds the evaporative mass loss"));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -78,7 +81,8 @@ static PetscErrorCode CreateHeatQFunctionContext(Ceed ceed, RDy rdy, CeedQFuncti
 ///  * the IFunction operator maps the active state `q` to the active residual,
 ///    reading `q_dot` and the per-cell atmospheric `forcing` passively
 ///  * the IJacobian operator maps the active state `q` to the active Jacobian
-///    diagonal, reading `forcing` passively
+///    blocks -- one dense num_comp x num_comp block per cell, in the row-major
+///    order expected by heat_jac's COO pattern -- reading `forcing` passively
 ///
 /// @param [inout] rdy the RDycore simulation context (must have heat enabled)
 /// @return 0 on success, or a non-zero error code on failure
@@ -118,26 +122,33 @@ PetscErrorCode CreateCeedHeatOperators(RDy rdy) {
   PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, HeatIJacobianAtmosphericSourceQF, HeatIJacobianAtmosphericSourceQF_loc, &qf_ijacobian));
   PetscCallCEED(CeedQFunctionAddInput(qf_ijacobian, "q", num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionAddInput(qf_ijacobian, "forcing", NUM_HEAT_FORCINGS, CEED_EVAL_NONE));
-  PetscCallCEED(CeedQFunctionAddOutput(qf_ijacobian, "diagonal", num_comp, CEED_EVAL_NONE));
+  PetscCallCEED(CeedQFunctionAddOutput(qf_ijacobian, "jacobian", num_comp * num_comp, CEED_EVAL_NONE));
   PetscCallCEED(CeedQFunctionSetContext(qf_ijacobian, qf_context));
 
   PetscCallCEED(CeedQFunctionContextDestroy(&qf_context));
 
   // the heat TS operates on global vectors, whose local portions hold exactly
   // the owned cells in block-interleaved order, so strided restrictions suffice
-  CeedElemRestriction restrict_state, restrict_forcing;
-  CeedInt             strides_state[]   = {num_comp, 1, num_comp};
-  CeedInt             strides_forcing[] = {NUM_HEAT_FORCINGS, 1, NUM_HEAT_FORCINGS};
+  CeedElemRestriction restrict_state, restrict_forcing, restrict_jacobian;
+  CeedInt             num_block_comp     = num_comp * num_comp;
+  CeedInt             strides_state[]    = {num_comp, 1, num_comp};
+  CeedInt             strides_forcing[]  = {NUM_HEAT_FORCINGS, 1, NUM_HEAT_FORCINGS};
+  CeedInt             strides_jacobian[] = {num_block_comp, 1, num_block_comp};
   PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_comp, num_owned_cells * num_comp, strides_state, &restrict_state));
   PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, NUM_HEAT_FORCINGS, num_owned_cells * NUM_HEAT_FORCINGS, strides_forcing,
                                                  &restrict_forcing));
+  // the Jacobian restriction lays each cell's block out contiguously, so the
+  // CeedVector's values arrive in the cell-major, row-major order that
+  // PreallocateHeatJacobianBlocks() used to build heat_jac's COO pattern
+  PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_owned_cells, 1, num_block_comp, num_owned_cells * num_block_comp, strides_jacobian,
+                                                 &restrict_jacobian));
 
   // CeedVectors used to wrap PETSc arrays during operator application; their
   // arrays are attached and detached on every callback
   PetscCallCEED(CeedElemRestrictionCreateVector(restrict_state, &heat->ceed.u, NULL));
   PetscCallCEED(CeedElemRestrictionCreateVector(restrict_state, &heat->ceed.u_dot, NULL));
   PetscCallCEED(CeedElemRestrictionCreateVector(restrict_state, &heat->ceed.residual, NULL));
-  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_state, &heat->ceed.diagonal, NULL));
+  PetscCallCEED(CeedElemRestrictionCreateVector(restrict_jacobian, &heat->ceed.jacobian, NULL));
 
   // the forcing vector is owned by us and refreshed by UpdateCeedHeatForcing()
   PetscCallCEED(CeedElemRestrictionCreateVector(restrict_forcing, &heat->ceed.forcing, NULL));
@@ -158,13 +169,18 @@ PetscErrorCode CreateCeedHeatOperators(RDy rdy) {
   PetscCallCEED(CeedOperatorCreate(ceed, qf_ijacobian, NULL, NULL, &heat->ceed.ijacobian_op));
   PetscCallCEED(CeedOperatorSetField(heat->ceed.ijacobian_op, "q", restrict_state, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
   PetscCallCEED(CeedOperatorSetField(heat->ceed.ijacobian_op, "forcing", restrict_forcing, CEED_BASIS_NONE, heat->ceed.forcing));
-  PetscCallCEED(CeedOperatorSetField(heat->ceed.ijacobian_op, "diagonal", restrict_state, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
+  PetscCallCEED(CeedOperatorSetField(heat->ceed.ijacobian_op, "jacobian", restrict_jacobian, CEED_BASIS_NONE, CEED_VECTOR_ACTIVE));
 
-  // cache the context field label used to update the shift between solves
+  // cache the context field labels used to update the shift and the step size between
+  // solves. The context itself is shared, but labels are per-operator, so the two
+  // operators that read "time step" each need their own.
   PetscCallCEED(CeedOperatorGetContextFieldLabel(heat->ceed.ijacobian_op, "time shift", &heat->ceed.shift_label));
+  PetscCallCEED(CeedOperatorGetContextFieldLabel(heat->ceed.ijacobian_op, "time step", &heat->ceed.ijacobian_dt_label));
+  PetscCallCEED(CeedOperatorGetContextFieldLabel(heat->ceed.ifunction_atmospheric_op, "time step", &heat->ceed.ifunction_dt_label));
 
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_state));
   PetscCallCEED(CeedElemRestrictionDestroy(&restrict_forcing));
+  PetscCallCEED(CeedElemRestrictionDestroy(&restrict_jacobian));
   PetscCallCEED(CeedQFunctionDestroy(&qf_ifunction_prescribed));
   PetscCallCEED(CeedQFunctionDestroy(&qf_ifunction_atmospheric));
   PetscCallCEED(CeedQFunctionDestroy(&qf_ijacobian));
@@ -187,7 +203,7 @@ PetscErrorCode DestroyCeedHeatOperators(RDy rdy) {
   if (heat->ceed.u) PetscCallCEED(CeedVectorDestroy(&heat->ceed.u));
   if (heat->ceed.u_dot) PetscCallCEED(CeedVectorDestroy(&heat->ceed.u_dot));
   if (heat->ceed.residual) PetscCallCEED(CeedVectorDestroy(&heat->ceed.residual));
-  if (heat->ceed.diagonal) PetscCallCEED(CeedVectorDestroy(&heat->ceed.diagonal));
+  if (heat->ceed.jacobian) PetscCallCEED(CeedVectorDestroy(&heat->ceed.jacobian));
   if (heat->ceed.forcing) PetscCallCEED(CeedVectorDestroy(&heat->ceed.forcing));
 
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -268,26 +284,33 @@ PetscErrorCode HeatIFunctionCeedPrescribedSource(TS ts, PetscReal t, Vec U, Vec 
 /// Q_net parameterization, evaluated with the CEED backend. Equivalent to
 /// HeatIFunctionAtmosphericSource() in heat_petsc.c.
 PetscErrorCode HeatIFunctionCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec Udot, Vec F, void *ctx) {
-  (void)ts;
   (void)t;
   PetscFunctionBegin;
-  RDy rdy = ctx;
-  PetscCall(ApplyCeedHeatIFunction(rdy, rdy->heat_context->ceed.ifunction_atmospheric_op, U, Udot, F));
+  RDy     rdy  = ctx;
+  RDyHeat heat = rdy->heat_context;
+
+  // the evaporation cap bounds how much water one step may remove, so the Q-function
+  // needs the length of the step being attempted
+  PetscReal dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+  double ceed_dt = (double)dt;
+  PetscCallCEED(CeedOperatorSetContextDouble(heat->ceed.ifunction_atmospheric_op, heat->ceed.ifunction_dt_label, &ceed_dt));
+
+  PetscCall(ApplyCeedHeatIFunction(rdy, heat->ceed.ifunction_atmospheric_op, U, Udot, F));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// TS IJacobian callback for the implicit heat source step with the atmospheric
 /// Q_net parameterization, evaluated with the CEED backend. The residual is
-/// pointwise, so the Jacobian is exactly diagonal: the CEED operator produces the
-/// diagonal values into a CEED-owned CeedVector, and MatSetValuesCOO() writes them
-/// straight into P using the diagonal COO layout PreallocateHeatJacobianDiagonal()
-/// (heat_petsc.c) installed on heat_jac. Unlike MatDiagonalSet()/MatSetValues(),
-/// MatSetValuesCOO() has a device-native implementation for GPU Mat types, so on a
-/// GPU run the diagonal never leaves the device between being computed by the CEED
-/// operator and being written into P. Equivalent to HeatIJacobianAtmosphericSource()
-/// in heat_petsc.c.
+/// pointwise, so the Jacobian is block diagonal: the CEED operator produces one dense
+/// num_comp x num_comp block per cell into a CEED-owned CeedVector, and
+/// MatSetValuesCOO() writes them straight into P using the block COO layout
+/// PreallocateHeatJacobianBlocks() (heat_petsc.c) installed on heat_jac. Unlike
+/// MatSetValues(), MatSetValuesCOO() has a device-native implementation for GPU Mat
+/// types, so on a GPU run the block values never leave the device between being
+/// computed by the CEED operator and being written into P. Equivalent to
+/// HeatIJacobianAtmosphericSource() in heat_petsc.c.
 PetscErrorCode HeatIJacobianCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec Udot, PetscReal shift, Mat J, Mat P, void *ctx) {
-  (void)ts;
   (void)t;
   (void)Udot;
   PetscFunctionBegin;
@@ -295,8 +318,13 @@ PetscErrorCode HeatIJacobianCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec
   RDy     rdy  = ctx;
   RDyHeat heat = rdy->heat_context;
 
+  PetscReal dt;
+  PetscCall(TSGetTimeStep(ts, &dt));
+
   double ceed_shift = (double)shift;
+  double ceed_dt    = (double)dt;
   PetscCallCEED(CeedOperatorSetContextDouble(heat->ceed.ijacobian_op, heat->ceed.shift_label, &ceed_shift));
+  PetscCallCEED(CeedOperatorSetContextDouble(heat->ceed.ijacobian_op, heat->ceed.ijacobian_dt_label, &ceed_dt));
 
   const PetscScalar *u_ptr;
   PetscMemType       u_mem_type;
@@ -304,19 +332,19 @@ PetscErrorCode HeatIJacobianCeedAtmosphericSource(TS ts, PetscReal t, Vec U, Vec
   PetscCallCEED(CeedVectorSetArray(heat->ceed.u, MemTypeP2C(u_mem_type), CEED_USE_POINTER, (CeedScalar *)u_ptr));
 
   PetscCall(PetscLogGpuTimeBegin());
-  PetscCallCEED(CeedOperatorApply(heat->ceed.ijacobian_op, heat->ceed.u, heat->ceed.diagonal, CEED_REQUEST_IMMEDIATE));
+  PetscCallCEED(CeedOperatorApply(heat->ceed.ijacobian_op, heat->ceed.u, heat->ceed.jacobian, CEED_REQUEST_IMMEDIATE));
   PetscCall(PetscLogGpuTimeEnd());
 
   PetscCallCEED(CeedVectorTakeArray(heat->ceed.u, MemTypeP2C(u_mem_type), (CeedScalar **)&u_ptr));
   PetscCall(VecRestoreArrayReadAndMemType(U, &u_ptr));
 
-  // heat->ceed.diagonal is CEED-owned (its array was never overridden above), so this
+  // heat->ceed.jacobian is CEED-owned (its array was never overridden above), so this
   // reads its data where the CEED operator left it -- device memory for a GPU backend --
   // and MatSetValuesCOO() detects that memory type itself, so no host round trip occurs.
-  const CeedScalar *diag_values;
-  PetscCallCEED(CeedVectorGetArrayRead(heat->ceed.diagonal, MemTypeP2C(u_mem_type), &diag_values));
-  PetscCall(MatSetValuesCOO(P, (const PetscScalar *)diag_values, INSERT_VALUES));
-  PetscCallCEED(CeedVectorRestoreArrayRead(heat->ceed.diagonal, &diag_values));
+  const CeedScalar *block_values;
+  PetscCallCEED(CeedVectorGetArrayRead(heat->ceed.jacobian, MemTypeP2C(u_mem_type), &block_values));
+  PetscCall(MatSetValuesCOO(P, (const PetscScalar *)block_values, INSERT_VALUES));
+  PetscCallCEED(CeedVectorRestoreArrayRead(heat->ceed.jacobian, &block_values));
 
   if (J != P) {
     PetscCall(MatAssemblyBegin(J, MAT_FINAL_ASSEMBLY));
