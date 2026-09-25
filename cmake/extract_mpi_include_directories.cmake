@@ -33,6 +33,16 @@ function(extract_mpi_include_directories directories)
     return()
   endif()
 
-  # Neither variable found
-  message(FATAL_ERROR "Could not find MPI include directories from PETSc (neither MPICXX_INCLUDES nor MPICC_SHOW available).")
+  # Fall back to the Cray Programming Environment's MPICH_DIR (set by the
+  # cray-mpich module), since Cray's compiler wrappers bake MPI in directly
+  # and PETSc's petscvariables therefore has no MPI include information.
+  if (DEFINED ENV{MPICH_DIR} AND EXISTS "$ENV{MPICH_DIR}/include")
+    set(${directories} "$ENV{MPICH_DIR}/include" PARENT_SCOPE)
+    return()
+  endif()
+
+  # None of the above worked. This only affects IDE/language-server tooling
+  # (compile_commands.json), not the actual build, so don't fail the configure.
+  message(WARNING "Could not find MPI include directories from PETSc or the environment (skipping).")
+  set(${directories} "" PARENT_SCOPE)
 endfunction()

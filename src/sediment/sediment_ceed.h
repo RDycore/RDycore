@@ -4,19 +4,19 @@
 // NOTE: PLEASE DO NOT EDIT DIRECTLY! Instead, make any necessary changes to
 // NOTE: include/private/physics_ceed.h.in.
 
-#ifndef TRACER_CEED_H
-#define TRACER_CEED_H
+#ifndef SEDIMENT_CEED_H
+#define SEDIMENT_CEED_H
 
 #include <ceed/types.h>
+
+#define MAX_NUM_FIELD_COMPONENTS 8
 
 // material properties
 #define MATERIAL_PROPERTY_MANNINGS 0
 #define NUM_MATERIAL_PROPERTIES 1
 
-// tracer transport
-#define MAX_NUM_TRACERS 7
+// sediment dynamics
 #define MAX_NUM_SEDIMENT_CLASSES 5
-#define MAX_NUM_FIELD_COMPONENTS 10
 
 // convenience macros
 

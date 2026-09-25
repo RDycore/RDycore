@@ -49,15 +49,15 @@ broad categories:
 * **Initial and boundary conditions, source terms**
     * [initial_conditions](input.md#initial_conditions): associates initial
       conditions (as defined in `flow_conditions`, `sediment_conditions`, `salinity_conditions`,
-      and/or `temperature_conditions`) with specific regions defined in the `regions`
+      and/or `heat_conditions`) with specific regions defined in the `regions`
       section
     * [sources](input.md#sources): associates source contributions
       (as defined in `flow_conditions`, `sediment_conditions`, `salinity_conditions`,
-      and/or `temperature_conditions`) with specific regions defined in the `regions`
+      and/or `heat_conditions`) with specific regions defined in the `regions`
       section
     * [boundary_conditions](input.md#boundary_conditions): associates boundary
       conditions (as defined in `flow_conditions`, `sediment_conditions`, `salinity_conditions`,
-      and/or `temperature_conditions`) with specific boundaries defined in the
+      and/or `heat_conditions`) with specific boundaries defined in the
       `boundaries` section
     * [flow_conditions](input.md#flow_conditions): defines flow-related
       parameters that can be used to specify initial/boundary conditions and
@@ -68,7 +68,7 @@ broad categories:
     * [salinity_conditions](input.md#salinity_conditions): defines salinity-related
       parameters that can be used to specify initial/boundary conditions and
       sources
-    * [temperature_conditions](input.md#salinity_conditions): defines salinity-related
+    * [heat_conditions](input.md#heat_conditions): defines heat-related
       parameters that can be used to specify initial/boundary conditions and
       sources
 * **Running Ensembles**
@@ -213,7 +213,7 @@ Sections that can be overridden in an ensemble member are:
 * [`flow_conditions`](input.md#flow_conditions)
 * [`sediment_conditions`](input.md#sediment_conditions)
 * [`salinity_conditions`](input.md#salinity_conditions)
-* [`temperature_conditions`](input.md#temperature_conditions)
+* [`heat_conditions`](input.md#heat_conditions)
 
 The example above redefines the Manning coefficient of the `smooth`
 [material](input.md#materials) defined elsewhere in the file. In plain language,
@@ -696,9 +696,36 @@ parameters in each entry. A region is understood to be completely filled with
 the material with which it is associated--the relationship between regions and
 materials is necessarily 1:1.
 
-## `temperature_conditions`
+## `heat_conditions`
 
-**Coming soon!**
+```yaml
+heat_conditions:
+  - name: placeholder_heat_ic
+    type: dirichlet
+    water_temperature: 0.0        # water surface temperature (°C)
+  - name: placeholder_heat_source
+    type: dirichlet
+    water_temperature: 0.0        # water surface temperature (°C)
+    downwelling_shortwave: 0.0    # downwelling shortwave radiation (W/m²)
+    downwelling_longwave: 0.0     # downwelling longwave radiation (W/m²)
+    wind_speed: 0.0               # wind speed (m/s)
+    air_temperature: 0.0          # air temperature (°C)
+```
+
+The `heat_conditions` section defines named heat conditions that can be
+referenced from `initial_conditions`, `sources`, and `boundary_conditions`.
+Each entry has the following fields:
+
+* `name`: a unique name identifying this condition
+* `type`: the condition type (e.g., `dirichlet`)
+* `water_temperature`: water surface temperature (°C). Required for initial conditions.
+* `downwelling_shortwave`: downwelling shortwave radiation flux (W/m²). Used for source conditions.
+* `downwelling_longwave`: downwelling longwave radiation flux (W/m²). Used for source conditions.
+* `wind_speed`: wind speed (m/s). Used for source conditions.
+* `air_temperature`: air temperature (°C). Used for source conditions.
+
+All sub-fields except `water_temperature` are optional and primarily meaningful
+for source conditions providing atmospheric forcing.
 
 ## `time`
 

@@ -1,0 +1,66 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+# Legacy-named copy of the MMS heat TS source-isolation case.
+# Flow is stationary (u=v=0, h=H0 constant), so TSSolve introduces no
+# transport error. Expected temperature convergence is O(dt) for backward
+# Euler and O(dt^2) for Crank-Nicolson with method-dependent source sampling.
+mms:
+  constants:
+    H: 1.0      # constant water depth (m)
+    A: 5.0      # temperature amplitude (deg C)
+    R: 20.0     # reference temperature (deg C)
+    T: 20.0     # time scale (s)
+    N: 0.01     # Manning coefficient
+    K: 0.6283185307179586  # wave number (pi/5)
+
+  swe:
+    h:    H
+    dhdx: 0
+    dhdy: 0
+    dhdt: 0
+    u:    0
+    dudx: 0
+    dudy: 0
+    dudt: 0
+    v:    0
+    dvdx: 0
+    dvdy: 0
+    dvdt: 0
+    z:    0
+    dzdx: 0
+    dzdy: 0
+    n:    N
+
+  temperature:
+    T:    R + A * sin(K*x) * sin(K*y) * exp(t/T)
+    dTdx: A * K * cos(K*x) * sin(K*y) * exp(t/T)
+    dTdy: A * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dTdt: (A / T) * sin(K*x) * sin(K*y) * exp(t/T)
+
+logging:
+  level: none
+
+time:
+  time_step: 0.1
+  unit: seconds
+  stop: 20.0
+  coupling_interval: 0.1
+
+grid:
+  file: mms_triangles_dx1.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+boundaries:
+  - name: domain_boundary
+    grid_boundary_id: 1

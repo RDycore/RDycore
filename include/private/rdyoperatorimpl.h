@@ -146,6 +146,19 @@ typedef struct Operator {
       // domain-wide flux_divergence vector;
       CeedVector flux_divergence;
 
+      // operator/vector backing the interior flux operator's passive
+      // "q_right" field, refreshed from u_local before every flux operator
+      // application (NULL/unused for the MUSCL path). CEED's CUDA backends
+      // support only a single active input field per operator, so q_right
+      // can't be made active alongside q_left; see
+      // CreateCeedInteriorFluxSuboperator for details. The refresh is done
+      // via a trivial one-field-in/one-field-out CeedOperator
+      // (q_right_refresh_op) rather than a standalone
+      // CeedElemRestrictionApply() call; see
+      // libceed-cuda-restriction-apply-broadcast-bug.md.
+      CeedOperator q_right_refresh_op;
+      CeedVector   q_right_restricted;
+
       // MUSCL slope reconstruction data (only allocated when use_slope_reconstruction is true)
       PetscBool    use_slope_reconstruction;
       PetscBool    use_limiter;                 // minmod limiter (default on with -second_order)
@@ -216,8 +229,10 @@ PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
 // CEED/PETSc Flux and Source Operator Constructors
 //--------------------------------------------------
 
-PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedOperator *);
-PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxOperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *, CeedOperator *,
+                                                   CeedVector *, CeedOperator *);
+PETSC_INTERN PetscErrorCode CreateCeedFluxHROperator(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedOperator *, CeedVector *,
+                                                     CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig, RDyMesh *, CeedVector *, RDyBoundary *, RDyCondition, CeedOperator *);
 PETSC_INTERN PetscErrorCode CreateCeedFluxOperatorReconstructed(RDyConfig *, RDyMesh *, PetscInt, RDyBoundary *, RDyCondition *, CeedVector *,
                                                                 CeedVector *, CeedOperator *, CeedOperator *);
@@ -252,6 +267,7 @@ typedef struct {
 PETSC_INTERN PetscErrorCode DestroyOperatorData(OperatorData *);
 
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(Operator *, RDyBoundary, PetscInt, PetscInt, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, PetscInt, PetscInt, PetscInt, PetscReal *);
 
 PETSC_INTERN PetscErrorCode ExtractOperatorBoundaryFluxes(Operator *, RDyBoundary *, OperatorData *);
 
