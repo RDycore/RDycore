@@ -749,20 +749,11 @@ fractional departure $n_k/n_{{\rm prior},k} - 1$ with a width
 $\sigma_\alpha$ instead treats the classes alike, and states the prior
 as the percentage by which the lookup can be wrong.
 
-The tension survives the reformulation, and that is the substantive
-result rather than an implementation detail. We ran the fifteen-class
-calibration under the fractional prior at the width we assign to the
-lookup, $\sigma_\alpha = 0.30$ (Table~\ref{tab:ladder}). Its first
-quasi-Newton step drove seven of the fifteen classes to a bound, and
-it finished with two classes on the floor, below the lookup's value
-for developed open land, at the same misfit the absolute prior
-reached in three times the iterations. A wider prior reaches the same
-fit sooner, by the same route, and the route is the problem: at that
-width this observable cannot deliver a fifteen-class roughness field
-inside the prior. What it can deliver is the subject of
-Sections~\ref{sec:calibrated} and~\ref{sec:spectrum}. We report the
-prior width used with every number; its value is a judgment about
-the land-cover lookup, not a tuning parameter.
+Which width to state is a judgment about the land-cover lookup rather
+than a tuning parameter, so we report the width used with every
+number. Whether the reformulation relieves the tension is a result and
+not an implementation detail, and Section~\ref{sec:calibrated}
+measures it.
 
 The failure mode is not specific to this model: an optimizer that
 takes zero steps on a problem whose gradient passes every verification
@@ -1653,9 +1644,16 @@ being a converged run.
 Third, and this is what the rest of the section is about, the field
 that achieves the $15\%$ is not one the land-cover table contains.
 Developed-medium sits on its lower bound throughout, at $n = 0.036$
-against the table's $0.040$ for developed open land, and
-Section~\ref{sec:calibration} has already shown that a wider prior
-sends seven of the fifteen classes to a bound on the first step.
+against the table's $0.040$ for developed open land. Widening the
+prior does not relieve that. Under the fractional prior at the width
+we assign to the lookup, $\sigma_\alpha = 0.30$, the first
+quasi-Newton step drove seven of the fifteen classes to a bound, and
+the run finished with developed-medium still on the floor and shrub
+joining it at $0.035$ (Table~\ref{tab:ladder}). A wider prior reaches
+the same fit sooner, by the same route, and the route is the problem:
+at that width this observable cannot deliver a fifteen-class roughness
+field inside the prior.
+
 Projected on the Gauss--Newton eigenvectors of the same prior, the
 calibrated field lies $9.2$ prior standard deviations from the lookup
 with only $2.9\%$ of that displacement in a direction these marks
@@ -1863,7 +1861,7 @@ more. That width admits the value for the classes the marks constrain,
 and it leaves the twelve combinations they do not constrain with
 nothing to hold them but the bounds of the search, which is where the
 first step of the wider calibration put seven of the fifteen classes
-(Section~\ref{sec:calibration}).
+(Section~\ref{sec:calibrated}).
 
 \begin{table}
 \centering\small
@@ -1958,7 +1956,7 @@ $0.6295$\,m (Table~\ref{tab:threefifteen}): $84\%$ and $83\%$ of the
 $0.107$\,m fifteen-class reduction, shares quoted throughout against
 the best fifteen-class field we obtained. The optimizer's path is short. At
 $\pm 30\%$ the first step puts all three classes on a bound, as it
-put seven of fifteen there (Section~\ref{sec:calibration}), and two
+put seven of fifteen there (Section~\ref{sec:calibrated}), and two
 more iterations bring developed-low back from $\alpha = 3$ to $2.34$;
 at $\pm 50\%$ the first step lands on a corner of the box, where the
 projected gradient is zero, and the run stops in one iteration. The
