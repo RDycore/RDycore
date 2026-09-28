@@ -1,4 +1,17 @@
-# Manning paper: state of play (2026-09-17, mid-restructure)
+# Manning paper: state of play (2026-09-28)
+
+*09-28: the narrative pass is DONE and all three of its open minor
+points are closed. Nothing on the paper is waiting on Mark. The
+paper builds clean at 34 pp, no undefined refs; Overleaf main is
+`960a655` and byte-identical to the repo, with no coauthor commits
+outstanding. What is open is structural and larger: the Sec 2.3
+results-in-Methods paragraph (below), the coauthor decisions, and the
+machine-state items, which are on hold with Perlmutter.*
+
+*Two stray zero-byte files, `papers/manning-calibration/The` and
+`L4n32.bins`, appeared on 09-25 from something Mark ran; left alone,
+not mine to delete.*
+
 
 *Read this first, then `plans/team-decision-list.md` (Emil's two 09-16
 replies at the end), `plans/RESULTS-gpu-implicit.md` sections o62-o66 and
