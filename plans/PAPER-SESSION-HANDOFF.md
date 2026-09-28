@@ -1,7 +1,13 @@
 # Manning paper: state of play (2026-09-28)
 
-*09-28: the narrative pass is DONE and all three of its open minor
-points are closed. Nothing on the paper is waiting on Mark. The
+*09-28: the narrative pass is DONE, all three of its open minor points
+are closed, and the one structural item left over -- the results
+paragraph inside Methods -- is done too (SPLIT, not moved: Sec 2.3
+keeps the methodological claim and the width-reporting policy; the
+seven-of-fifteen result now sits in Sec 6.3 beside tab:ladder, naming
+developed-medium 0.036 and shrub 0.035 from the table's own row; the
+two Sec 6.4 citations point at Sec 6.3 and the Sec 6.3 one is gone; no
+number changed). Nothing on the paper is waiting on Mark. The
 paper builds clean at 34 pp, no undefined refs; Overleaf main is
 `960a655` and byte-identical to the repo, with no coauthor commits
 outstanding. What is open is structural and larger: the Sec 2.3
@@ -148,7 +154,7 @@ paragraph states a result ("seven of fifteen to a bound") inside
 Methods; Secs 6.3 and 6.4 both cite it, so it stays load-bearing.
 
 **09-21/09-28: two of those closed, and a coauthor citation landed. Overleaf
-main is now `960a655` (the new sync base).**
+main is now `5e6410d` (the new sync base).**
 - (1) CLOSED. Xia and Liang is cited in Sec 2.1 (`xia2018implicit`,
   Adv. Water Resour. 117 (2018) 87-97, doi 10.1016/j.advwatres.2018.05.004).
   The full reference was already in RDycore's own source comments
