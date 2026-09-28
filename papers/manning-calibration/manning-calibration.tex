@@ -114,7 +114,13 @@ Thetis coastal model, which calibrated a spatially varying Manning
 field for the Baltic Sea with an automatically generated
 adjoint~\cite{karna2023baltic}, following storm-surge sensitivity
 studies that addressed the overfitting inherent in distributed
-friction estimation~\cite{warder2021storm}. The closest published
+friction estimation~\cite{warder2021storm}. A newer route trains a
+physics-informed neural network on the observations and the equation
+residual and recovers the friction parameter with the fit; a benchmark
+on idealized steady channels with a single Manning scalar reports where
+it recovers the scalar and where it does not, under observation
+sparsity, noise and choice of observed
+variable~\cite{radfar2026pinn}. The closest published
 work to ours is Pujol et al.~\cite{pujol2024urban}, who infer
 distributed friction in a 2D urban flood model by variational
 assimilation of multi-source data including high-water marks, and who
@@ -1095,16 +1101,7 @@ does reaches a gauge. The identical configuration observed at
 418{,}076 strided cells recovers all fifteen classes to machine
 precision, so the failure is the network, not the method. Fifteen
 parameters and thirteen gauges, an ``overdetermined'' observation
-count, remain unidentifiable. The separation between a structural
-limit and a shortage of observations is not specific to this code or
-this method: a benchmark of inverse physics-informed neural networks
-recovering a single Manning scalar in steady channel flow reports a
-residual error that added observations do not reduce, attributed to
-the configuration rather than to observation scarcity, and a recovery
-that collapses the scalar toward zero when depth alone is observed
-rather than depth and velocity~\cite{radfar2026pinn}. Those are
-idealized channels and one parameter; what carries over is the
-separation, not the numbers.
+count, remain unidentifiable.
 
 The same question re-asked with the peak observable comes out
 differently. Observing the same NLCD-truth twin at the 108
