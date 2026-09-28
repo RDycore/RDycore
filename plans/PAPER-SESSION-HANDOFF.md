@@ -135,7 +135,7 @@ paragraph states a result ("seven of fifteen to a bound") inside
 Methods; Secs 6.3 and 6.4 both cite it, so it stays load-bearing.
 
 **09-21/09-28: two of those closed, and a coauthor citation landed. Overleaf
-main is now `4b17877` (the new sync base).**
+main is now `960a655` (the new sync base).**
 - (1) CLOSED. Xia and Liang is cited in Sec 2.1 (`xia2018implicit`,
   Adv. Water Resour. 117 (2018) 87-97, doi 10.1016/j.advwatres.2018.05.004).
   The full reference was already in RDycore's own source comments
@@ -155,7 +155,11 @@ main is now `4b17877` (the new sync base).**
   true 0.02, 96% error at 20 observations) is no concern for our 108
   peak-WSE marks. Sec 5.1 passage removed; one sentence in the intro, no
   numbers.
-- (2) ECCO and (3) "Turning mesh" remain open with Mark.
+- (2) CLOSED 09-28. ECCO expanded at first use in the intro: "two
+  decades of global ocean state and parameter estimation in ECCO,
+  Estimating the Circulation and Climate of the Ocean" (it is reference
+  17, forget2015ecco; Mark asked, the answer was yes). Overleaf 960a655.
+- (3) "Turning mesh" remains open with Mark.
 
 
 **Next session: a whole-paper narrative pass, prompt in
