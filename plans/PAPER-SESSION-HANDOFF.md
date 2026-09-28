@@ -159,7 +159,8 @@ main is now `960a655` (the new sync base).**
   decades of global ocean state and parameter estimation in ECCO,
   Estimating the Circulation and Climate of the Ocean" (it is reference
   17, forget2015ecco; Mark asked, the answer was yes). Overleaf 960a655.
-- (3) "Turning mesh" remains open with Mark.
+- (3) CLOSED 09-28, Mark's ruling: "Turning mesh" does NOT need a gloss
+  at first use. It stays a bare proper name. Do not re-raise it.
 
 
 **Next session: a whole-paper narrative pass, prompt in
