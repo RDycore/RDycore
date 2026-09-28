@@ -134,8 +134,8 @@ use (Sec 3). Not changed: Sec 2.3 "Absolute or fractional prior" second
 paragraph states a result ("seven of fifteen to a bound") inside
 Methods; Secs 6.3 and 6.4 both cite it, so it stays load-bearing.
 
-**09-21: two of those closed, and a coauthor citation landed. Overleaf
-main is now `1f34491` (the new sync base).**
+**09-21/09-28: two of those closed, and a coauthor citation landed. Overleaf
+main is now `4b17877` (the new sync base).**
 - (1) CLOSED. Xia and Liang is cited in Sec 2.1 (`xia2018implicit`,
   Adv. Water Resour. 117 (2018) 87-97, doi 10.1016/j.advwatres.2018.05.004).
   The full reference was already in RDycore's own source comments
@@ -146,16 +146,15 @@ main is now `1f34491` (the new sync base).**
   Donghui ("that makes sense to me", 09-20 email). No further action.
 - Donghui relayed Radfar (2026), Phys. Fluids 38(8) 086611, doi
   10.1063/5.0349054, an inverse-PINN benchmark of Manning estimation
-  under observation sparsity, noise and observed-variable type. Cited in
-  Sec 5.1 (`radfar2026pinn`) for the one thing it directly supports: the
-  separation between a structural limit and a shortage of observations,
-  which is that subsection's claim. Its regime is named in the text
-  (steady idealized channels, one scalar) so its depth-only failure
-  (n collapses to 0.0009 against a true 0.02, 96% error at 20
-  observations) is not read across to our 108 peak-WSE marks, which DO
-  identify the area-dominant classes. Not cited a second time in the
-  intro's differentiable-codes paragraph -- it is a benchmark study, not
-  a code, and that paragraph's argument is about production components.
+  under observation sparsity, noise and observed-variable type. First
+  cited in Sec 5.1 for the structure-versus-count separation; MOVED on
+  09-28 to the intro's Manning-calibration literature paragraph (between
+  warder2021storm and Pujol) on Donghui's reading -- it is literature
+  review, not evidence, and its idealized setting (steady channels, one
+  scalar) means its depth-only failure (n collapses to 0.0009 against a
+  true 0.02, 96% error at 20 observations) is no concern for our 108
+  peak-WSE marks. Sec 5.1 passage removed; one sentence in the intro, no
+  numbers.
 - (2) ECCO and (3) "Turning mesh" remain open with Mark.
 
 
