@@ -47,9 +47,21 @@ storage, net source over the event; stated as measured, with "where it
 sits at hour 29 is unmeasured"; Sec 4's "cure" is qualified, Sec 7's
 candidate lists include it, conclusions' third next step names it.
 Contribution 5 (the divide attribution) is UNCHANGED pending the team
-(review B1). Overleaf NOT synced this session; Mark reviews first. The
-open-questions list is at the end of the review file's chat summary and
-in the commit message.*
+(review B1). Wrapped up on Mark's word: repo commits ee97401d /
+d76d433d pushed to GitHub; **Overleaf main is `8aab347` (the new sync
+base)**, a plain copy since nothing had landed on 5e6410d, with the
+latexdiff changes PDF rebuilt against 363971e (40 pp, 0 errors, the
+recipe in the Overleaf memory worked unchanged). The open questions, in
+order: (1) Donghui/Gautam, the outlet inflow and contribution 5; (2)
+Mark, whether "the scale is known before any optimizer runs" stays in
+the abstract; (3) Donghui/Emil, +/-30% prior vs the box [0.3, 3] doing
+the constraining; (4) Emil, the hold-out; (5) Mark, more iterations for
+the 15-class +/-30% run or leave the floor claim dropped; (6) Emil, the
+acknowledgement wording; (7) Mark, cut or keep the ARK-IMEX paragraph
+and the 36-h/0.25 s configuration; (8) provenance: crest histogram, o62
+c15 iterate history and the o48 field file are not in logs/, and a
+`--field` option on o58_gauss_newton.py would reproduce the new Sec 6.4
+projections. Details in review B1-B6.*
 
 *Two stray zero-byte files, `papers/manning-calibration/The` and
 `L4n32.bins`, appeared on 09-25 from something Mark ran; left alone,
