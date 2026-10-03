@@ -35,7 +35,14 @@ replies at the end), `plans/RESULTS-gpu-implicit.md` sections o62-o66 and
 `papers/manning-calibration/manning-calibration.tex`, 33 pp, builds clean
 with latexmk. Branch `adams/gpu-implicit`. **The 09-16 review and the
 09-17 restructure are committed and pushed to Overleaf** (see the
-Overleaf paragraph below); the branch is not pushed to GitHub. Only the
+Overleaf paragraph below). **PUSH `adams/gpu-implicit` TO GITHUB AT THE
+END OF EVERY SESSION (Mark's rule, 2026-10-03).** Mark points coauthors
+at the GitHub branch to read and edit, and pushing only occasionally let
+it drift 19 days stale -- the copy they were reading was 2026-09-14,
+missing the whole 09-17 restructure and 09-18 narrative pass. The paper
+is NOT on `main`, and `adams/manning-draft` is a stale sibling (.tex
+from 08-20); the live branch is `adams/gpu-implicit` and nothing else.
+Fetch first and never force, as with Overleaf. Only the
 two root-level `paper-*-prompt.md` files are untracked.*
 
 ## The one-paragraph version
@@ -218,7 +225,8 @@ reads in parallel and routes comments through the session.
 - Mark's own Overleaf edits merged (CPU node -> socket, applied to the
   conclusions too; "survey" moved off the Pujol sentence).
 - Workflow: Mark's edits now come through the session; other coauthors
-  still edit Overleaf directly; fetch before every push.
+  still edit Overleaf directly; fetch before every push. Push the branch
+  to GitHub every session too (see the top section).
 
 ## RESTRUCTURE SESSION: start here (2026-09-17)
 
