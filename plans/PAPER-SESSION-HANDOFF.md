@@ -705,8 +705,26 @@ Restart this by re-reading the three steps below when the group replies.
 **Run in this order; each step is independently reportable, so stop
 wherever the budget ends.**
 
-**Step A (zero node-hours, login node): does a transmissive perimeter
-leak inward?** This is the guard-rail on Donghui's suggestion and needs
+**Step A: DONE 2026-10-03 -- IT LEAKS INWARD, DECISIVELY.** Net
+perimeter flux -6,607 / -7,240 / -8,288 m3/s at hours 40/60/72 against
++25 / +364 / +661 m3/s out the outlet; the imbalance survives
+aggregation along the boundary loop (|in|/out 122% per edge to 164% at
+3 km runs), all of the net inflow is within 10 km of the outlet with one
+3 km run carrying more than the whole-perimeter net, and 85% of it sits
+in the 37 censored marks' reach. The existing free-outflow outlet
+already admits water for the first 38 hours (-8,522 m3/s at hour 3).
+Validated by mass balance over all 73 checkpoints (implied rainfall
+positive, hyetograph-shaped, ~725 mm/72 h). Full entry in
+RESULTS-gpu-implicit.md, script `plans/campaigns/stepA_perimeter_flux.py`,
+logs in `logs/stepA/`.
+**Consequence for Step B: do not run it as written.** Bare free-outflow
+on the perimeter would open an inflow in exactly the reach the test is
+about, so the counterfactual would measure two changes at once. It needs
+an elevation-thresholded overflow condition first, which is driver work,
+not a yaml change. Tell Donghui the measurement before anyone builds it.
+
+**Step A, as originally specified (zero node-hours, login node): does a
+transmissive perimeter leak inward?** This is the guard-rail on Donghui's suggestion and needs
 no run. From an existing o37 hourly checkpoint plus the mesh, compute for
 every perimeter (auto-generated boundary) edge the would-be transmissive
 flux h*u_n*L from the interior state, and split the sum by sign at two or
