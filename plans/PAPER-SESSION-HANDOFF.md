@@ -1,4 +1,4 @@
-# Manning paper: state of play (2026-09-28)
+# Manning paper: state of play (2026-10-03)
 
 *09-28: the narrative pass is DONE, all three of its open minor points
 are closed, and the one structural item left over -- the results
@@ -13,6 +13,16 @@ paper builds clean at 34 pp, no undefined refs; Overleaf main is
 outstanding. What is open is structural and larger: the Sec 2.3
 results-in-Methods paragraph (below), the coauthor decisions, and the
 machine-state items, which are on hold with Perlmutter.*
+
+*10-03: STEP A IS DONE and the paper was not touched -- Overleaf main is
+still `5e6410d`, confirmed against the live remote. Perlmutter is back
+up. A transmissive perimeter leaks INWARD (net -8,288 m3/s at hour 72
+against +661 out the outlet, 85% of it in the censored reach), so Step B
+must NOT be run as written: bare free-outflow would open an inflow in
+the reach the test is about. It needs an elevation-thresholded overflow,
+which is driver work. See the Step A entry in RESULTS-gpu-implicit.md
+and the downstream-reach section below. Next action is an email to
+Donghui with the measurement, not a run.*
 
 *Two stray zero-byte files, `papers/manning-calibration/The` and
 `L4n32.bins`, appeared on 09-25 from something Mark ran; left alone,
