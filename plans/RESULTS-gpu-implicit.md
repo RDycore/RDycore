@@ -2837,3 +2837,72 @@ change shifts hydrograph timing.
 cross-observable section becomes: the gauges disagree with the marks in
 sign (adjoint, solid), and the reason is that 99.5% of what they measure
 is an offset roughness cannot produce.
+
+### Step A -- a transmissive perimeter would leak INWARD, decisively (2026-10-03)
+
+Donghui's question (09-06, relayed 09-16) was whether to open all the
+boundary edges. This is the guard-rail, and it needed no allocation: a
+login-node pass over the existing o37 hourly checkpoints
+(`plans/campaigns/stepA_perimeter_flux.py`, logs mirrored to
+`logs/stepA/`). RDycore's free-outflow ghost map is the identity (o26),
+so for a boundary edge the Roe flux equals the interior physical flux
+exactly, and the would-be transmissive volume flux is just
+`q = (hu, hv) . n_out * L`, positive outward. No approximation enters.
+
+**Answer: opening the perimeter as written is NOT safe.** The net flux
+over the 6,185 perimeter (id 0) edges is INWARD at every hour checked:
+
+| hour | perimeter net | outlet net | concurrent rain | perimeter / rain |
+|------|--------------:|-----------:|----------------:|-----------------:|
+| 40   | -6,607 m3/s   | +25 m3/s   | 1,456 m3/s      | 4.5x |
+| 60   | -7,240 m3/s   | +364 m3/s  | 1,167 m3/s      | 6.2x |
+| 72   | -8,288 m3/s   | +661 m3/s  | 77 m3/s         | 107x |
+
+At hour 72 an opened perimeter would admit 29.8e6 m3 in one hour against
+a stored volume of 1,252e6 m3 -- 2.4% of the domain's water per hour,
+12.5x what the outlet discharges. An elevation-thresholded overflow is
+the right condition, not bare free-outflow.
+
+**The imbalance is not a facet artifact.** The 30 m perimeter is a
+zig-zag, and a flow parallel to a zig-zag crosses alternating facets in
+and out in near-equal measure, so a per-edge sign split overstates both
+sides. Walking the boundary into its single 217.3 km loop and
+aggregating into runs before splitting kills that cancellation and the
+imbalance SURVIVES, growing with scale: |in|/out = 122% per edge, 134%
+at 300 m, 145% at 1 km, 164% at 3 km (hour 72). The inflow is spatially
+coherent.
+
+**It is concentrated, and in the censored reach.** Net flux by distance
+from the outlet (hour 72): -14,879 m3/s over the 29.2 km of divide
+within 10 km of the outlet, and net OUTWARD (+6,591 m3/s) over the
+187.6 km beyond it. One 3 km run at (3226445, 3637206), 8.1 km from the
+outlet, carries -9,215 m3/s by itself -- more than the whole-perimeter
+net. By the Voronoi split on the 108 marks, 85% of the inward flux
+belongs to the 37 censored marks' reach. So the leak is where the model
+already ponds, which is the worst place for it: Step B's counterfactual
+would have been measuring an opened perimeter AND a new inflow source at
+once, in exactly the reach the test is about.
+
+**The existing outlet already does this.** The named outlet carries the
+identical free-outflow condition, and its net flux is INWARD for the
+first 38 hours of the baseline, reaching -8,522 m3/s at hour 3, turning
+outward only at hour 39. The no-inflow-guard pathology is not
+hypothetical; it is in the production configuration, on 503 m of
+boundary.
+
+**Validation.** The perimeter is closed in the baseline, so
+d(storage)/dt + outlet = rain. Over all 73 checkpoints the implied
+rainfall is positive at every hour, hyetograph-shaped (peak 45.8 mm/hr
+at hour 28, decaying to 0.2 mm/hr at hour 72) and integrates to ~725 mm
+over 72 h, which is right for Harvey over this domain. That exercises
+the normals, the cell areas (1,428.7 km2 over 2,926,532 triangles,
+median 488 m2 -- NOT 900 m2) and the flux formula together.
+
+**Caveat.** These are instantaneous fluxes from the closed-perimeter
+state: opening the boundary changes the solution, and the water piled
+against the divide would partly equalize. The sign, the concentration
+and the order of magnitude are the answer; the transient is not
+predicted.
+
+**What this does NOT do:** it does not touch the paper. Sec 6.1 still
+says the closed perimeter represents neither crossing, which stands.

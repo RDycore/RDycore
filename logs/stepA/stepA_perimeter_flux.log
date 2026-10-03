@@ -1,0 +1,66 @@
+mesh: 2926532 cells, 1466366 nodes, area 1428.7 km^2, cell area median 488.3 m^2
+boundary edges 6198: outlet 13, perimeter (id 0) 6185
+boundary length 217.3 km (outlet 503 m)
+boundary nodes 6198, degree 2 on 6198 (0 non-manifold)
+loops: 1; lengths km 217.3
+marks 108 (37 censored); censored reach: Voronoi 1769 edges, within 26.2 km of outlet 2082 edges
+
+=== hour 40 ===  storage 1070.6 x10^6 m^3, max h 18.20 m, wet (h>1cm) 100% of cells
+  net flux [m^3/s, + = out]: perimeter    -6607.0   outlet     24.9   ratio 264.9x
+     run | perimeter: out           in  |in|/out |  censored reach: out           in
+    edge |        29857.8     -36464.8    122.1% |              17891.7     -29061.8
+   100 m |        25139.2     -31746.2    126.3% |              14630.5     -25800.5
+   300 m |        19686.0     -26293.0    133.6% |              10759.0     -21929.0
+  1000 m |        15038.6     -21645.6    143.9% |               7626.1     -18796.2
+  3000 m |        10184.7     -16791.7    164.9% |               5333.2     -16503.3
+  net perimeter flux by distance from the outlet [m^3/s, + = out]:
+      0.0 -  10.0 km     -12701.5   over  29.2 km of divide,  833 edges
+     10.0 -  26.2 km       1525.0   over  42.3 km of divide, 1249 edges
+     26.2 -  50.0 km       3861.3   over  63.1 km of divide, 1772 edges
+     50.0 -  74.9 km        708.1   over  82.2 km of divide, 2331 edges
+  five most inward 3 km runs (m^3/s, km of run, x, y, km from outlet):
+       -7958.7   3.00 km     3226445    3637206    8.1 km
+       -2830.3   3.03 km     3228590    3637589    6.4 km
+       -2057.1   3.02 km     3230922    3636710    4.1 km
+       -1429.3   3.03 km     3224858    3637324    9.6 km
+        -833.1   3.02 km     3229674    3634188    4.2 km
+
+=== hour 60 ===  storage 1254.3 x10^6 m^3, max h 19.09 m, wet (h>1cm) 99% of cells
+  net flux [m^3/s, + = out]: perimeter    -7239.7   outlet    364.3   ratio 19.9x
+     run | perimeter: out           in  |in|/out |  censored reach: out           in
+    edge |        36672.3     -43912.0    119.7% |              22656.3     -34935.3
+   100 m |        30724.7     -37964.4    123.6% |              18627.3     -30906.3
+   300 m |        24013.3     -31253.0    130.1% |              13753.7     -26032.6
+  1000 m |        18165.5     -25405.1    139.9% |               9939.2     -22218.1
+  3000 m |        12692.0     -19931.7    157.0% |               7091.3     -19370.3
+  net perimeter flux by distance from the outlet [m^3/s, + = out]:
+      0.0 -  10.0 km     -14132.1   over  29.2 km of divide,  833 edges
+     10.0 -  26.2 km       1834.6   over  42.3 km of divide, 1249 edges
+     26.2 -  50.0 km       4444.2   over  63.1 km of divide, 1772 edges
+     50.0 -  74.9 km        613.7   over  82.2 km of divide, 2331 edges
+  five most inward 3 km runs (m^3/s, km of run, x, y, km from outlet):
+       -8781.5   3.00 km     3226445    3637206    8.1 km
+       -3174.2   3.03 km     3228590    3637589    6.4 km
+       -2323.1   3.02 km     3230922    3636710    4.1 km
+       -1643.1   3.03 km     3224858    3637324    9.6 km
+       -1022.0   3.02 km     3214695    3628665   19.9 km
+
+=== hour 72 ===  storage 1252.5 x10^6 m^3, max h 19.53 m, wet (h>1cm) 99% of cells
+  net flux [m^3/s, + = out]: perimeter    -8287.6   outlet    661.3   ratio 12.5x
+     run | perimeter: out           in  |in|/out |  censored reach: out           in
+    edge |        37712.0     -45999.6    122.0% |              24665.5     -37679.6
+   100 m |        31574.1     -39861.7    126.2% |              20296.4     -33310.5
+   300 m |        24597.7     -32885.3    133.7% |              14965.2     -27979.3
+  1000 m |        18469.2     -26756.9    144.9% |              10801.4     -23815.4
+  3000 m |        13031.7     -21319.3    163.6% |               7740.8     -20754.9
+  net perimeter flux by distance from the outlet [m^3/s, + = out]:
+      0.0 -  10.0 km     -14878.5   over  29.2 km of divide,  833 edges
+     10.0 -  26.2 km       1845.2   over  42.3 km of divide, 1249 edges
+     26.2 -  50.0 km       4279.7   over  63.1 km of divide, 1772 edges
+     50.0 -  74.9 km        465.9   over  82.2 km of divide, 2331 edges
+  five most inward 3 km runs (m^3/s, km of run, x, y, km from outlet):
+       -9215.1   3.00 km     3226445    3637206    8.1 km
+       -3348.7   3.03 km     3228590    3637589    6.4 km
+       -2472.0   3.02 km     3230922    3636710    4.1 km
+       -1752.1   3.03 km     3224858    3637324    9.6 km
+       -1350.1   3.02 km     3214695    3628665   19.9 km
