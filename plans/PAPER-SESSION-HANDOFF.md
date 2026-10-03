@@ -24,6 +24,33 @@ which is driver work. See the Step A entry in RESULTS-gpu-implicit.md
 and the downstream-reach section below. Next action is an email to
 Donghui with the measurement, not a run.*
 
+*10-03 evening (Fable): a full referee read, written to
+`plans/review-fable-2026-10-03.md` (20 findings, 6 team questions, a
+cleared list), then APPLIED to the .tex on Mark's instruction. The paper
+builds at 35 pp, no undefined refs, zero prose dashes (fig:map's five are
+gone). The big changes: the abstract and contribution 2 no longer say the
+15% ceiling is "measurable from forward runs alone" (the scan gave 11%,
+the calibration 15%; every "bound" became "scale"); the abstract says two
+of the three classes land in the same place, not three; Sec 6.4's "lies
+in the one direction the data constrains" is replaced by the exact
+projection (the displacement runs along the SECOND eigenvector, lambda
+0.68 at the absolute prior, 2.99 at +/-30%); the 15-class +/-30% run is
+no longer "flat" (it was falling 1.7%/it when the wall hit) and the
+"floor" inference is gone; "within 4% on every class" is now "on the
+three leading classes, within 3 units on every class"; tab:halves'
+"45x" is gone; the 35% gauge saturation cited in Sec 6.4 is now the mark
+objective's 51%; the acknowledgement no longer claims to answer Emil's
+subspace question. NEW MEASUREMENT IN THE PAPER (Sec 6.1, from
+`logs/stepA/stepA_mass_balance.log`): the production outlet admits water
+for the first 38 hours, ~1.9e8 m3 by hour 29 = 19% of the hour-29
+storage, net source over the event; stated as measured, with "where it
+sits at hour 29 is unmeasured"; Sec 4's "cure" is qualified, Sec 7's
+candidate lists include it, conclusions' third next step names it.
+Contribution 5 (the divide attribution) is UNCHANGED pending the team
+(review B1). Overleaf NOT synced this session; Mark reviews first. The
+open-questions list is at the end of the review file's chat summary and
+in the commit message.*
+
 *Two stray zero-byte files, `papers/manning-calibration/The` and
 `L4n32.bins`, appeared on 09-25 from something Mark ran; left alone,
 not mine to delete.*
