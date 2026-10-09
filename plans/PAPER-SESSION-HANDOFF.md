@@ -63,6 +63,11 @@ c15 iterate history and the o48 field file are not in logs/, and a
 `--field` option on o58_gauss_newton.py would reproduce the new Sec 6.4
 projections. Details in review B1-B6.*
 
+*10-09: the SciDAC BER/ASCR acknowledgement added verbatim (Mark: "we are
+going to put this on arXiv soon"), its own paragraph ahead of FASTMath; repo
+0d333c2a, pushed to GitHub; **Overleaf main is `14eb96f` (the new sync base)**,
+a plain copy since nothing had landed on 8aab347, changes PDF rebuilt (40 pp).*
+
 *Two stray zero-byte files, `papers/manning-calibration/The` and
 `L4n32.bins`, appeared on 09-25 from something Mark ran; left alone,
 not mine to delete.*
