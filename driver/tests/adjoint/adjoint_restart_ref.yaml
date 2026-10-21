@@ -1,0 +1,77 @@
+# Reference leg of the checkpoint/restart consistency gate (see the adjoint
+# CMakeLists): a continuous 2-hour rain-forced window on the Houston 1 km mesh,
+# checkpointing hourly. The companion adjoint_restart_window.yaml restarts from
+# the 1-hour checkpoint and must reproduce this run's 2-hour state exactly.
+#
+# This is the path a mid-event calibration window uses: the only initial
+# condition is at the start of the event, so the window's IC comes from a
+# checkpoint of a longer forward, and -adjoint_rain_start_hour re-aligns the
+# window's rain with the event clock (the TS clock always restarts at 0).
+physics:
+  flow:
+    mode: swe
+    source:
+      method: explicit
+
+numerics:
+  spatial: fv
+  temporal: beuler
+  riemann: roe
+  jacobian: analytic
+
+logging:
+  level: none
+
+time:
+  stop: 2.0
+  unit: hours
+  stop_n: 120
+
+checkpoint:
+  format: hdf5
+  interval: 60
+  prefix: restart_ref
+
+output:
+  format: none
+
+grid:
+  file: Houston1km_with_z.exo
+
+# one region represents the whole domain (the rain source targets region id 1)
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: domain
+    flow: domain_flow_ic
+
+boundaries:
+  - name: bottom_wall
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [bottom_wall]
+    flow: outflow_bc
+
+flow_conditions:
+  - name: domain_flow_ic
+    type: dirichlet
+    file: Houston1km.ic.${PETSC_ID_TYPE}.bin
+    format: binary
+  - name: outflow_bc
+    type: dirichlet
+    height: 0
+    x_momentum: 0
+    y_momentum: 0

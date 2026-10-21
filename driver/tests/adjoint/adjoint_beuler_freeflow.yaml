@@ -1,0 +1,78 @@
+# Free-outflow twin of adjoint_beuler.yaml: same wet uniform flowing lake,
+# but the bottom wall is a free-outflow (transmissive) boundary, so the FD
+# gates validate dJ/du0 and dJ/dn through the free-outflow ghost + Jacobian.
+# Smooth, fully wet dynamics keep the discrete map differentiable.
+physics:
+  flow:
+    mode: swe
+    source:
+      method: explicit
+
+numerics:
+  spatial: fv
+  temporal: beuler
+  riemann: roe
+  jacobian: analytic
+
+logging:
+  level: none
+
+time:
+  stop: 0.0005
+  unit: hours
+  stop_n: 40
+
+output:
+  format: none
+
+grid:
+  file: planar_dam_10x5.msh
+
+regions:
+  - name: upstream
+    grid_region_id: 1
+  - name: downstream
+    grid_region_id: 2
+
+surface_composition:
+  - region: upstream
+    material: smooth
+  - region: downstream
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.03
+
+initial_conditions:
+  - region: upstream
+    flow: lake_ic
+  - region: downstream
+    flow: lake_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+  - name: top_wall
+    grid_boundary_id: 2
+  - name: bottom_wall
+    grid_boundary_id: 3
+
+boundary_conditions:
+  - boundaries: [top_wall]
+    flow: reflecting_bc
+  - boundaries: [bottom_wall]
+    flow: free_outflow_bc
+
+flow_conditions:
+  - name: lake_ic
+    type: dirichlet
+    height: 8
+    x_momentum: 2
+    y_momentum: 1
+  - name: reflecting_bc
+    type: reflecting
+  - name: free_outflow_bc
+    type: free-outflow

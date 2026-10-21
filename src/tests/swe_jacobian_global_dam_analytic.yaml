@@ -1,0 +1,85 @@
+# Minimal uniform-lake configuration (planar dam mesh, equal heights, zero
+# momentum, explicit source treatment) used by test_swe_jacobian_global to
+# compare the FD-coloring and analytic Jacobians. The uniform state keeps the
+# frozen-dissipation approximation exact (uL == uR on every edge), so this
+# validates the ASSEMBLY (indices, signs, ownership, halo) rather than the
+# dissipation derivatives, which the edge harness covers.
+
+physics:
+  flow:
+    mode: swe
+    source:
+      method: explicit
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+  jacobian: analytic
+
+logging:
+  level: none
+
+time:
+  stop: 0.0005
+  unit: hours
+  stop_n: 10
+
+output:
+  format: none
+
+grid:
+  file: planar_dam_10x5.msh
+
+regions:
+  - name: upstream
+    grid_region_id: 1
+  - name: downstream
+    grid_region_id: 2
+
+surface_composition:
+  - region: upstream
+    material: smooth
+  - region: downstream
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.03
+
+initial_conditions:
+  - region: upstream
+    flow: dam_ic_up
+  - region: downstream
+    flow: dam_ic_down
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+  - name: top_wall
+    grid_boundary_id: 2
+  - name: bottom_wall
+    grid_boundary_id: 3
+
+boundary_conditions:
+  - boundaries: [top_wall]
+    flow: reflecting_bc
+  - boundaries: [bottom_wall]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: dam_ic_up
+    type: dirichlet
+    height: 10
+    x_momentum: 0
+    y_momentum: 0
+  - name: dam_ic_down
+    type: dirichlet
+    height: 5
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting
+

@@ -472,6 +472,9 @@ static PetscErrorCode ApplyTracerBoundaryFlux(void *context, PetscOperatorFields
     case CONDITION_CRITICAL_OUTFLOW:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_CRITICAL_OUTFLOW not supported for tracers");
       break;
+    case CONDITION_FREE_OUTFLOW:
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "CONDITION_FREE_OUTFLOW not supported for tracers");
+      break;
     default:
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n", boundary.id);
   }

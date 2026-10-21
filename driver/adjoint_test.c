@@ -1,0 +1,3254 @@
+// rdycore_adjoint - adjoint sensitivity twin experiment for RDycore
+//
+// Increment 3 of the Manning-calibration plan: computes dJ/du0 for a
+// terminal-time gauge misfit with TSAdjoint and validates it against central
+// finite differences of the full nonlinear solve.
+//
+// Twin experiment (single execution):
+//   1. "truth" forward solve from the configured IC; record y = H u(T)
+//   2. perturbed forward solve from a scaled IC (nonzero misfit)
+//        J(u0) = 1/2 (H u(T) - y)^T R^-1 (H u(T) - y),  R = sigma^2 I
+//   3. TSAdjointSolve with lambda(T) = H^T R^-1 (H u(T) - y)  ->  dJ/du0
+//   4. FD check: central differences of J for sampled components of u0
+//
+// The config must set numerics.jacobian (fd validates the adjoint wiring
+// independent of the analytic Jacobian's accuracy) and
+// physics.flow.source.method: explicit.
+
+#include <petscsys.h>
+#include <petscts.h>
+#include <private/rdycoreimpl.h>
+#include <private/rdyforcingimpl.h>
+#include <private/rdymathimpl.h>
+#include <private/rdymeshimpl.h>
+#include <rdycore.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+static const char *help_str =
+    "rdycore_adjoint - adjoint sensitivity twin experiment\n"
+    "usage: rdycore_adjoint <filename.yaml> [options]\n\n"
+    "Options:\n"
+    "  -adjoint_obs_stride <int>   Observe height at every Nth cell (default: 2)\n"
+    "  -adjoint_obs_error <real>   Observation error std dev sigma (default: 0.01)\n"
+    "  -adjoint_ic_perturb <real>  Relative height perturbation of the IC (default: 1e-3)\n"
+    "  -adjoint_fd_samples <int>   # of u0 components for the FD check (default: 8; 0 disables)\n"
+    "  -adjoint_fd_eps <real>      FD step scale (default: 1e-6)\n"
+    "  -adjoint_fd_tol <real>      relative L2 gate for adjoint-vs-FD (default: 1e-5)\n"
+    "  -adjoint_calibrate_gauges   per-cell Manning calibration from a gauge WSE table\n"
+    "  -adjoint_obs_file <path>    observation table (see papers/manning-calibration/data/harvey_gauges/)\n"
+    "  -adjoint_obs_above_bed      keep a gauge observation only while the observed WSE is\n"
+    "                              above the cell bed (+ -adjoint_obs_min_depth <m>, default 0):\n"
+    "                              a 30 m cell stores the bank, not the channel\n"
+    "  -adjoint_obs_eval_only      classes mode, gauge table: one forward of the prior field (or\n"
+    "                              of -adjoint_classes_init <table>), J and RMSE over the kept\n"
+    "                              observations, no adjoint, no TAO\n"
+    "  -adjoint_obs_model_dump <path>  with -adjoint_obs_eval_only: write the modelled WSE at every\n"
+    "                              gauge and observation time in the obs-table format, plus\n"
+    "                              <path>.zb with each gauge's cell and bed elevation\n"
+    "  -adjoint_hwm_file <path>    high-water-mark table (cell + peak WSE; see papers/manning-calibration/data/harvey_hwm/):\n"
+    "                              switches the gauge/class misfit to peak WSE at the marks\n"
+    "  -adjoint_hwm_twin           synthesize the mark WSE values from the truth forward's peaks\n"
+    "  -adjoint_obs_noise <real>   twin modes: N(0, stddev) noise added to synthesized observations\n"
+    "  -adjoint_gauges_twin        first synthesize the table from a two-zone truth\n"
+    "  -adjoint_gauge_stride <int> twin: gauges at every Nth natural cell (default: 7)\n"
+    "  -adjoint_n0 <real>          gauge mode: constant prior/initial n (default: 0.03)\n"
+    "  -adjoint_jred_gate <real>   gauge/classes mode: require J_final < gate*J_init (0 = off)\n"
+    "  -adjoint_rain_start_hour <int>  event hour the window's rain starts at (default: 0);\n"
+    "                              use with RDycore's -restart to run a mid-event window\n"
+    "  -adjoint_forward_only       one forward over the window, then exit (no adjoint/FD/TAO)\n"
+    "  -adjoint_classes_dump <path>  classes mode: write the solution (NLCD code, n) per line\n"
+    "  -adjoint_classes_init <path>  classes mode: warm-start TAO from such a file, so a\n"
+    "                              calibration too long for one queue slot can be continued\n"
+    "  -adjoint_classes_active <codes>  classes mode: calibrate only these NLCD classes,\n"
+    "                              holding the rest at their prior (comma-separated)\n"
+    "  -adjoint_sigma_n <real>     prior std dev on Manning n; sets the Tikhonov weight\n"
+    "                              beta = 1/sigma_n^2 (overrides -adjoint_beta)\n"
+    "  -adjoint_sigma_alpha <real> the same prior as a FRACTION of the prior value: penalizes\n"
+    "                              n/n_prior - 1, so every class is treated alike\n"
+    "  -adjoint_classes_relative   classes mode: optimize alpha_k = n_k/n_prior_k with the\n"
+    "                              objective scaled by 1/J(start) -- both O(1), so the\n"
+    "                              quasi-Newton unit step is a sane roughness change\n"
+    "  -adjoint_classes_alpha_min/max <real>  relative mode: bounds on alpha (0.3, 3.0)\n"
+    "  -adjoint_classes_grad_dump <path>  classes mode: write (code, n, dJ/dn) at the\n"
+    "                              start point, for an explicit line search along -g\n"
+    "  -adjoint_ic_scale <real>    multiply the initial state by this factor (velocities\n"
+    "                              unchanged); the IC analogue of the uniform roughness scan\n"
+    "  -adjoint_classes_grad_only  write the start-point gradient and exit (one objective+\n"
+    "                              gradient per run; for assembling a Hessian by columns)\n";
+
+#define NDOF 3
+
+// observation-matrix type matching the state vec: a device (aijkokkos) H
+// keeps the per-observation-time MatMult / MatMultTranspose applies -- and,
+// via MatCreateVecs, the observation-space vecs -- off the host when the
+// solve runs on kokkos types
+static PetscErrorCode ObservationMatrixType(Vec state, MatType *type) {
+  PetscBool is_kokkos;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectTypeCompareAny((PetscObject)state, &is_kokkos, VECKOKKOS, VECSEQKOKKOS, VECMPIKOKKOS, ""));
+  *type = is_kokkos ? MATAIJKOKKOS : MATAIJ;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// observation operator: height (DOF 0) at every obs_stride-th cell
+// (same layout as the LETKF driver's observation matrix)
+static PetscErrorCode CreateObservationMatrix(MPI_Comm comm, PetscInt ncells, Vec u_global, PetscInt obs_stride, Mat *H,
+                                              PetscInt *nobs) {
+  PetscInt state_size = ncells * NDOF;
+  PetscInt n_obs      = 0, state_nlocal;
+  MatType  mat_type;
+  PetscFunctionBeginUser;
+  for (PetscInt i = 0; i < ncells; i++)
+    if (i % obs_stride == 0) n_obs++;
+  PetscCall(VecGetLocalSize(u_global, &state_nlocal));
+
+  PetscCall(MatCreate(comm, H));
+  // the column layout must match u_global's (uneven) DMPlex distribution
+  PetscCall(MatSetSizes(*H, PETSC_DECIDE, state_nlocal, n_obs, state_size));
+  PetscCall(ObservationMatrixType(u_global, &mat_type));
+  PetscCall(MatSetType(*H, mat_type));
+  PetscCall(MatSeqAIJSetPreallocation(*H, 1, NULL));
+  PetscCall(MatMPIAIJSetPreallocation(*H, 1, NULL, 1, NULL));
+
+  PetscInt rstart, rend, obs_idx = 0;
+  PetscCall(MatGetOwnershipRange(*H, &rstart, &rend));
+  for (PetscInt i = 0; i < ncells; i++) {
+    if (i % obs_stride == 0) {
+      if (obs_idx >= rstart && obs_idx < rend) PetscCall(MatSetValue(*H, obs_idx, i * NDOF, 1.0, INSERT_VALUES));
+      obs_idx++;
+    }
+  }
+  PetscCall(MatAssemblyBegin(*H, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(*H, MAT_FINAL_ASSEMBLY));
+  *nobs = n_obs;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// gauge observation operator: height (DOF 0) at gauge cells given by NATURAL
+// cell IDs (mesh-file order, the numbering observations.sites.cells and
+// map_gauges_to_cells.py use). Also returns the bed elevation (centroid z) at
+// each gauge, replicated on all ranks, for the WSE <-> h conversion.
+static PetscErrorCode CreateGaugeObservationMatrix(RDy rdy, PetscInt ngauges, const PetscInt *gauge_cells, Mat *H, PetscReal *zb_gauges) {
+  MPI_Comm comm;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectGetComm((PetscObject)rdy->u_global, &comm));
+
+  PetscInt state_lo, state_size, state_nlocal;
+  PetscCall(VecGetOwnershipRange(rdy->u_global, &state_lo, NULL));
+  PetscCall(VecGetSize(rdy->u_global, &state_size));
+  PetscCall(VecGetLocalSize(rdy->u_global, &state_nlocal));
+
+  MatType mat_type;
+  PetscCall(MatCreate(comm, H));
+  // the column layout must match u_global's (uneven) DMPlex distribution
+  PetscCall(MatSetSizes(*H, PETSC_DECIDE, state_nlocal, ngauges, state_size));
+  PetscCall(ObservationMatrixType(rdy->u_global, &mat_type));
+  PetscCall(MatSetType(*H, mat_type));
+  PetscCall(MatSeqAIJSetPreallocation(*H, 1, NULL));
+  PetscCall(MatMPIAIJSetPreallocation(*H, 1, NULL, 1, NULL));
+
+  PetscInt *found;  // how many owned cells matched each gauge (validation)
+  PetscCall(PetscCalloc1(ngauges, &found));
+  for (PetscInt g = 0; g < ngauges; ++g) zb_gauges[g] = 0.0;
+
+  RDyCells *cells = &rdy->mesh.cells;
+  for (PetscInt i = 0; i < rdy->mesh.num_cells; ++i) {
+    if (!cells->is_owned[i]) continue;
+    for (PetscInt g = 0; g < ngauges; ++g) {
+      if (cells->natural_ids[i] == gauge_cells[g]) {
+        PetscInt col = state_lo + cells->local_to_owned[i] * NDOF;  // h dof
+        PetscCall(MatSetValue(*H, g, col, 1.0, INSERT_VALUES));
+        zb_gauges[g] = cells->centroids[i].X[2];
+        found[g]++;
+      }
+    }
+  }
+  PetscCall(MatAssemblyBegin(*H, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(*H, MAT_FINAL_ASSEMBLY));
+
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, found, ngauges, MPIU_INT, MPI_SUM, comm));
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, zb_gauges, ngauges, MPIU_REAL, MPIU_SUM, comm));
+  for (PetscInt g = 0; g < ngauges; ++g)
+    PetscCheck(found[g] == 1, comm, PETSC_ERR_USER, "gauge %" PetscInt_FMT " (natural cell %" PetscInt_FMT ") matched %" PetscInt_FMT
+               " owned cells (expected exactly 1)", g, gauge_cells[g], found[g]);
+  PetscCall(PetscFree(found));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// gauge observation table: plain text, WSE in meters (same vertical datum as
+// the mesh z). Missing observations are recorded as nan and zero-weighted.
+//   line 1: ngauges K
+//   line 2: ngauges natural cell IDs
+//   lines 3..K+2: time_seconds then ngauges WSE values
+// ---------------------------------------------------------------------------
+
+static PetscErrorCode ReadObsTable(MPI_Comm comm, const char *path, PetscInt *ngauges, PetscInt **gauge_cells, PetscInt *K,
+                                   PetscReal **times, PetscReal **wse) {
+  PetscMPIInt rank;
+  PetscInt    hdr[2] = {0, 0};
+  PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  FILE *fp = NULL;
+  if (rank == 0) {
+    fp = fopen(path, "r");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "could not open observation table %s", path);
+    PetscCheck(fscanf(fp, "%" PetscInt_FMT " %" PetscInt_FMT, &hdr[0], &hdr[1]) == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
+               "bad header in %s", path);
+  }
+  PetscCallMPI(MPI_Bcast(hdr, 2, MPIU_INT, 0, comm));
+  *ngauges = hdr[0];
+  *K       = hdr[1];
+  PetscCall(PetscMalloc1(*ngauges, gauge_cells));
+  PetscCall(PetscMalloc1(*K, times));
+  PetscCall(PetscMalloc1((*K) * (*ngauges), wse));
+  if (rank == 0) {
+    for (PetscInt g = 0; g < *ngauges; ++g)
+      PetscCheck(fscanf(fp, "%" PetscInt_FMT, &(*gauge_cells)[g]) == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "bad cell list in %s", path);
+    for (PetscInt k = 0; k < *K; ++k) {
+      PetscCheck(fscanf(fp, "%lf", &(*times)[k]) == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "bad time row %" PetscInt_FMT " in %s", k, path);
+      for (PetscInt g = 0; g < *ngauges; ++g)
+        PetscCheck(fscanf(fp, "%lf", &(*wse)[k * (*ngauges) + g]) == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
+                   "bad wse row %" PetscInt_FMT " in %s", k, path);
+    }
+    fclose(fp);
+  }
+  PetscCallMPI(MPI_Bcast(*gauge_cells, *ngauges, MPIU_INT, 0, comm));
+  PetscCallMPI(MPI_Bcast(*times, *K, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Bcast(*wse, (*K) * (*ngauges), MPIU_REAL, 0, comm));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// gathers each y_k (h at gauges) to rank 0, converts to WSE with zb, writes the table
+static PetscErrorCode WriteObsTable(MPI_Comm comm, const char *path, PetscInt ngauges, const PetscInt *gauge_cells, PetscInt K,
+                                    PetscReal obs_dt, Vec *y_k, const PetscReal *zb_gauges) {
+  PetscMPIInt rank;
+  PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  FILE *fp = NULL;
+  if (rank == 0) {
+    fp = fopen(path, "w");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "could not open %s for writing", path);
+    fprintf(fp, "%" PetscInt_FMT " %" PetscInt_FMT "\n", ngauges, K);
+    for (PetscInt g = 0; g < ngauges; ++g) fprintf(fp, "%" PetscInt_FMT "%c", gauge_cells[g], g + 1 == ngauges ? '\n' : ' ');
+  }
+  for (PetscInt k = 0; k < K; ++k) {
+    Vec        y_all;
+    VecScatter sc;
+    PetscCall(VecScatterCreateToZero(y_k[k], &sc, &y_all));
+    PetscCall(VecScatterBegin(sc, y_k[k], y_all, INSERT_VALUES, SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(sc, y_k[k], y_all, INSERT_VALUES, SCATTER_FORWARD));
+    if (rank == 0) {
+      const PetscScalar *ya;
+      PetscCall(VecGetArrayRead(y_all, &ya));
+      fprintf(fp, "%.10g", (double)((k + 1) * obs_dt));
+      for (PetscInt g = 0; g < ngauges; ++g) fprintf(fp, " %.10g", (double)(PetscRealPart(ya[g]) + zb_gauges[g]));
+      fprintf(fp, "\n");
+      PetscCall(VecRestoreArrayRead(y_all, &ya));
+    }
+    PetscCall(VecScatterDestroy(&sc));
+    PetscCall(VecDestroy(&y_all));
+  }
+  if (rank == 0) fclose(fp);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// high-water-mark table: "n_marks" header, then one "cell_id wse_m" line per
+// mark (natural cell IDs, WSE in meters, same datum as the mesh z; see
+// papers/manning-calibration/data/harvey_hwm/). Several marks may share a cell -- each is an independent
+// observation row.
+static PetscErrorCode ReadHWMFile(MPI_Comm comm, const char *path, PetscInt *nmarks, PetscInt **cells, PetscReal **wse) {
+  PetscMPIInt rank;
+  PetscInt    n = 0;
+  PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  FILE *fp = NULL;
+  if (rank == 0) {
+    fp = fopen(path, "r");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "could not open high-water-mark table %s", path);
+    PetscCheck(fscanf(fp, "%" PetscInt_FMT, &n) == 1, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "bad header in %s", path);
+  }
+  PetscCallMPI(MPI_Bcast(&n, 1, MPIU_INT, 0, comm));
+  *nmarks = n;
+  PetscCall(PetscMalloc1(n, cells));
+  PetscCall(PetscMalloc1(n, wse));
+  if (rank == 0) {
+    for (PetscInt m = 0; m < n; ++m)
+      PetscCheck(fscanf(fp, "%" PetscInt_FMT " %lf", &(*cells)[m], &(*wse)[m]) == 2, PETSC_COMM_SELF, PETSC_ERR_FILE_READ,
+                 "bad mark row %" PetscInt_FMT " in %s", m, path);
+    fclose(fp);
+  }
+  PetscCallMPI(MPI_Bcast(*cells, n, MPIU_INT, 0, comm));
+  PetscCallMPI(MPI_Bcast(*wse, n, MPIU_REAL, 0, comm));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode WriteHWMFile(MPI_Comm comm, const char *path, PetscInt nmarks, const PetscInt *cells, const PetscReal *wse) {
+  PetscMPIInt rank;
+  PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (rank == 0) {
+    FILE *fp = fopen(path, "w");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "could not open %s for writing", path);
+    fprintf(fp, "%" PetscInt_FMT "\n", nmarks);
+    for (PetscInt m = 0; m < nmarks; ++m) fprintf(fp, "%" PetscInt_FMT " %.10g\n", cells[m], (double)wse[m]);
+    fclose(fp);
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Reads a PETSc binary Vec written in NATURAL cell order (mesh-file order --
+// what make_nlcd_manning.py and the gauge tools produce) and returns
+// the values for this rank's owned cells, in owned order.
+static PetscErrorCode ReadNaturalCellField(RDy rdy, const char *path, PetscReal **owned_values) {
+  PetscViewer viewer;
+  PetscInt    hdr[2], n_owned;
+  PetscFunctionBeginUser;
+
+  PetscCall(PetscViewerBinaryOpen(rdy->comm, path, FILE_MODE_READ, &viewer));
+  PetscCall(PetscViewerBinaryRead(viewer, hdr, 2, NULL, PETSC_INT));
+  PetscCheck(hdr[0] == 1211214, rdy->comm, PETSC_ERR_FILE_UNEXPECTED, "%s is not a PETSc binary Vec (classid %" PetscInt_FMT ")", path,
+             hdr[0]);
+  PetscInt ncells_global;
+  PetscCall(RDyGetNumGlobalCells(rdy, &ncells_global));
+  PetscCheck(hdr[1] == ncells_global, rdy->comm, PETSC_ERR_FILE_UNEXPECTED,
+             "%s holds %" PetscInt_FMT " values but the mesh has %" PetscInt_FMT " cells", path, hdr[1], ncells_global);
+
+  PetscReal *all;
+  PetscCall(PetscMalloc1(hdr[1], &all));
+  PetscCall(PetscViewerBinaryRead(viewer, all, hdr[1], NULL, PETSC_REAL));
+  PetscCall(PetscViewerDestroy(&viewer));
+
+  PetscCall(RDyGetNumOwnedCells(rdy, &n_owned));
+  PetscCall(PetscMalloc1(n_owned, owned_values));
+  RDyCells *cells = &rdy->mesh.cells;
+  for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
+    if (!cells->is_owned[c]) continue;
+    (*owned_values)[cells->local_to_owned[c]] = all[cells->natural_ids[c]];
+  }
+  PetscCall(PetscFree(all));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Clears any previously recorded trajectory. The memory trajectory keeps a
+// strict stack, so a new forward solve starting again at step 0 on top of an
+// unconsumed stack aborts with "Illegal modification of a non-top stack
+// element" -- which happens whenever we do two forward passes before an adjoint
+// sweep (truth then perturbed, or a fresh TAO objective evaluation). The disk
+// trajectory tolerates it, but is ~6.5x slower at scale, so keep both usable.
+// The disk ("basic") trajectory records its directory on first setup and then
+// refuses to set up again while that directory exists ("Directory ... not
+// empty"), which breaks any repeated forward pass -- e.g. every TAO iteration.
+// We give it a fixed name (see main) and delete the tree here, so the next
+// setup recreates it. TSTrajectoryReset alone is not enough.
+#define TRAJ_DIR "rdycore-traj"
+
+static PetscErrorCode ResetTrajectory(TS ts) {
+  TSTrajectory tj;
+  PetscFunctionBeginUser;
+  PetscCall(TSGetTrajectory(ts, &tj));
+  if (!tj) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(TSTrajectoryReset(tj));
+  PetscBool is_basic;
+  PetscCall(PetscObjectTypeCompare((PetscObject)tj, TSTRAJECTORYBASIC, &is_basic));
+  if (is_basic) {
+    MPI_Comm    comm;
+    PetscMPIInt rank;
+    PetscCall(PetscObjectGetComm((PetscObject)tj, &comm));
+    PetscCallMPI(MPI_Comm_rank(comm, &rank));
+    if (rank == 0) {
+      PetscBool exists;
+      PetscCall(PetscTestDirectory(TRAJ_DIR, 'w', &exists));
+      if (exists) PetscCall(PetscRMTree(TRAJ_DIR));
+    }
+    PetscCall(PetscBarrier((PetscObject)tj));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// forward solve with observations every `freq` steps (K = total_steps/freq
+// observation times, at steps freq, 2 freq, ..., K freq).
+// mode "record": y_k = H u(t_k). mode "residual": r_k = H u(t_k) - y_k and
+// J = 1/2 sigma^-2 sum_k |r_k|^2. Optional w_k (0/1 per observation)
+// zero-weights missing data in both the misfit and (via r_k) the adjoint.
+//
+// The whole window is ONE TSSolve, with observations taken by a TS monitor.
+// The memory trajectory (checkpointing/revolve) cannot tolerate a segmented
+// forward: TSSolve sets ts->reason before the final TSTrajectorySet of every
+// call, and TSTrajectoryMemorySet_N treats reason != 0 as "end of the forward
+// run" -- it clobbers its total_steps, pops the second-last checkpoint, and
+// skips storing the boundary step, corrupting the checkpoint stack at every
+// interior observation time (SEGV in TSAdjointSolve). The segmented BACKWARD
+// sweep (TSAdjointSetSteps) is fine: no trajectory writes happen there.
+typedef struct {
+  Mat        H;
+  Vec       *y_k, *r_k, *w_k;
+  PetscInt   freq, K;
+  PetscReal  sigma;
+  PetscReal  J;       // accumulated misfit (residual mode)
+  PetscBool  active;  // record only during ForwardObserve's own TSSolve --
+                      // the trajectory's ReCompute replays also fire monitors
+} ObsMonitorCtx;
+
+static ObsMonitorCtx obs_mon;  // one TS per driver run; installed once
+
+// ---------------------------------------------------------------------------
+// Hourly rainfall for the window (raster/unstructured/homogeneous datasets,
+// -raster_rain_dir etc.): RDySetup builds rdy->forcing from those options,
+// but RDyApplyForcing is only invoked by RDyAdvance, which this driver
+// bypasses (single TSSolve per window, for trajectory integrity). The
+// datasets also stream strictly FORWARD in time, while the adjoint's
+// checkpoint recomputes REWIND time. So: preload the mapped per-cell rain for
+// every hour of the window once at setup (monotone RDyApplyForcing calls),
+// then swap the active hour in from a TSPreStage hook -- which fires inside
+// every TSStep, INCLUDING trajectory ReCompute replays -- as a pure function
+// of stage time, so replays reproduce the original forcing exactly. Hour h
+// covers stage times in (h*3600, (h+1)*3600], matching RDyAdvance's
+// hourly-coupling semantics; region id 1 mirrors RDyApplyForcing.
+// The source is state-independent, so no Jacobian/adjoint terms arise.
+typedef struct {
+  RDy         rdy;
+  PetscInt    nhours, ndata;
+  PetscReal **hours;  // [nhours][ndata]: water source (m/s) per owned region cell
+  PetscInt    cur_bucket;
+} RainSchedule;
+
+static RainSchedule rain_sched;  // one TS per driver run, like obs_mon
+
+static PetscErrorCode PreStageApplyRain(TS ts, PetscReal stage_time) {
+  RainSchedule *rs = &rain_sched;
+  (void)ts;
+  PetscFunctionBeginUser;
+  if (!rs->nhours) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscInt bucket = (PetscInt)PetscFloorReal((stage_time - 1e-9) / 3600.0);
+  if (bucket < 0) bucket = 0;
+  if (bucket >= rs->nhours) bucket = rs->nhours - 1;
+  if (bucket != rs->cur_bucket) {
+    PetscCall(RDySetRegionalWaterSource(rs->rdy, 1, rs->ndata, rs->hours[bucket]));
+    rs->cur_bucket = bucket;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// -adjoint_rain_start_hour <h0> shifts the window's rain to event hour h0: the
+// TS clock always restarts at 0 (ForwardObserve/ForwardSolve), so a window that
+// begins mid-event -- e.g. one started from a checkpoint via -restart -- would
+// otherwise replay the rain from the event's first hour. The raster dataset
+// advances exactly ONE file per RDyForcingSetRasterData call whose clock has
+// passed the current file (rdyforcing_dataset.c), so the skipped hours must
+// still be streamed through; only hours >= h0 are retained.
+static PetscErrorCode SetupRainSchedule(RDy rdy, PetscReal t_final) {
+  MPI_Comm comm;
+  PetscFunctionBeginUser;
+  rain_sched = (RainSchedule){.rdy = rdy, .cur_bucket = -1};
+  RDyForcing forcing    = rdy->forcing;
+  PetscInt   start_hour = 0;
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_rain_start_hour", &start_hour, NULL));
+  if (!forcing || forcing->source.type == FORCING_DATASET_UNSET || !forcing->source.ndata) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(PetscObjectGetComm((PetscObject)rdy->ts, &comm));
+  PetscCheck(start_hour >= 0, comm, PETSC_ERR_USER, "-adjoint_rain_start_hour must be >= 0");
+
+  PetscInt nhours = (PetscInt)PetscCeilReal(t_final / 3600.0);
+  if (nhours < 1) nhours = 1;
+  rain_sched.nhours = nhours;
+  rain_sched.ndata  = forcing->source.ndata;
+  PetscCall(PetscMalloc1(nhours, &rain_sched.hours));
+  for (PetscInt h = 0; h < start_hour + nhours; ++h) {
+    PetscCall(RDyApplyForcing(rdy, forcing, 3600.0 * h));  // streams dataset files forward
+    if (h < start_hour) continue;                          // streamed past: before the window
+    PetscInt hw = h - start_hour;
+    PetscCall(PetscMalloc1(rain_sched.ndata, &rain_sched.hours[hw]));
+    for (PetscInt i = 0; i < rain_sched.ndata; ++i) rain_sched.hours[hw][i] = forcing->source.data_for_rdycore[i];
+  }
+  PetscCall(RDySetRegionalWaterSource(rdy, 1, rain_sched.ndata, rain_sched.hours[0]));
+  rain_sched.cur_bucket = 0;
+  PetscCall(TSSetPreStage(rdy->ts, PreStageApplyRain));
+  PetscCall(PetscPrintf(comm,
+                        "rain schedule: %" PetscInt_FMT " hourly datasets preloaded for the %.0f s window (event hours %" PetscInt_FMT "-%" PetscInt_FMT
+                        ")\n",
+                        nhours, (double)t_final, start_hour, start_hour + nhours - 1));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroyRainSchedule(void) {
+  PetscFunctionBeginUser;
+  for (PetscInt h = 0; h < rain_sched.nhours; ++h) PetscCall(PetscFree(rain_sched.hours[h]));
+  if (rain_sched.hours) PetscCall(PetscFree(rain_sched.hours));
+  rain_sched = (RainSchedule){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ObsMonitor(TS ts, PetscInt step, PetscReal t, Vec u, void *ctx) {
+  ObsMonitorCtx *m = ctx;
+  PetscFunctionBeginUser;
+  if (!m->active || step <= 0 || step % m->freq != 0) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscInt k = step / m->freq;
+  if (k > m->K) PetscFunctionReturn(PETSC_SUCCESS);
+  if (m->r_k) {  // residual mode
+    PetscCall(MatMult(m->H, u, m->r_k[k - 1]));
+    PetscCall(VecAXPY(m->r_k[k - 1], -1.0, m->y_k[k - 1]));
+    if (m->w_k) PetscCall(VecPointwiseMult(m->r_k[k - 1], m->r_k[k - 1], m->w_k[k - 1]));
+    PetscReal norm;
+    PetscCall(VecNorm(m->r_k[k - 1], NORM_2, &norm));
+    m->J += 0.5 * norm * norm / (m->sigma * m->sigma);
+  } else {  // record mode
+    PetscCall(MatMult(m->H, u, m->y_k[k - 1]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ForwardObserve(RDy rdy, Vec ic, PetscInt total_steps, PetscInt freq, Mat H, Vec *y_k, Vec *r_k, Vec *w_k,
+                                     PetscReal sigma, PetscReal *J_out) {
+  static PetscBool obs_mon_installed = PETSC_FALSE;
+  PetscFunctionBeginUser;
+  PetscCall(ResetTrajectory(rdy->ts));
+  PetscCall(VecCopy(ic, rdy->u_global));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
+  PetscCall(TSSetStepNumber(rdy->ts, 0));
+  PetscCall(TSSetMaxTime(rdy->ts, PETSC_MAX_REAL));
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+  PetscCall(TSSetMaxSteps(rdy->ts, total_steps));
+
+  if (!obs_mon_installed) {
+    PetscCall(TSMonitorSet(rdy->ts, ObsMonitor, &obs_mon, NULL));
+    obs_mon_installed = PETSC_TRUE;
+  }
+  obs_mon = (ObsMonitorCtx){.H = H, .y_k = y_k, .r_k = r_k, .w_k = w_k, .freq = freq, .K = total_steps / freq, .sigma = sigma};
+  obs_mon.active = PETSC_TRUE;
+  PetscCall(TSSolve(rdy->ts, rdy->u_global));
+  obs_mon.active = PETSC_FALSE;
+  if (J_out) *J_out = obs_mon.J;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// peak-WSE (high-water-mark) observation: one forward pass recording
+// h_k = H u(t_k) at every observation time, then per mark m the peak sample
+// --- peak-probe introspection (kink diagnosis for the FD gate) --------------
+// The peak-WSE objective is only piecewise smooth: an FD probe step can move a
+// mark's argmax time or flip its wet/dry state, and a central difference that
+// straddles such a kink measures a divided difference across two BRANCHES of
+// J, not the one-branch derivative the adjoint computes (the catalog's one
+// open entry). When enabled, ForwardObservePeak deposits each evaluation's
+// per-mark argmax sample and peak height here, and FDCheckParamGradient uses
+// the +/- snapshots to (a) count the marks that flip across each probe pair
+// and (b) rerun the comparison RESTRICTED to the non-flipping marks S. Both
+// FD and the adjoint are linear over marks (J = J_S + J_flip), so on S the
+// objective is branch-constant at the observable level and the two must agree
+// to inner-solve accuracy -- unless a kink BELOW the observable (a wet/dry
+// branch flip in the dynamics itself) is in play, which is what a residual
+// restricted failure would indicate. The restricted adjoint is obtained by
+// zero-weighting the flipped marks and re-evaluating at the base point; the
+// restricted FD comes free from the +/- snapshots.
+typedef struct {
+  PetscBool  enabled;
+  PetscInt   nloc;   // owned marks
+  Vec        y, w;   // borrowed: observations and the LIVE weights vec
+  PetscReal  sigma;
+  PetscInt  *kstar;  // [nloc] argmax sample of the last evaluation
+  PetscReal *hpeak;  // [nloc] model peak h of the last evaluation
+} HwmProbeCtx;
+
+static HwmProbeCtx hwm_probe;  // one TS per driver run, like obs_mon
+
+static PetscErrorCode HwmProbeEnable(Vec y_hwm, Vec w_hwm, PetscReal sigma) {
+  PetscInt rlo, rhi;
+  PetscFunctionBeginUser;
+  PetscCall(VecGetOwnershipRange(y_hwm, &rlo, &rhi));
+  hwm_probe.enabled = PETSC_TRUE;
+  hwm_probe.nloc    = rhi - rlo;
+  hwm_probe.y       = y_hwm;
+  hwm_probe.w       = w_hwm;
+  hwm_probe.sigma   = sigma;
+  PetscCall(PetscMalloc1(PetscMax(hwm_probe.nloc, 1), &hwm_probe.kstar));
+  PetscCall(PetscMalloc1(PetscMax(hwm_probe.nloc, 1), &hwm_probe.hpeak));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode HwmProbeDisable(void) {
+  PetscFunctionBeginUser;
+  PetscCall(PetscFree(hwm_probe.kstar));
+  PetscCall(PetscFree(hwm_probe.hpeak));
+  hwm_probe = (HwmProbeCtx){0};
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// k*_m = argmax_k h_k[m] defines the misfit
+//   J = 1/2 sigma^-2 sum_m ( w_m (h_{k*_m}[m] - y_hwm[m]) )^2
+// and the residual vecs r_k are filled with that residual at k*_m and zero
+// elsewhere -- so AdjointSweepMulti injects each mark's H^T R^-1 r jump at
+// exactly its own peak time, which is the exact gradient of J wherever the
+// argmax is locally constant (ties have measure zero; the argmax may move
+// between TAO iterates, which just means J is piecewise smooth -- standard
+// for peak observables). Peaks are sampled at the observation cadence, not
+// every step; a cadence well under the flood's rise time loses nothing.
+// Also returns the unweighted MAE of peak WSE over the weighted marks (the
+// benchmark number reported against HWM datasets) and the count of marks
+// whose model peak stays below `dry_h`.
+static PetscErrorCode ForwardObservePeak(RDy rdy, Vec ic, PetscInt total_steps, PetscInt freq, Mat H, PetscInt K, Vec *h_k, Vec y_hwm,
+                                         Vec w_hwm, PetscReal sigma, Vec *r_k, PetscReal *J, PetscReal *mae, PetscInt *n_dry,
+                                         const char *dump_path) {
+  const PetscReal dry_h = 0.01;  // model-peak-below-this counts as "model dry at the mark"
+  PetscFunctionBeginUser;
+  PetscCall(ForwardObserve(rdy, ic, total_steps, freq, H, h_k, NULL, NULL, sigma, NULL));  // record mode
+
+  // per owned mark row: peak sample, residual at the peak time only
+  PetscInt rlo, rhi;
+  PetscCall(VecGetOwnershipRange(y_hwm, &rlo, &rhi));
+  const PetscInt nloc = rhi - rlo;
+  PetscInt      *kstar;
+  PetscReal     *hpeak;
+  PetscCall(PetscMalloc1(nloc, &kstar));
+  PetscCall(PetscMalloc1(nloc, &hpeak));
+  for (PetscInt i = 0; i < nloc; ++i) {
+    kstar[i] = 0;
+    hpeak[i] = -PETSC_MAX_REAL;
+  }
+  for (PetscInt k = 0; k < K; ++k) {
+    const PetscScalar *ha;
+    PetscCall(VecGetArrayRead(h_k[k], &ha));
+    for (PetscInt i = 0; i < nloc; ++i) {
+      PetscReal h = PetscRealPart(ha[i]);
+      if (h > hpeak[i]) {
+        hpeak[i] = h;
+        kstar[i] = k;
+      }
+    }
+    PetscCall(VecRestoreArrayRead(h_k[k], &ha));
+  }
+
+  // deposit this evaluation's argmax/peak snapshot for the FD kink diagnosis
+  if (hwm_probe.enabled && hwm_probe.nloc == nloc) {
+    for (PetscInt i = 0; i < nloc; ++i) {
+      hwm_probe.kstar[i] = kstar[i];
+      hwm_probe.hpeak[i] = hpeak[i];
+    }
+  }
+
+  PetscReal sums[3] = {0.0, 0.0, 0.0};  // J, sum |err|, n_weighted; dry count separate
+  PetscReal ndry_l  = 0.0;
+  {
+    const PetscScalar *ya, *wa;
+    PetscCall(VecGetArrayRead(y_hwm, &ya));
+    PetscCall(VecGetArrayRead(w_hwm, &wa));
+    for (PetscInt k = 0; k < K; ++k) PetscCall(VecZeroEntries(r_k[k]));
+    for (PetscInt i = 0; i < nloc; ++i) {
+      PetscReal w = PetscRealPart(wa[i]);
+      if (w == 0.0) continue;
+      PetscReal r = w * (hpeak[i] - PetscRealPart(ya[i]));
+      PetscCall(VecSetValue(r_k[kstar[i]], rlo + i, r, INSERT_VALUES));
+      sums[0] += 0.5 * r * r / (sigma * sigma);
+      sums[1] += PetscAbsReal(hpeak[i] - PetscRealPart(ya[i]));
+      sums[2] += 1.0;
+      if (hpeak[i] < dry_h) ndry_l += 1.0;
+    }
+    PetscCall(VecRestoreArrayRead(y_hwm, &ya));
+    PetscCall(VecRestoreArrayRead(w_hwm, &wa));
+  }
+  for (PetscInt k = 0; k < K; ++k) {
+    PetscCall(VecAssemblyBegin(r_k[k]));
+    PetscCall(VecAssemblyEnd(r_k[k]));
+  }
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)y_hwm, &comm));
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, sums, 3, MPIU_REAL, MPIU_SUM, comm));
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &ndry_l, 1, MPIU_REAL, MPIU_SUM, comm));
+  if (J) *J = sums[0];
+  if (mae) *mae = sums[1] / PetscMax(sums[2], 1.0);
+  if (n_dry) *n_dry = (PetscInt)ndry_l;
+
+  // optional per-mark dump (mark row, weight, observed h, model peak h, peak
+  // step): the raw material for bias/quantile analysis and for placing the
+  // calibration window at the marks' peak times
+  if (dump_path) {
+    Vec vals[4], vals0[4];  // hpeak, peak step, h_obs, weight (same layout)
+    PetscCall(VecDuplicate(y_hwm, &vals[0]));
+    PetscCall(VecDuplicate(y_hwm, &vals[1]));
+    vals[2] = y_hwm;
+    vals[3] = w_hwm;
+    {
+      PetscScalar *pa, *ka;
+      PetscCall(VecGetArray(vals[0], &pa));
+      PetscCall(VecGetArray(vals[1], &ka));
+      for (PetscInt i = 0; i < nloc; ++i) {
+        pa[i] = hpeak[i];
+        ka[i] = (PetscReal)((kstar[i] + 1) * freq);  // step number of the peak sample
+      }
+      PetscCall(VecRestoreArray(vals[0], &pa));
+      PetscCall(VecRestoreArray(vals[1], &ka));
+    }
+    VecScatter sc;
+    PetscCall(VecScatterCreateToZero(vals[0], &sc, &vals0[0]));
+    for (PetscInt v = 1; v < 4; ++v) PetscCall(VecDuplicate(vals0[0], &vals0[v]));
+    for (PetscInt v = 0; v < 4; ++v) {
+      PetscCall(VecScatterBegin(sc, vals[v], vals0[v], INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(sc, vals[v], vals0[v], INSERT_VALUES, SCATTER_FORWARD));
+    }
+    PetscMPIInt rank;
+    PetscCallMPI(MPI_Comm_rank(comm, &rank));
+    if (rank == 0) {
+      FILE *fp = fopen(dump_path, "w");
+      PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "could not open %s for writing", dump_path);
+      const PetscScalar *pa, *ka, *ya, *wa;
+      PetscInt           N;
+      PetscCall(VecGetSize(vals0[0], &N));
+      PetscCall(VecGetArrayRead(vals0[0], &pa));
+      PetscCall(VecGetArrayRead(vals0[1], &ka));
+      PetscCall(VecGetArrayRead(vals0[2], &ya));
+      PetscCall(VecGetArrayRead(vals0[3], &wa));
+      fprintf(fp, "# mark  weight  h_obs[m]  h_model_peak[m]  peak_step\n");
+      for (PetscInt m = 0; m < N; ++m)
+        fprintf(fp, "%" PetscInt_FMT " %g %.6g %.6g %.0f\n", m, (double)PetscRealPart(wa[m]), (double)PetscRealPart(ya[m]),
+                (double)PetscRealPart(pa[m]), (double)PetscRealPart(ka[m]));
+      PetscCall(VecRestoreArrayRead(vals0[0], &pa));
+      PetscCall(VecRestoreArrayRead(vals0[1], &ka));
+      PetscCall(VecRestoreArrayRead(vals0[2], &ya));
+      PetscCall(VecRestoreArrayRead(vals0[3], &wa));
+      fclose(fp);
+    }
+    PetscCall(VecScatterDestroy(&sc));
+    PetscCall(VecDestroy(&vals[0]));
+    PetscCall(VecDestroy(&vals[1]));
+    for (PetscInt v = 0; v < 4; ++v) PetscCall(VecDestroy(&vals0[v]));
+  }
+  PetscCall(PetscFree(kstar));
+  PetscCall(PetscFree(hpeak));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// backward sweep over the observation windows: lambda accumulates the
+// H^T R^-1 r_k jumps at each observation time; mu integrates dJ/dn
+static PetscErrorCode AdjointSweepMulti(RDy rdy, Mat H, PetscReal sigma, PetscInt freq, PetscInt K, Vec *r_k, Vec r_scratch, Vec lambda,
+                                        Vec mu) {
+  PetscFunctionBeginUser;
+  PetscCall(VecCopy(r_k[K - 1], r_scratch));
+  PetscCall(VecScale(r_scratch, 1.0 / (sigma * sigma)));
+  PetscCall(MatMultTranspose(H, r_scratch, lambda));
+  PetscCall(VecZeroEntries(mu));
+  PetscCall(TSSetCostGradients(rdy->ts, 1, &lambda, &mu));
+  Vec jump;
+  PetscCall(VecDuplicate(lambda, &jump));
+  for (PetscInt k = K; k >= 1; --k) {
+    PetscCall(TSAdjointSetSteps(rdy->ts, freq));
+    PetscCall(TSAdjointSolve(rdy->ts));
+    if (k > 1) {
+      PetscCall(VecCopy(r_k[k - 2], r_scratch));
+      PetscCall(VecScale(r_scratch, 1.0 / (sigma * sigma)));
+      PetscCall(MatMultTranspose(H, r_scratch, jump));
+      PetscCall(VecAXPY(lambda, 1.0, jump));
+    }
+  }
+  PetscCall(VecDestroy(&jump));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// resets the TS clock and solves forward from ic (copied into rdy->u_global)
+static PetscErrorCode ForwardSolve(RDy rdy, Vec ic, PetscReal t_final) {
+  PetscFunctionBeginUser;
+  PetscCall(ResetTrajectory(rdy->ts));
+  PetscCall(VecCopy(ic, rdy->u_global));
+  PetscCall(TSSetTime(rdy->ts, 0.0));
+  PetscCall(TSSetStepNumber(rdy->ts, 0));
+  PetscCall(TSSetMaxTime(rdy->ts, t_final));
+  PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_MATCHSTEP));
+  PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+  PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+  PetscCall(TSSolve(rdy->ts, rdy->u_global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// deterministic, decomposition-independent Gaussian observation noise for
+// twin experiments (-adjoint_obs_noise <stddev>, applied to the SYNTHESIZED
+// observations only): each (observation time, global row) pair gets an
+// independent N(0, stddev) draw from a counter-based generator (splitmix64
+// finalizer + Box-Muller), so the noisy twin is bitwise reproducible at any
+// process count.
+static uint64_t SplitMix64(uint64_t z) {
+  z += 0x9E3779B97F4A7C15ULL;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  return z ^ (z >> 31);
+}
+
+static PetscErrorCode AddObservationNoise(Vec *y_k, PetscInt K, PetscReal stddev) {
+  PetscFunctionBeginUser;
+  if (stddev <= 0.0) PetscFunctionReturn(PETSC_SUCCESS);
+  for (PetscInt k = 0; k < K; ++k) {
+    PetscInt     rlo, rhi;
+    PetscScalar *ya;
+    PetscCall(VecGetOwnershipRange(y_k[k], &rlo, &rhi));
+    PetscCall(VecGetArray(y_k[k], &ya));
+    for (PetscInt g = rlo; g < rhi; ++g) {
+      uint64_t  ctr = (uint64_t)(k + 1) * 0x51ED2701ULL + (uint64_t)g;
+      PetscReal u1  = ((SplitMix64(ctr) >> 11) + 1.0) / 9007199254740993.0;  // (0, 1]
+      PetscReal u2  = (SplitMix64(ctr ^ 0xDEADBEEFCAFEF00DULL) >> 11) / 9007199254740992.0;
+      ya[g - rlo] += stddev * PetscSqrtReal(-2.0 * PetscLogReal(u1)) * PetscCosReal(2.0 * PETSC_PI * u2);
+    }
+    PetscCall(VecRestoreArray(y_k[k], &ya));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// With TSSetErrorIfStepFails disabled (so an optimizer trial field that
+// breaks the nonlinear solve rejects softly instead of aborting the run --
+// see the objective functions), any forward pass whose result is USED as
+// data must be verified explicitly.
+static PetscErrorCode CheckTruthForward(RDy rdy, const char *what) {
+  TSConvergedReason r;
+  PetscFunctionBeginUser;
+  PetscCall(TSGetConvergedReason(rdy->ts, &r));
+  PetscCheck(r > 0, PetscObjectComm((PetscObject)rdy->ts), PETSC_ERR_CONV_FAILED, "%s forward solve diverged (%s)", what,
+             TSConvergedReasons[r]);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// returns whether the last forward solve diverged; used by the objective
+// functions to grade a broken trial point with a huge J so the line search
+// backs off, instead of aborting the whole calibration
+static PetscErrorCode ForwardDiverged(RDy rdy, PetscBool *diverged) {
+  TSConvergedReason r;
+  PetscFunctionBeginUser;
+  PetscCall(TSGetConvergedReason(rdy->ts, &r));
+  *diverged = (PetscBool)(r < 0);
+  if (r < 0)
+    PetscCall(PetscPrintf(PetscObjectComm((PetscObject)rdy->ts),
+                          "  objective evaluation: forward solve diverged (%s) -- rejecting this trial point\n", TSConvergedReasons[r]));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// J = 1/2 sigma^-2 |H u - y|^2; optionally returns the residual r = H u - y
+static PetscErrorCode Misfit(Mat H, Vec u, Vec y, PetscReal sigma, Vec r_work, PetscReal *J) {
+  PetscFunctionBeginUser;
+  PetscCall(MatMult(H, u, r_work));
+  PetscCall(VecAXPY(r_work, -1.0, y));
+  PetscReal norm;
+  PetscCall(VecNorm(r_work, NORM_2, &norm));
+  *J = 0.5 * norm * norm / (sigma * sigma);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// TAO calibration mode (-adjoint_calibrate): recover per-region Manning n
+// from synthetic terminal observations (increment 5 of the plan)
+// ---------------------------------------------------------------------------
+
+typedef struct {
+  RDy       rdy;
+  Mat       H;
+  Vec       y, r_work, u_ic, lambda, mu;
+  PetscReal sigma, t_final;
+} CalibrationCtx;
+
+// applies the per-region parameter vector p to the model's Manning field
+static PetscErrorCode ApplyRegionManning(RDy rdy, const PetscReal *p_all) {
+  PetscFunctionBeginUser;
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion *region = &rdy->regions[r];
+    if (region->num_owned_cells > 0) {
+      PetscReal *vals;
+      PetscCall(PetscMalloc1(region->num_owned_cells, &vals));
+      for (PetscInt i = 0; i < region->num_owned_cells; ++i) vals[i] = p_all[r];
+      PetscCall(RDySetRegionalManningsN(rdy, r, region->num_owned_cells, vals));
+      PetscCall(PetscFree(vals));
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// TAO objective + gradient: forward solve -> misfit; adjoint sweep -> mu;
+// region gradient g_r = sum of mu over the region's owned cells
+static PetscErrorCode FormObjectiveAndGradient(Tao tao, Vec p, PetscReal *J, Vec g, void *ctx) {
+  CalibrationCtx *cal = ctx;
+  RDy             rdy = cal->rdy;
+  PetscFunctionBeginUser;
+
+  // broadcast the (tiny) parameter vector to all ranks
+  Vec        p_all_vec;
+  VecScatter scatter;
+  PetscCall(VecScatterCreateToAll(p, &scatter, &p_all_vec));
+  PetscCall(VecScatterBegin(scatter, p, p_all_vec, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(scatter, p, p_all_vec, INSERT_VALUES, SCATTER_FORWARD));
+  const PetscScalar *p_all;
+  PetscCall(VecGetArrayRead(p_all_vec, &p_all));
+
+  PetscReal *p_vals;
+  PetscCall(PetscMalloc1(rdy->num_regions, &p_vals));
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) p_vals[r] = PetscRealPart(p_all[r]);
+  PetscCall(VecRestoreArrayRead(p_all_vec, &p_all));
+  PetscCall(VecScatterDestroy(&scatter));
+  PetscCall(VecDestroy(&p_all_vec));
+
+  PetscCall(ApplyRegionManning(rdy, p_vals));
+  PetscCall(ForwardSolve(rdy, cal->u_ic, cal->t_final));
+  PetscBool diverged;
+  PetscCall(ForwardDiverged(rdy, &diverged));
+  if (diverged) {  // broken trial field: huge J, zero gradient -> line search backs off
+    *J = 1e30;
+    PetscCall(VecZeroEntries(g));
+    PetscCall(PetscFree(p_vals));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  PetscCall(Misfit(cal->H, rdy->u_global, cal->y, cal->sigma, cal->r_work, J));
+
+  // adjoint sweep for dJ/dn (per owned cell)
+  PetscCall(VecScale(cal->r_work, 1.0 / (cal->sigma * cal->sigma)));
+  PetscCall(MatMultTranspose(cal->H, cal->r_work, cal->lambda));
+  PetscCall(VecZeroEntries(cal->mu));
+  PetscCall(TSSetCostGradients(rdy->ts, 1, &cal->lambda, &cal->mu));
+  PetscCall(TSAdjointSolve(rdy->ts));
+
+  // reduce mu over each region's owned cells
+  const PetscScalar *mu_ptr;
+  PetscCall(VecGetArrayRead(cal->mu, &mu_ptr));
+  PetscReal *g_vals;
+  PetscCall(PetscCalloc1(rdy->num_regions, &g_vals));
+  for (PetscInt r = 0; r < rdy->num_regions; ++r) {
+    RDyRegion *region = &rdy->regions[r];
+    for (PetscInt i = 0; i < region->num_owned_cells; ++i) g_vals[r] += PetscRealPart(mu_ptr[region->owned_cell_global_ids[i]]);
+  }
+  PetscCall(VecRestoreArrayRead(cal->mu, &mu_ptr));
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, g_vals, rdy->num_regions, MPIU_REAL, MPIU_SUM, PetscObjectComm((PetscObject)tao)));
+
+  PetscInt lo, hi;
+  PetscCall(VecGetOwnershipRange(g, &lo, &hi));
+  for (PetscInt r = lo; r < hi; ++r) PetscCall(VecSetValue(g, r, g_vals[r], INSERT_VALUES));
+  PetscCall(VecAssemblyBegin(g));
+  PetscCall(VecAssemblyEnd(g));
+  PetscCall(PetscFree(g_vals));
+  PetscCall(PetscFree(p_vals));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// per-cell calibration (-adjoint_calibrate_percell): recover a spatially
+// distributed Manning field with Tikhonov regularization (increment 6)
+// ---------------------------------------------------------------------------
+
+typedef struct {
+  CalibrationCtx base;
+  Vec            n_prior;      // constant prior n0 (also the initial guess)
+  PetscReal      beta;         // Tikhonov weight
+  PetscInt       total_steps;  // forward steps in the window
+  PetscInt       obs_freq;     // observe every obs_freq steps
+  PetscInt       K;            // number of observation times
+  Vec           *y_k, *r_k;    // per-observation-time data and residuals
+  Vec           *w_k;          // optional 0/1 weights (missing data); NULL = all present
+  // peak-WSE (high-water-mark) observation mode: y_k become per-time h
+  // scratch and the misfit compares each mark's PEAK sample against y_hwm
+  PetscBool hwm;
+  Vec       y_hwm, w_hwm;  // per-mark target h (WSE - zb, clamped) and 0/1 weight
+  PetscReal hwm_mae;       // unweighted peak-WSE MAE of the last evaluation
+  PetscInt  hwm_ndry;      // marks whose model peak stayed dry in the last evaluation
+} PerCellCtx;
+
+// J = multi-time misfit + beta/2 |p - n0|^2;  g = mu + beta (p - n0)
+// host vec with the same layout as x: the TAO solution/gradient vecs stay on
+// host types even when the adjoint's mu is a device vec (it follows the
+// device Jacp) -- PETSc's LMVM dense internals abort on CUDA device solution
+// vecs, and the optimizer update cost is negligible next to the solves
+static PetscErrorCode VecDuplicateHostLayout(Vec x, Vec *y) {
+  PetscInt n, N;
+  PetscFunctionBeginUser;
+  PetscCall(VecGetLocalSize(x, &n));
+  PetscCall(VecGetSize(x, &N));
+  PetscCall(VecCreate(PetscObjectComm((PetscObject)x), y));
+  PetscCall(VecSetSizes(*y, n, N));
+  PetscCall(VecSetType(*y, VECSTANDARD));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode FormObjectiveAndGradientPerCell(Tao tao, Vec p, PetscReal *J, Vec g, void *ctx) {
+  PerCellCtx     *pc  = ctx;
+  CalibrationCtx *cal = &pc->base;
+  RDy             rdy = cal->rdy;
+  PetscFunctionBeginUser;
+
+  // apply p (local part == owned cells, same layout as mu)
+  const PetscScalar *p_ptr;
+  PetscInt           n_owned;
+  PetscCall(VecGetLocalSize(p, &n_owned));
+  PetscCall(VecGetArrayRead(p, &p_ptr));
+  PetscReal *n_vals;
+  PetscCall(PetscMalloc1(n_owned, &n_vals));
+  for (PetscInt i = 0; i < n_owned; ++i) n_vals[i] = PetscRealPart(p_ptr[i]);
+  PetscCall(VecRestoreArrayRead(p, &p_ptr));
+  PetscCall(RDySetDomainManningsN(rdy, n_owned, n_vals));
+  PetscCall(PetscFree(n_vals));
+
+  if (pc->hwm) {
+    PetscCall(ForwardObservePeak(rdy, cal->u_ic, pc->total_steps, pc->obs_freq, cal->H, pc->K, pc->y_k, pc->y_hwm, pc->w_hwm, cal->sigma,
+                                 pc->r_k, J, &pc->hwm_mae, &pc->hwm_ndry, NULL));
+  } else {
+    PetscCall(ForwardObserve(rdy, cal->u_ic, pc->total_steps, pc->obs_freq, cal->H, pc->y_k, pc->r_k, pc->w_k, cal->sigma, J));
+  }
+  PetscBool diverged;
+  PetscCall(ForwardDiverged(rdy, &diverged));
+  if (diverged) {  // broken trial field: huge J, zero gradient -> line search backs off
+    *J = 1e30;
+    PetscCall(VecZeroEntries(g));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  PetscCall(AdjointSweepMulti(rdy, cal->H, cal->sigma, pc->obs_freq, pc->K, pc->r_k, cal->r_work, cal->lambda, cal->mu));
+
+  // g = mu + beta (p - n_prior); J += beta/2 |p - n_prior|^2
+  PetscCall(VecCopy(p, g));
+  PetscCall(VecAXPY(g, -1.0, pc->n_prior));
+  PetscReal reg_norm;
+  PetscCall(VecNorm(g, NORM_2, &reg_norm));
+  *J += 0.5 * pc->beta * reg_norm * reg_norm;
+  // mu may be a device vec while g follows the host TAO types, so combine
+  // through host arrays (same g[i] = beta*g[i] + mu[i] as the former VecAYPX)
+  {
+    const PetscScalar *mu_ptr;
+    PetscScalar       *g_ptr;
+    PetscInt           n;
+    PetscCall(VecGetLocalSize(g, &n));
+    PetscCall(VecGetArrayRead(cal->mu, &mu_ptr));
+    PetscCall(VecGetArray(g, &g_ptr));
+    for (PetscInt i = 0; i < n; ++i) g_ptr[i] = mu_ptr[i] + pc->beta * g_ptr[i];
+    PetscCall(VecRestoreArray(g, &g_ptr));
+    PetscCall(VecRestoreArrayRead(cal->mu, &mu_ptr));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// land-cover class calibration (-adjoint_calibrate_classes): one Manning value
+// per NLCD class instead of one per cell. Same forward/adjoint machinery as the
+// per-cell mode; the per-cell gradient mu is summed over each class.
+// ---------------------------------------------------------------------------
+
+typedef struct {
+  PerCellCtx pc;            // forward/adjoint machinery (multi-time gauge obs)
+  PetscInt   nclass;        // number of distinct classes present globally
+  PetscInt  *class_codes;   // [nclass] NLCD code for each parameter
+  PetscInt  *cell_class;    // [n_owned] parameter index for each owned cell
+  PetscInt   n_owned;
+  Vec        p_prior;       // [nclass] prior value per class (NLCD table)
+  PetscReal *prior_k;       // [nclass] the same, replicated on every rank
+  PetscReal *n_k;           // [nclass] Manning n of the point last evaluated
+  PetscReal *n_scratch;     // [n_owned]
+  // -adjoint_classes_relative: the optimizer's variable is alpha_k = n_k/prior_k
+  // and its objective is J/J_start. Both are then O(1) and the quasi-Newton
+  // unit step is a ~10% roughness change instead of a 5-orders-too-large one
+  // that projects onto the bounds. The parameter files, the bounds in n, and
+  // everything printed stay in physical Manning units.
+  PetscBool relative;
+  PetscBool rel_prior;  // -adjoint_sigma_alpha: penalize fractional, not absolute, departure
+  PetscReal Jscale;  // 1 = off; otherwise 1/J at the start point
+  char      dump_path[PETSC_MAX_PATH_LEN];  // -adjoint_classes_dump; "" = off
+} ClassCtx;
+
+// class parameter p_k -> Manning n_k (identity, or alpha_k * prior_k)
+static inline PetscReal ClassN(const ClassCtx *cc, PetscInt k, PetscReal p_k) { return cc->relative ? p_k * cc->prior_k[k] : p_k; }
+
+// The solution in physical Manning units, in the form -adjoint_classes_init
+// reads back, so a calibration too long for one queue slot can be continued by
+// the next job. Written after every TAO iteration and not only at the end: a
+// production window fits only a few iterations in a 12-hour slot, and a job
+// stopped by the wall used to leave nothing to resume from.
+static PetscErrorCode WriteClassSolution(const ClassCtx *cc, Vec p, const char *path, PetscInt its, PetscReal J) {
+  Vec                p_all;
+  VecScatter         sc;
+  const PetscScalar *pa;
+  PetscMPIInt        rank;
+  MPI_Comm           comm;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectGetComm((PetscObject)p, &comm));
+  PetscCall(VecScatterCreateToAll(p, &sc, &p_all));
+  PetscCall(VecScatterBegin(sc, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(sc, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(p_all, &pa));
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (rank == 0) {
+    FILE *fp = fopen(path, "w");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_dump file %s", path);
+    fprintf(fp, "# NLCD_code  manning_n   (after %d TAO iterations, J %.6e)\n", (int)its, (double)J);
+    for (PetscInt kk = 0; kk < cc->nclass; ++kk)
+      fprintf(fp, "%d %.10g\n", (int)cc->class_codes[kk], (double)ClassN(cc, kk, PetscRealPart(pa[kk])));
+    fclose(fp);
+  }
+  PetscCall(VecRestoreArrayRead(p_all, &pa));
+  PetscCall(VecScatterDestroy(&sc));
+  PetscCall(VecDestroy(&p_all));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// Reads a "<NLCD code> <manning n>" table (the form WriteClassSolution emits)
+// into per-class values, matched by code rather than by position so a
+// differing class ordering is not silently misapplied.
+static PetscErrorCode ReadClassTable(MPI_Comm comm, const char *path, PetscInt nclass, const PetscInt *class_codes, PetscReal *out) {
+  PetscInt    nread = 0;
+  PetscMPIInt rank;
+  PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_rank(comm, &rank));
+  if (rank == 0) {
+    FILE *fp = fopen(path, "r");
+    PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot open class table %s", path);
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+      if (line[0] == '#' || line[0] == '\n') continue;
+      int    code;
+      double val;
+      if (sscanf(line, "%d %lf", &code, &val) != 2) continue;
+      for (PetscInt kk = 0; kk < nclass; ++kk) {
+        if (class_codes[kk] == code) {
+          out[kk] = val;
+          ++nread;
+          break;
+        }
+      }
+    }
+    fclose(fp);
+  }
+  PetscCallMPI(MPI_Bcast(out, (int)nclass, MPIU_REAL, 0, comm));
+  PetscCallMPI(MPI_Bcast(&nread, 1, MPIU_INT, 0, comm));
+  PetscCheck(nread == nclass, comm, PETSC_ERR_USER, "%s supplied %" PetscInt_FMT " of %" PetscInt_FMT " classes", path, nread, nclass);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode ClassDumpMonitor(Tao tao, void *ctx) {
+  ClassCtx *cc = ctx;
+  Vec       p;
+  PetscInt  its;
+  PetscReal J;
+  PetscFunctionBeginUser;
+  PetscCall(TaoGetSolution(tao, &p));
+  PetscCall(TaoGetIterationNumber(tao, &its));
+  PetscCall(TaoGetSolutionStatus(tao, NULL, &J, NULL, NULL, NULL, NULL));
+  PetscCall(WriteClassSolution(cc, p, cc->dump_path, its, J / cc->Jscale));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// J = multi-time gauge misfit + beta/2 |n - n_prior|^2;  g_k = sum_{c in k} mu_c
+static PetscErrorCode FormObjectiveAndGradientClasses(Tao tao, Vec p, PetscReal *J, Vec g, void *ctx) {
+  ClassCtx       *cc  = ctx;
+  CalibrationCtx *cal = &cc->pc.base;
+  RDy             rdy = cal->rdy;
+  MPI_Comm        comm;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectGetComm((PetscObject)p, &comm));
+
+  // p is tiny; replicate it so every rank can expand it onto its cells
+  Vec                p_all;
+  VecScatter         scatter;
+  const PetscScalar *pa;
+  PetscCall(VecScatterCreateToAll(p, &scatter, &p_all));
+  PetscCall(VecScatterBegin(scatter, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(scatter, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(p_all, &pa));
+  for (PetscInt k = 0; k < cc->nclass; ++k) cc->n_k[k] = ClassN(cc, k, PetscRealPart(pa[k]));
+  PetscCall(VecRestoreArrayRead(p_all, &pa));
+  for (PetscInt i = 0; i < cc->n_owned; ++i) cc->n_scratch[i] = cc->n_k[cc->cell_class[i]];
+  PetscCall(RDySetDomainManningsN(rdy, cc->n_owned, cc->n_scratch));
+
+  if (cc->pc.hwm) {
+    PetscCall(ForwardObservePeak(rdy, cal->u_ic, cc->pc.total_steps, cc->pc.obs_freq, cal->H, cc->pc.K, cc->pc.y_k, cc->pc.y_hwm,
+                                 cc->pc.w_hwm, cal->sigma, cc->pc.r_k, J, &cc->pc.hwm_mae, &cc->pc.hwm_ndry, NULL));
+  } else {
+    PetscCall(
+        ForwardObserve(rdy, cal->u_ic, cc->pc.total_steps, cc->pc.obs_freq, cal->H, cc->pc.y_k, cc->pc.r_k, cc->pc.w_k, cal->sigma, J));
+  }
+  PetscBool diverged;
+  PetscCall(ForwardDiverged(rdy, &diverged));
+  if (diverged) {  // broken trial field: huge J, zero gradient -> line search backs off
+    *J = 1e30;
+    PetscCall(VecZeroEntries(g));
+    PetscCall(VecScatterDestroy(&scatter));
+    PetscCall(VecDestroy(&p_all));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  PetscCall(AdjointSweepMulti(rdy, cal->H, cal->sigma, cc->pc.obs_freq, cc->pc.K, cc->pc.r_k, cal->r_work, cal->lambda, cal->mu));
+
+  // reduce the per-cell gradient onto classes
+  const PetscScalar *mu;
+  PetscReal         *gk;
+  PetscCall(PetscCalloc1(cc->nclass, &gk));
+  PetscCall(VecGetArrayRead(cal->mu, &mu));
+  for (PetscInt i = 0; i < cc->n_owned; ++i) gk[cc->cell_class[i]] += PetscRealPart(mu[i]);
+  PetscCall(VecRestoreArrayRead(cal->mu, &mu));
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, gk, cc->nclass, MPIU_REAL, MPIU_SUM, comm));
+
+  // Tikhonov toward the NLCD class values. Two forms, and the choice is not
+  // cosmetic. An ABSOLUTE prior (sigma_n, in metres^(-1/3) s) says every class
+  // is known to the same +/- in n -- which for an NLCD table spanning 0.027 to
+  // 0.16 means +/-56% for barren and +/-9% for developed-high, and lets a
+  // small-n class make a large RELATIVE excursion cheaply because the penalty
+  // scales as n_prior^2. That is measurable in the iterates: every class that
+  // ran to the upper bound was small-n and every one that ran to the lower
+  // bound was large-n, which is the prior's signature rather than a statement
+  // about the basin. A RELATIVE prior (sigma_alpha) penalizes fractional
+  // departure instead, which is what "the lookup could be 30% wrong" means and
+  // is the question a domain expert can actually answer.
+  for (PetscInt k = 0; k < cc->nclass; ++k) {
+    if (cc->rel_prior) {
+      PetscReal d = cc->n_k[k] / cc->prior_k[k] - 1.0;  // fractional departure
+      *J += 0.5 * cc->pc.beta * d * d;
+      gk[k] += cc->pc.beta * d / cc->prior_k[k];  // dJ/dn_k
+    } else {
+      PetscReal d = cc->n_k[k] - cc->prior_k[k];
+      *J += 0.5 * cc->pc.beta * d * d;
+      gk[k] += cc->pc.beta * d;
+    }
+  }
+  // chain rule dJ/dalpha_k = prior_k dJ/dn_k, and the objective scaling
+  if (cc->relative)
+    for (PetscInt k = 0; k < cc->nclass; ++k) gk[k] *= cc->prior_k[k];
+  if (cc->Jscale != 1.0) {
+    *J *= cc->Jscale;
+    for (PetscInt k = 0; k < cc->nclass; ++k) gk[k] *= cc->Jscale;
+  }
+  PetscCall(VecScatterDestroy(&scatter));
+  PetscCall(VecDestroy(&p_all));
+
+  PetscInt lo, hi;
+  PetscCall(VecGetOwnershipRange(g, &lo, &hi));
+  for (PetscInt k = lo; k < hi; ++k) PetscCall(VecSetValue(g, k, gk[k], INSERT_VALUES));
+  PetscCall(VecAssemblyBegin(g));
+  PetscCall(VecAssemblyEnd(g));
+  PetscCall(PetscFree(gk));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// high-water-mark observations (-adjoint_hwm_file): peak WSE at surveyed mark
+// cells replaces the multi-time gauge table in the per-cell and class
+// calibration modes. Shared setup for both.
+// ---------------------------------------------------------------------------
+
+// Reads the mark table; with `twin` first refreshes its WSE values from the
+// CURRENT Manning field's forward peaks (the caller sets the truth field
+// beforehand), falling back to marks at every `stride`-th natural cell if the
+// table does not exist yet -- then reads it back so the twin exercises the
+// identical file path real data uses. Builds the observation operator, the
+// per-mark target h (WSE - zb, clamped at 0 with zero weight below bed), and
+// the K per-time scratch/residual vecs.
+static PetscErrorCode SetupHWMObservations(RDy rdy, Vec u_ic, const char *hwm_file, PetscBool twin, PetscReal twin_noise, PetscInt stride,
+                                           PetscInt total_steps, PetscInt obs_freq, PetscReal sigma, PetscInt *K_out, Mat *Hg_out,
+                                           Vec *y_hwm, Vec *w_hwm, Vec **h_k, Vec **r_k, PetscInt *nmarks_out) {
+  MPI_Comm comm;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectGetComm((PetscObject)u_ic, &comm));
+  PetscInt K = total_steps / obs_freq;
+  PetscCheck(K >= 1, comm, PETSC_ERR_USER, "observation cadence %" PetscInt_FMT " exceeds the window (%" PetscInt_FMT " steps)", obs_freq,
+             total_steps);
+
+  if (twin) {
+    // mark cells: reuse the table's if it exists (real mark geometry),
+    // otherwise strided natural cells
+    PetscInt   ng;
+    PetscInt  *gc;
+    PetscReal *wse_old = NULL;
+    PetscBool  table_exists;
+    PetscCall(PetscTestFile(hwm_file, 'r', &table_exists));
+    if (table_exists) {
+      PetscCall(ReadHWMFile(comm, hwm_file, &ng, &gc, &wse_old));
+      PetscCall(PetscFree(wse_old));
+      PetscCall(PetscPrintf(comm, "hwm twin: reusing %" PetscInt_FMT " mark cells from %s\n", ng, hwm_file));
+    } else {
+      PetscInt ncells_global;
+      PetscCall(RDyGetNumGlobalCells(rdy, &ncells_global));
+      ng = (ncells_global + stride - 1) / stride;
+      PetscCall(PetscMalloc1(ng, &gc));
+      for (PetscInt g = 0; g < ng; ++g) gc[g] = g * stride;
+    }
+    PetscReal *zbg;
+    Mat        Hg;
+    PetscCall(PetscMalloc1(ng, &zbg));
+    PetscCall(CreateGaugeObservationMatrix(rdy, ng, gc, &Hg, zbg));
+    Vec *ht;
+    PetscCall(PetscMalloc1(K, &ht));
+    for (PetscInt k = 0; k < K; ++k) PetscCall(MatCreateVecs(Hg, NULL, &ht[k]));
+    PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, ht, NULL, NULL, sigma, NULL));  // record h at the marks
+    PetscCall(CheckTruthForward(rdy, "hwm twin truth"));
+    // peak WSE per mark = zb + max_k h_k, gathered to rank 0 through one vec
+    Vec hpeak;
+    PetscCall(MatCreateVecs(Hg, NULL, &hpeak));
+    PetscCall(VecCopy(ht[0], hpeak));
+    for (PetscInt k = 1; k < K; ++k) PetscCall(VecPointwiseMax(hpeak, hpeak, ht[k]));
+    PetscCall(AddObservationNoise(&hpeak, 1, twin_noise));
+    Vec        hp_all;
+    VecScatter sc;
+    PetscCall(VecScatterCreateToZero(hpeak, &sc, &hp_all));
+    PetscCall(VecScatterBegin(sc, hpeak, hp_all, INSERT_VALUES, SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(sc, hpeak, hp_all, INSERT_VALUES, SCATTER_FORWARD));
+    PetscMPIInt rank;
+    PetscCallMPI(MPI_Comm_rank(comm, &rank));
+    if (rank == 0) {
+      const PetscScalar *hp;
+      PetscReal         *wse_new;
+      PetscCall(PetscMalloc1(ng, &wse_new));
+      PetscCall(VecGetArrayRead(hp_all, &hp));
+      for (PetscInt g = 0; g < ng; ++g) wse_new[g] = PetscRealPart(hp[g]) + zbg[g];
+      PetscCall(VecRestoreArrayRead(hp_all, &hp));
+      PetscCall(WriteHWMFile(PETSC_COMM_SELF, hwm_file, ng, gc, wse_new));
+      PetscCall(PetscFree(wse_new));
+    }
+    PetscCall(PetscBarrier((PetscObject)hpeak));
+    PetscCall(PetscPrintf(comm, "hwm twin: wrote %" PetscInt_FMT " mark peaks (of %" PetscInt_FMT " obs times) to %s\n", ng, K, hwm_file));
+    PetscCall(VecScatterDestroy(&sc));
+    PetscCall(VecDestroy(&hp_all));
+    PetscCall(VecDestroy(&hpeak));
+    for (PetscInt k = 0; k < K; ++k) PetscCall(VecDestroy(&ht[k]));
+    PetscCall(PetscFree(ht));
+    PetscCall(MatDestroy(&Hg));
+    PetscCall(PetscFree(gc));
+    PetscCall(PetscFree(zbg));
+  }
+
+  // read the table and build the observation set from its cells
+  PetscInt   nmarks;
+  PetscInt  *mark_cells;
+  PetscReal *mark_wse;
+  PetscCall(ReadHWMFile(comm, hwm_file, &nmarks, &mark_cells, &mark_wse));
+  PetscReal *zbg;
+  PetscCall(PetscMalloc1(nmarks, &zbg));
+  PetscCall(CreateGaugeObservationMatrix(rdy, nmarks, mark_cells, Hg_out, zbg));
+
+  PetscCall(MatCreateVecs(*Hg_out, NULL, y_hwm));
+  PetscCall(MatCreateVecs(*Hg_out, NULL, w_hwm));
+  PetscInt rlo, rhi, n_below = 0;
+  PetscCall(VecGetOwnershipRange(*y_hwm, &rlo, &rhi));
+  {
+    PetscScalar *ya, *wa;
+    PetscCall(VecGetArray(*y_hwm, &ya));
+    PetscCall(VecGetArray(*w_hwm, &wa));
+    for (PetscInt g = rlo; g < rhi; ++g) {
+      PetscReal h_obs = mark_wse[g] - zbg[g];
+      if (h_obs <= 0.0) {  // mark below the cell-mean bed: unusable (channel-incision trap)
+        ya[g - rlo] = 0.0;
+        wa[g - rlo] = 0.0;
+        n_below++;
+      } else {
+        ya[g - rlo] = h_obs;
+        wa[g - rlo] = 1.0;
+      }
+    }
+    PetscCall(VecRestoreArray(*y_hwm, &ya));
+    PetscCall(VecRestoreArray(*w_hwm, &wa));
+  }
+  PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &n_below, 1, MPIU_INT, MPI_SUM, comm));
+
+  PetscCall(PetscMalloc1(K, h_k));
+  PetscCall(PetscMalloc1(K, r_k));
+  for (PetscInt k = 0; k < K; ++k) {
+    PetscCall(MatCreateVecs(*Hg_out, NULL, &(*h_k)[k]));
+    PetscCall(MatCreateVecs(*Hg_out, NULL, &(*r_k)[k]));
+  }
+  PetscCall(PetscPrintf(comm,
+                        "hwm observations: %" PetscInt_FMT " marks (%" PetscInt_FMT
+                        " below cell bed, zero-weighted), peaks sampled at %" PetscInt_FMT " times every %" PetscInt_FMT " steps\n",
+                        nmarks, n_below, K, obs_freq));
+  *K_out      = K;
+  *nmarks_out = nmarks;
+  PetscCall(PetscFree(mark_cells));
+  PetscCall(PetscFree(mark_wse));
+  PetscCall(PetscFree(zbg));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// g . d for the FD directions: d = ones (s < 0) or the coordinate e_s
+static PetscErrorCode DirDot(Vec g, PetscInt s, PetscReal *out) {
+  PetscFunctionBeginUser;
+  if (s < 0) {
+    PetscCall(VecSum(g, out));
+  } else {
+    MPI_Comm comm;
+    PetscInt lo, hi;
+    PetscCall(PetscObjectGetComm((PetscObject)g, &comm));
+    PetscCall(VecGetOwnershipRange(g, &lo, &hi));
+    PetscReal gl = 0.0;
+    if (s >= lo && s < hi) {
+      const PetscScalar *ga;
+      PetscCall(VecGetArrayRead(g, &ga));
+      gl = PetscRealPart(ga[s - lo]);
+      PetscCall(VecRestoreArrayRead(g, &ga));
+    }
+    PetscCallMPI(MPIU_Allreduce(&gl, out, 1, MPIU_REAL, MPIU_SUM, comm));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// directional FD gate on a TAO parameter gradient: for the all-ones direction
+// and the `nsamp` coordinate directions with the LARGEST |g| (components with
+// negligible gradient are pure central-difference roundoff and say nothing),
+// compare (J(p+eps d)-J(p-eps d)) / (2 eps) against g.d. Each probe evaluates
+// the full objective (the gradient it also computes is discarded). The step is
+// the central-difference optimum cbrt(eps_mach) * scale(p); for the peak-WSE
+// observable the argmax must also not move across the probe -- when it can
+// (basin-scale runs), enable hwm_probe and the check reports, per direction,
+// the flip counts and the comparison restricted to the non-flipping marks.
+static PetscErrorCode FDCheckParamGradient(PetscErrorCode (*obj)(Tao, Vec, PetscReal *, Vec, void *), void *ctx, Vec p, Vec g_ref,
+                                           PetscInt nsamp, PetscReal eps_scale, PetscReal tol, const char *label) {
+  MPI_Comm comm;
+  PetscFunctionBeginUser;
+  PetscCall(PetscObjectGetComm((PetscObject)p, &comm));
+  PetscInt N;
+  PetscCall(VecGetSize(p, &N));
+  PetscReal pnorm;
+  PetscCall(VecNorm(p, NORM_INFINITY, &pnorm));
+  // relative probe step: the u0-check default (1e-6) is far too small for
+  // parameter probes (the forward solve's own noise floor, not eps_mach*J,
+  // sets the roundoff limit), so anything at or below it selects 1e-3 --
+  // the measured optimum of the probe's error V-curve on the dam-break twin
+  // (max rel err 8.6e-7 at 1e-3 vs 4e-5 at 1e-5 and 6e-5 at 1e-2)
+  PetscReal eps_rel = (eps_scale > 1e-6) ? eps_scale : 1e-3;
+  PetscReal eps     = eps_rel * PetscMax(pnorm, 1e-2);
+
+  // the nsamp components with the largest |g|, chosen on rank 0
+  nsamp = PetscMin(nsamp, N);
+  PetscInt *samp_idx = NULL;
+  PetscCall(PetscMalloc1(PetscMax(nsamp, 1), &samp_idx));
+  {
+    Vec        g_all;
+    VecScatter sc;
+    PetscCall(VecScatterCreateToZero(g_ref, &sc, &g_all));
+    PetscCall(VecScatterBegin(sc, g_ref, g_all, INSERT_VALUES, SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(sc, g_ref, g_all, INSERT_VALUES, SCATTER_FORWARD));
+    PetscMPIInt rank;
+    PetscCallMPI(MPI_Comm_rank(comm, &rank));
+    if (rank == 0) {
+      const PetscScalar *ga;
+      PetscBool         *taken;
+      PetscCall(PetscCalloc1(N, &taken));
+      PetscCall(VecGetArrayRead(g_all, &ga));
+      for (PetscInt s = 0; s < nsamp; ++s) {
+        PetscInt  best   = -1;
+        PetscReal bestab = -1.0;
+        for (PetscInt i = 0; i < N; ++i) {
+          if (taken[i]) continue;
+          PetscReal ab = PetscAbsReal(PetscRealPart(ga[i]));
+          if (ab > bestab) {
+            bestab = ab;
+            best   = i;
+          }
+        }
+        taken[best] = PETSC_TRUE;
+        samp_idx[s] = best;
+      }
+      PetscCall(VecRestoreArrayRead(g_all, &ga));
+      PetscCall(PetscFree(taken));
+    }
+    PetscCallMPI(MPI_Bcast(samp_idx, PetscMax(nsamp, 1), MPIU_INT, 0, comm));
+    PetscCall(VecScatterDestroy(&sc));
+    PetscCall(VecDestroy(&g_all));
+  }
+
+  Vec pp, gs;
+  PetscCall(VecDuplicate(p, &pp));
+  PetscCall(VecDuplicate(p, &gs));
+
+  // kink diagnosis: snapshots of the +/- evaluations' per-mark peak state,
+  // and a pristine copy of the weights (each direction's restricted eval
+  // zeroes the flipped marks' weights and must put them back)
+  const PetscBool probe = hwm_probe.enabled;
+  const PetscReal dry_h = 0.01;  // matches ForwardObservePeak
+  PetscInt       *ks_p = NULL, *ks_m = NULL;
+  PetscReal      *hp_p = NULL, *hp_m = NULL;
+  Vec             w_saved = NULL;
+  if (probe) {
+    const PetscInt nl = PetscMax(hwm_probe.nloc, 1);
+    PetscCall(PetscMalloc1(nl, &ks_p));
+    PetscCall(PetscMalloc1(nl, &ks_m));
+    PetscCall(PetscMalloc1(nl, &hp_p));
+    PetscCall(PetscMalloc1(nl, &hp_m));
+    PetscCall(VecDuplicate(hwm_probe.w, &w_saved));
+    PetscCall(VecCopy(hwm_probe.w, w_saved));
+  }
+
+  PetscReal max_rel = 0.0, max_rel_smooth = 0.0;
+  for (PetscInt si = -1; si < nsamp; ++si) {
+    // si = -1: all-ones direction; si >= 0: coordinate direction e_{samp_idx[si]}
+    PetscInt  s = (si < 0) ? -1 : samp_idx[si];
+    PetscReal gdotd;
+    PetscCall(DirDot(g_ref, s, &gdotd));
+    PetscInt plo, phi;
+    PetscCall(VecGetOwnershipRange(pp, &plo, &phi));
+    PetscReal Jp, Jm;
+    PetscCall(VecCopy(p, pp));
+    if (s < 0) PetscCall(VecShift(pp, eps));
+    else if (s >= plo && s < phi) PetscCall(VecSetValue(pp, s, eps, ADD_VALUES));
+    PetscCall(VecAssemblyBegin(pp));
+    PetscCall(VecAssemblyEnd(pp));
+    PetscCall(obj(NULL, pp, &Jp, gs, ctx));
+    if (probe) {
+      for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+        ks_p[i] = hwm_probe.kstar[i];
+        hp_p[i] = hwm_probe.hpeak[i];
+      }
+    }
+    PetscCall(VecCopy(p, pp));
+    if (s < 0) PetscCall(VecShift(pp, -eps));
+    else if (s >= plo && s < phi) PetscCall(VecSetValue(pp, s, -eps, ADD_VALUES));
+    PetscCall(VecAssemblyBegin(pp));
+    PetscCall(VecAssemblyEnd(pp));
+    PetscCall(obj(NULL, pp, &Jm, gs, ctx));
+    if (probe) {
+      for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+        ks_m[i] = hwm_probe.kstar[i];
+        hp_m[i] = hwm_probe.hpeak[i];
+      }
+    }
+    PetscReal fd  = (Jp - Jm) / (2.0 * eps);
+    PetscReal rel = PetscAbsReal(fd - gdotd) / PetscMax(PetscAbsReal(gdotd), 1e-12);
+    if (rel > max_rel) max_rel = rel;
+    char dirname[32];
+    if (s < 0) PetscCall(PetscSNPrintf(dirname, sizeof(dirname), "ones"));
+    else PetscCall(PetscSNPrintf(dirname, sizeof(dirname), "e_%" PetscInt_FMT, s));
+    // Jp and Jm are printed so logs support one-sided-difference and
+    // second-difference analysis: (Jp - 2 J0 + Jm)/eps^2 is bounded for
+    // genuine curvature but grows ~1/eps when a branch surface sits inside
+    // the probe interval -- the cheap kink-vs-curvature discriminator.
+    PetscCall(PetscPrintf(comm, "  %s fd check dir %s: adjoint %.8e  fd %.8e  rel %.3e  (Jp %.10e  Jm %.10e  eps %.3e)\n", label, dirname,
+                          (double)gdotd, (double)fd, (double)rel, (double)Jp, (double)Jm, (double)eps));
+
+    if (probe) {
+      // classify the weighted marks: argmax moved / wet-dry flipped / smooth,
+      // zero the flipped marks' weights, and accumulate the restricted FD
+      // difference from the snapshots (the same forwards as the full check)
+      PetscInt rlo2, rhi2;
+      PetscCall(VecGetOwnershipRange(hwm_probe.w, &rlo2, &rhi2));
+      const PetscScalar *ya, *wa;
+      PetscCall(VecGetArrayRead(hwm_probe.y, &ya));
+      PetscCall(VecGetArrayRead(w_saved, &wa));
+      // n_argmax, n_wetdry, n_smooth, J_S(+), J_S(-)
+      PetscReal acc[5] = {0.0, 0.0, 0.0, 0.0, 0.0};
+      for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+        PetscReal w = PetscRealPart(wa[i]);
+        if (w == 0.0) continue;
+        PetscBool arg_flip = (PetscBool)(ks_p[i] != ks_m[i]);
+        PetscBool wd_flip  = (PetscBool)((hp_p[i] >= dry_h) != (hp_m[i] >= dry_h));
+        if (arg_flip) acc[0] += 1.0;
+        if (wd_flip) acc[1] += 1.0;
+        if (arg_flip || wd_flip) {
+          PetscCall(VecSetValue(hwm_probe.w, rlo2 + i, 0.0, INSERT_VALUES));
+        } else {
+          acc[2] += 1.0;
+          PetscReal rp = w * (hp_p[i] - PetscRealPart(ya[i]));
+          PetscReal rm = w * (hp_m[i] - PetscRealPart(ya[i]));
+          acc[3] += 0.5 * rp * rp / (hwm_probe.sigma * hwm_probe.sigma);
+          acc[4] += 0.5 * rm * rm / (hwm_probe.sigma * hwm_probe.sigma);
+        }
+      }
+      PetscCall(VecRestoreArrayRead(hwm_probe.y, &ya));
+      PetscCall(VecRestoreArrayRead(w_saved, &wa));
+      PetscCall(VecAssemblyBegin(hwm_probe.w));
+      PetscCall(VecAssemblyEnd(hwm_probe.w));
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, acc, 5, MPIU_REAL, MPIU_SUM, comm));
+
+      // restricted adjoint: one evaluation at the BASE point with the flipped
+      // marks zero-weighted -- the gradient of J_S
+      PetscReal J_S, gdotd_S;
+      PetscCall(obj(NULL, p, &J_S, gs, ctx));
+      PetscCall(DirDot(gs, s, &gdotd_S));
+
+      // the endpoints agreeing does not guarantee the BASE argmax matches
+      // them (the argmax can move non-monotonically inside the probe); the
+      // base eval just computed every mark's argmax, so count the exceptions
+      // -- the smooth-subset comparison is only exact where this is zero
+      PetscReal base_mismatch = 0.0;
+      {
+        const PetscScalar *wa2;
+        PetscCall(VecGetArrayRead(w_saved, &wa2));
+        for (PetscInt i = 0; i < hwm_probe.nloc; ++i) {
+          if (PetscRealPart(wa2[i]) == 0.0) continue;
+          if (ks_p[i] == ks_m[i] && (hp_p[i] >= dry_h) == (hp_m[i] >= dry_h) && hwm_probe.kstar[i] != ks_p[i]) base_mismatch += 1.0;
+        }
+        PetscCall(VecRestoreArrayRead(w_saved, &wa2));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &base_mismatch, 1, MPIU_REAL, MPIU_SUM, comm));
+      }
+      PetscCall(VecCopy(w_saved, hwm_probe.w));  // restore for the next direction
+
+      PetscReal fd_S  = (acc[3] - acc[4]) / (2.0 * eps);
+      PetscReal rel_S = PetscAbsReal(fd_S - gdotd_S) / PetscMax(PetscAbsReal(gdotd_S), 1e-12);
+      if (rel_S > max_rel_smooth) max_rel_smooth = rel_S;
+      PetscCall(PetscPrintf(comm,
+                            "    kink probe: argmax moved %d, wet/dry flipped %d of %d weighted marks; smooth subset %d (base argmax differs "
+                            "at %d): J_S %.6e  adjoint %.8e  fd %.8e  rel %.3e\n",
+                            (int)acc[0], (int)acc[1], (int)(acc[0] + acc[1] + acc[2]), (int)acc[2], (int)base_mismatch, (double)J_S,
+                            (double)gdotd_S, (double)fd_S, (double)rel_S));
+    }
+  }
+  if (probe) {
+    PetscCall(PetscPrintf(comm, "  %s kink-probe verdict: max rel error %.3e full, %.3e on the smooth subsets\n", label, (double)max_rel,
+                          (double)max_rel_smooth));
+    PetscCall(PetscFree(ks_p));
+    PetscCall(PetscFree(ks_m));
+    PetscCall(PetscFree(hp_p));
+    PetscCall(PetscFree(hp_m));
+    PetscCall(VecDestroy(&w_saved));
+  }
+  PetscCall(VecDestroy(&pp));
+  PetscCall(VecDestroy(&gs));
+  PetscCall(PetscPrintf(comm, "%s parameter-gradient FD check: max rel error %.3e (gate %.1e)\n", label, (double)max_rel, (double)tol));
+  PetscCheck(max_rel < tol, comm, PETSC_ERR_PLIB, "%s parameter gradient fails the FD gate: %g >= %g", label, (double)max_rel, (double)tol);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// writes a per-owned-cell field as a cell field on a 1-dof clone of the DM
+// (VTK .vtu -- the "Manning map" artifact)
+static PetscErrorCode WriteCellFieldVTK(RDy rdy, Vec p, const char *field_name, const char *filename) {
+  PetscFunctionBeginUser;
+  DM dm1;
+  PetscCall(DMClone(rdy->dm, &dm1));
+  PetscSection sec;
+  PetscInt     c_start, c_end;
+  PetscCall(DMPlexGetHeightStratum(dm1, 0, &c_start, &c_end));
+  PetscCall(PetscSectionCreate(PETSC_COMM_WORLD, &sec));
+  PetscCall(PetscSectionSetNumFields(sec, 1));
+  PetscCall(PetscSectionSetFieldName(sec, 0, field_name));
+  PetscCall(PetscSectionSetFieldComponents(sec, 0, 1));
+  PetscCall(PetscSectionSetChart(sec, c_start, c_end));
+  for (PetscInt c = c_start; c < c_end; ++c) {
+    PetscCall(PetscSectionSetDof(sec, c, 1));
+    PetscCall(PetscSectionSetFieldDof(sec, c, 0, 1));
+  }
+  PetscCall(PetscSectionSetUp(sec));
+  PetscCall(DMSetLocalSection(dm1, sec));
+  PetscCall(PetscSectionDestroy(&sec));
+
+  Vec field;
+  PetscCall(DMCreateGlobalVector(dm1, &field));
+  PetscCall(PetscObjectSetName((PetscObject)field, field_name));
+  // both global vecs enumerate the same owned cells in the same order
+  const PetscScalar *p_ptr;
+  PetscScalar       *f_ptr;
+  PetscInt           n_owned;
+  PetscCall(VecGetLocalSize(p, &n_owned));
+  PetscCall(VecGetArrayRead(p, &p_ptr));
+  PetscCall(VecGetArray(field, &f_ptr));
+  for (PetscInt i = 0; i < n_owned; ++i) f_ptr[i] = p_ptr[i];
+  PetscCall(VecRestoreArray(field, &f_ptr));
+  PetscCall(VecRestoreArrayRead(p, &p_ptr));
+
+  PetscViewer viewer;
+  PetscCall(PetscViewerVTKOpen(PETSC_COMM_WORLD, filename, FILE_MODE_WRITE, &viewer));
+  PetscCall(VecView(field, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(VecDestroy(&field));
+  PetscCall(DMDestroy(&dm1));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+int main(int argc, char *argv[]) {
+  if (argc < 2) {
+    fprintf(stderr, "rdycore_adjoint: usage:\nrdycore_adjoint <input.yaml> [options]\n\n");
+    exit(0);
+  }
+
+  PetscCall(RDyInit(argc, argv, help_str));
+  if (strcmp(argv[1], "-help")) {
+    MPI_Comm comm = PETSC_COMM_WORLD;
+
+    PetscInt  obs_stride = 2, fd_samples = 8;
+    PetscReal sigma = 0.01, ic_perturb = 1e-3, fd_eps = 1e-6, fd_tol = 1e-5;
+    PetscBool calibrate = PETSC_FALSE, calibrate_percell = PETSC_FALSE, calibrate_gauges = PETSC_FALSE, gauges_twin = PETSC_FALSE;
+    PetscInt  obs_freq  = 0;  // per-cell mode: observe every N steps (0 = terminal only)
+    PetscReal beta      = 1e-4;
+    PetscInt  gauge_stride                  = 7;     // twin mode: gauges at natural cells 0, s, 2s, ...
+    PetscReal n0                            = 0.03;  // gauge mode: constant prior
+    char      map_file[PETSC_MAX_PATH_LEN]         = {0};
+    char      obs_file[PETSC_MAX_PATH_LEN]         = {0};
+    char      gauge_cells_file[PETSC_MAX_PATH_LEN] = {0};  // twin mode: real gauge geometry (natural cell IDs)
+    PetscBool have_map_file                        = PETSC_FALSE;
+    PetscBool have_obs_file                        = PETSC_FALSE;
+    PetscBool have_gauge_cells                     = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate", &calibrate, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate_percell", &calibrate_percell, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate_gauges", &calibrate_gauges, NULL));
+    PetscBool sensitivity = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_sensitivity", &sensitivity, NULL));
+    PetscBool calibrate_classes = PETSC_FALSE, classes_twin = PETSC_FALSE;
+    char      class_file[PETSC_MAX_PATH_LEN] = {0}, prior_file[PETSC_MAX_PATH_LEN] = {0};
+    PetscBool have_class_file = PETSC_FALSE, have_prior_file = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_calibrate_classes", &calibrate_classes, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_classes_twin", &classes_twin, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_class_file", class_file, sizeof(class_file), &have_class_file));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_prior_file", prior_file, sizeof(prior_file), &have_prior_file));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_gauges_twin", &gauges_twin, NULL));
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_gauge_stride", &gauge_stride, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_gauge_cells_file", gauge_cells_file, sizeof(gauge_cells_file), &have_gauge_cells));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_n0", &n0, NULL));
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_obs_file", obs_file, sizeof(obs_file), &have_obs_file));
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_freq", &obs_freq, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_beta", &beta, NULL));
+    // -adjoint_sigma_n <s>: the Tikhonov weight set on principle rather than by
+    // hand. beta is dimensional (units of 1/n^2), so a bare value means nothing
+    // across problems and was picked ad hoc in every earlier experiment. Writing
+    // the objective as J = (1/2 sigma^2) sum r^2 + (1/2 sigma_n^2) |n - n_prior|^2
+    // makes the second term a prior with a stated uncertainty on Manning n, so
+    // beta = 1/sigma_n^2 and what gets reported is sigma_n.
+    PetscReal sigma_n      = 0.0;
+    PetscBool have_sigma_n = PETSC_FALSE;
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_sigma_n", &sigma_n, &have_sigma_n));
+    if (have_sigma_n) {
+      PetscCheck(sigma_n > 0.0, comm, PETSC_ERR_USER, "-adjoint_sigma_n must be positive");
+      beta = 1.0 / (sigma_n * sigma_n);
+    }
+    // -adjoint_sigma_alpha <s>: the same prior stated as a FRACTION of the
+    // prior value rather than an absolute offset -- "the lookup could be s*100
+    // percent wrong", which is the form a domain expert can answer and the form
+    // that treats a class at n = 0.027 and one at n = 0.16 alike.
+    PetscReal sigma_alpha      = 0.0;
+    PetscBool have_sigma_alpha = PETSC_FALSE;
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_sigma_alpha", &sigma_alpha, &have_sigma_alpha));
+    if (have_sigma_alpha) {
+      PetscCheck(sigma_alpha > 0.0, comm, PETSC_ERR_USER, "-adjoint_sigma_alpha must be positive");
+      PetscCheck(!have_sigma_n, comm, PETSC_ERR_USER, "give -adjoint_sigma_n or -adjoint_sigma_alpha, not both");
+      beta = 1.0 / (sigma_alpha * sigma_alpha);
+    }
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_map_file", map_file, sizeof(map_file), &have_map_file));
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_obs_stride", &obs_stride, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_error", &sigma, NULL));
+    // -adjoint_obs_above_bed: keep a gauge observation only when the observed
+    // water surface is above the cell's bed by more than -adjoint_obs_min_depth.
+    // A 30 m cell stores the mean ground elevation, which at an incised bayou is
+    // the bank; the gauge hangs in the channel below it, and while the real
+    // water is below the cell bed no roughness can make the model match it.
+    // Masking sets w_k = 0 for that (gauge, time), which removes it from both the
+    // misfit and the adjoint injection; the count of masked observations is
+    // reported so the paper can state how much of the record survived.
+    PetscBool obs_above_bed = PETSC_FALSE;
+    PetscReal obs_min_depth = 0.0;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_obs_above_bed", &obs_above_bed, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_min_depth", &obs_min_depth, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_ic_perturb", &ic_perturb, NULL));
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-adjoint_fd_samples", &fd_samples, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_fd_eps", &fd_eps, NULL));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_fd_tol", &fd_tol, NULL));
+    char      hwm_file[PETSC_MAX_PATH_LEN] = {0};
+    PetscBool have_hwm_file = PETSC_FALSE, hwm_twin = PETSC_FALSE, hwm_fd = PETSC_FALSE;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_hwm_file", hwm_file, sizeof(hwm_file), &have_hwm_file));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_twin", &hwm_twin, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_fd", &hwm_fd, NULL));
+    PetscReal obs_noise = 0.0;  // twin modes: N(0, stddev) noise added to the synthesized observations
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_obs_noise", &obs_noise, NULL));
+
+    // NOTE: the memory/revolve trajectory requires the single-TSSolve
+    // forward in ForwardObserve (see the comment there); both disk and
+    // memory trajectories are supported.
+
+    RDy rdy;
+    PetscCall(RDyCreate(comm, argv[1], &rdy));
+    PetscCall(RDySetup(rdy));
+    PetscCheck(rdy->config.numerics.jacobian != JACOBIAN_NONE, comm, PETSC_ERR_USER,
+               "the adjoint driver requires numerics.jacobian: fd or analytic");
+    PetscCall(TSSetSaveTrajectory(rdy->ts));
+    {
+      // RDycore's TSSetFromOptions ran before the trajectory existed; consume
+      // any -ts_trajectory_* options now so they actually take effect.
+      TSTrajectory tj;
+      PetscCall(TSGetTrajectory(rdy->ts, &tj));
+      PetscCall(TSTrajectorySetFromOptions(tj, rdy->ts));
+      // fixed directory name so ResetTrajectory can clear it between passes
+      PetscCall(TSTrajectorySetDirname(tj, TRAJ_DIR));
+    }
+    // The basic (disk) trajectory VecLoads solution checkpoints during the
+    // adjoint sweep; with useNatural set that goes through the natural-order
+    // path, which PETSc only supports for HDF5 and errors at np>1. This
+    // driver never uses RDycore's natural-order I/O (no output, no native
+    // time series), so natural ordering can be disabled for the run.
+    PetscCall(DMSetUseNatural(rdy->dm, PETSC_FALSE));
+    // A nonlinear-solve failure inside a forward pass must not abort the
+    // whole run: an optimizer trial field can legitimately break the solver
+    // (e.g. near-zero drag at a bound), and the objective functions grade
+    // such a trial with a huge J instead. TSSolve then returns with a
+    // negative reason rather than erroring; every forward whose result is
+    // used as DATA is verified with CheckTruthForward.
+    PetscCall(TSSetErrorIfStepFails(rdy->ts, PETSC_FALSE));
+
+    PetscInt ncells_global;
+    PetscCall(RDyGetNumGlobalCells(rdy, &ncells_global));
+    PetscReal t_final = rdy->dt * rdy->config.time.stop_n;
+
+    // hourly rainfall (if -raster_rain_dir etc. was given): preload the
+    // window's datasets and install the stage-time forcing hook
+    PetscCall(SetupRainSchedule(rdy, t_final));
+
+    Mat      H;
+    PetscInt nobs;
+    PetscCall(CreateObservationMatrix(comm, ncells_global, rdy->u_global, obs_stride, &H, &nobs));
+
+    Vec y, r_work;
+    PetscCall(MatCreateVecs(H, NULL, &y));
+    PetscCall(VecDuplicate(y, &r_work));
+
+    // stash the configured IC
+    Vec u_ic, u_ic_pert;
+    PetscCall(VecDuplicate(rdy->u_global, &u_ic));
+    PetscCall(VecCopy(rdy->u_global, u_ic));
+
+    // -adjoint_ic_scale <a>: multiply the whole initial state by a, which
+    // scales antecedent water volume while leaving every velocity unchanged
+    // (h, hu, hv all scale, so u = hu/h does not). This is the initial
+    // condition's analogue of the uniform roughness scan: one physically
+    // interpretable direction along which to measure how much of the
+    // model-vs-survey discrepancy the antecedent state could ever explain,
+    // before committing to a control vector with 3 unknowns per cell against
+    // a few dozen observations. Applied AFTER -restart has loaded the
+    // checkpoint, so it perturbs the mid-event state a calibration window
+    // actually starts from.
+    {
+      PetscReal ic_scale = 1.0;
+      PetscBool have_ic_scale = PETSC_FALSE;
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_ic_scale", &ic_scale, &have_ic_scale));
+      if (have_ic_scale) {
+        PetscCheck(ic_scale > 0.0, comm, PETSC_ERR_USER, "-adjoint_ic_scale must be positive");
+        PetscReal h_before, h_after;
+        PetscCall(VecStrideMax(u_ic, 0, NULL, &h_before));
+        PetscCall(VecScale(u_ic, ic_scale));
+        PetscCall(VecCopy(u_ic, rdy->u_global));  // keep the model state in step
+        PetscCall(VecStrideMax(u_ic, 0, NULL, &h_after));
+        PetscCall(PetscPrintf(comm, "ic scale: state x %g (max h %.4f -> %.4f m), velocities unchanged\n", (double)ic_scale,
+                              (double)h_before, (double)h_after));
+      }
+    }
+
+    // -adjoint_forward_only: exactly ONE forward over the window, then exit.
+    // Every other mode runs several forwards (a perturbed IC, optimizer
+    // trials, ...), so this is the only mode whose end state -- and whose
+    // yaml `checkpoint:` output -- is the window's forward answer. Used to
+    // produce the restart checkpoint for a mid-event calibration window, and
+    // to compare a restarted window against a continuous run.
+    {
+      PetscBool forward_only = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_forward_only", &forward_only, NULL));
+      if (forward_only) {
+        PetscCall(ForwardSolve(rdy, u_ic, t_final));
+        PetscCall(CheckTruthForward(rdy, "forward-only"));
+        PetscReal unorm, hmin, hmax;
+        PetscCall(VecNorm(rdy->u_global, NORM_2, &unorm));
+        PetscCall(VecStrideMax(rdy->u_global, 0, NULL, &hmax));
+        PetscCall(VecStrideMin(rdy->u_global, 0, NULL, &hmin));
+        PetscCall(PetscPrintf(comm, "forward only: t_final %.1f s  |u|_2 %.10e  h in [%.10e, %.10e]\n", (double)t_final, (double)unorm, (double)hmin,
+                              (double)hmax));
+        PetscCall(VecDestroy(&u_ic));
+        PetscCall(VecDestroy(&y));
+        PetscCall(VecDestroy(&r_work));
+        PetscCall(MatDestroy(&H));
+        PetscCall(DestroyRainSchedule());
+        PetscCall(RDyDestroy(&rdy));
+        PetscCall(RDyFinalize());
+        return 0;
+      }
+    }
+
+    if (calibrate_classes) {
+      // ------------------------------------------------------------------
+      // Land-cover class calibration: one Manning value per NLCD class.
+      // Classes come from a per-cell class map (share/materials/*_class.bin) and the
+      // prior from the matching Manning map (*_manning.bin). Observations are
+      // the same gauge WSE table used by -adjoint_calibrate_gauges; with
+      // -adjoint_classes_twin the table is first synthesised from the NLCD map
+      // itself, which tests whether 18 gauges can recover the class values.
+      // ------------------------------------------------------------------
+      PetscCheck(have_class_file, comm, PETSC_ERR_USER, "-adjoint_calibrate_classes requires -adjoint_class_file");
+      PetscCheck(have_obs_file || have_hwm_file, comm, PETSC_ERR_USER,
+                 "-adjoint_calibrate_classes requires -adjoint_obs_file or -adjoint_hwm_file");
+      PetscCall(TSSetSaveTrajectory(rdy->ts));
+
+      PetscInt n_owned, total_steps = rdy->config.time.stop_n;
+      PetscCall(RDyGetNumOwnedCells(rdy, &n_owned));
+
+      PetscReal *class_field, *prior_field;
+      PetscCall(ReadNaturalCellField(rdy, class_file, &class_field));
+      PetscCall(ReadNaturalCellField(rdy, have_prior_file ? prior_file : class_file, &prior_field));
+
+      // distinct class codes present anywhere in the domain
+      PetscInt  present[256] = {0};
+      for (PetscInt i = 0; i < n_owned; ++i) {
+        PetscInt code = (PetscInt)llround(class_field[i]);
+        PetscCheck(code >= 0 && code < 256, comm, PETSC_ERR_USER, "class code %" PetscInt_FMT " out of range", code);
+        present[code] = 1;
+      }
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, present, 256, MPIU_INT, MPI_MAX, comm));
+      PetscInt nclass = 0;
+      for (PetscInt c = 0; c < 256; ++c) nclass += present[c];
+      PetscCheck(nclass > 0, comm, PETSC_ERR_USER, "no land-cover classes found in %s", class_file);
+
+      ClassCtx cc = {.nclass = nclass, .n_owned = n_owned, .Jscale = 1.0, .rel_prior = have_sigma_alpha};
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_classes_relative", &cc.relative, NULL));
+      PetscCall(PetscMalloc1(nclass, &cc.class_codes));
+      PetscCall(PetscMalloc1(nclass, &cc.prior_k));
+      PetscCall(PetscMalloc1(nclass, &cc.n_k));
+      PetscCall(PetscMalloc1(n_owned, &cc.cell_class));
+      PetscCall(PetscMalloc1(n_owned, &cc.n_scratch));
+      PetscInt idx_of_code[256], k = 0;
+      for (PetscInt c = 0; c < 256; ++c) {
+        if (present[c]) {
+          idx_of_code[c]      = k;
+          cc.class_codes[k++] = c;
+        } else {
+          idx_of_code[c] = -1;
+        }
+      }
+      for (PetscInt i = 0; i < n_owned; ++i) cc.cell_class[i] = idx_of_code[(PetscInt)llround(class_field[i])];
+
+      // class prior = mean of the per-cell prior over that class (= the table value)
+      PetscReal *psum, *pcnt;
+      PetscCall(PetscCalloc1(nclass, &psum));
+      PetscCall(PetscCalloc1(nclass, &pcnt));
+      for (PetscInt i = 0; i < n_owned; ++i) {
+        psum[cc.cell_class[i]] += prior_field[i];
+        pcnt[cc.cell_class[i]] += 1.0;
+      }
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, psum, nclass, MPIU_REAL, MPIU_SUM, comm));
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, pcnt, nclass, MPIU_REAL, MPIU_SUM, comm));
+      for (PetscInt kk = 0; kk < nclass; ++kk) {
+        cc.prior_k[kk] = psum[kk] / PetscMax(pcnt[kk], 1.0);
+        PetscCheck(!cc.relative || cc.prior_k[kk] > 0.0, comm, PETSC_ERR_USER,
+                   "-adjoint_classes_relative needs a positive prior; NLCD class %" PetscInt_FMT " has n = %g", cc.class_codes[kk],
+                   (double)cc.prior_k[kk]);
+      }
+
+      // observation table -> gauge operator and per-time data/weights
+      PetscInt   ngauges, K;
+      PetscInt  *gauge_cells = NULL;
+      PetscReal *obs_times = NULL, *obs_wse = NULL;
+      Mat        Hg;
+      PetscReal *zbg = NULL;
+      Vec       *y_k, *r_k, *w_k = NULL;
+      Vec        y_hwm = NULL, w_hwm = NULL;
+
+      if (have_hwm_file) {
+        // peak-WSE observations at high-water-mark cells; with -adjoint_hwm_twin
+        // the mark values are first synthesized from the NLCD prior as truth
+        if (hwm_twin) {
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+          PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
+        }
+        if (obs_freq <= 0) obs_freq = PetscMax(1, total_steps / 12);
+        PetscCall(SetupHWMObservations(rdy, u_ic, hwm_file, hwm_twin, obs_noise, gauge_stride, total_steps, obs_freq, sigma, &K, &Hg,
+                                       &y_hwm, &w_hwm, &y_k, &r_k, &ngauges));
+        total_steps = (total_steps / obs_freq) * obs_freq;  // stop at the last sample
+      } else if (classes_twin) {
+        // synthesise the observation table from the NLCD map itself. If the
+        // table already exists, keep its gauge cells (so the twin can be run at
+        // the REAL gauge locations) and overwrite only the values; otherwise
+        // fall back to evenly strided cells.
+        for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
+        PetscInt  ng;
+        PetscInt *gc;
+        PetscBool table_exists;
+        PetscCall(PetscTestFile(obs_file, 'r', &table_exists));
+        if (table_exists) {
+          PetscInt   K_tmp;
+          PetscReal *t_tmp, *w_tmp;
+          PetscCall(ReadObsTable(comm, obs_file, &ng, &gc, &K_tmp, &t_tmp, &w_tmp));
+          PetscCall(PetscFree(t_tmp));
+          PetscCall(PetscFree(w_tmp));
+          PetscCall(PetscPrintf(comm, "classes twin: reusing %" PetscInt_FMT " gauge cells from %s\n", ng, obs_file));
+        } else {
+          ng = (ncells_global + gauge_stride - 1) / gauge_stride;
+          PetscCall(PetscMalloc1(ng, &gc));
+          for (PetscInt g = 0; g < ng; ++g) gc[g] = g * gauge_stride;
+        }
+        PetscCall(PetscMalloc1(ng, &zbg));
+        PetscCall(CreateGaugeObservationMatrix(rdy, ng, gc, &Hg, zbg));
+        if (obs_freq <= 0) obs_freq = PetscMax(1, total_steps / 12);
+        PetscInt Kt = total_steps / obs_freq;
+        Vec     *yt;
+        PetscCall(PetscMalloc1(Kt, &yt));
+        for (PetscInt i = 0; i < Kt; ++i) PetscCall(MatCreateVecs(Hg, NULL, &yt[i]));
+        PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, yt, NULL, NULL, sigma, NULL));
+        PetscCall(CheckTruthForward(rdy, "classes twin truth"));
+        PetscCall(AddObservationNoise(yt, Kt, obs_noise));
+        PetscCall(WriteObsTable(comm, obs_file, ng, gc, Kt, obs_freq * rdy->dt, yt, zbg));
+        PetscCall(PetscPrintf(comm, "classes twin: wrote %" PetscInt_FMT " gauges x %" PetscInt_FMT " times to %s\n", ng, Kt, obs_file));
+        for (PetscInt i = 0; i < Kt; ++i) PetscCall(VecDestroy(&yt[i]));
+        PetscCall(PetscFree(yt));
+        PetscCall(MatDestroy(&Hg));
+        PetscCall(PetscFree(gc));
+        PetscCall(PetscFree(zbg));
+      }
+
+      PetscInt n_present = 0, n_below_bed = 0;
+      if (!have_hwm_file) {
+        PetscCall(ReadObsTable(comm, obs_file, &ngauges, &gauge_cells, &K, &obs_times, &obs_wse));
+        PetscInt freq = (PetscInt)llround(obs_times[0] / rdy->dt);
+        PetscCheck(freq >= 1 && K * freq <= total_steps, comm, PETSC_ERR_USER,
+                   "observation table (%" PetscInt_FMT " times every %" PetscInt_FMT " steps) does not fit time.stop_n = %" PetscInt_FMT, K,
+                   freq, total_steps);
+        obs_freq    = freq;
+        total_steps = K * freq;
+
+        PetscCall(PetscMalloc1(ngauges, &zbg));
+        PetscCall(CreateGaugeObservationMatrix(rdy, ngauges, gauge_cells, &Hg, zbg));
+        PetscCall(PetscMalloc1(K, &y_k));
+        PetscCall(PetscMalloc1(K, &r_k));
+        PetscCall(PetscMalloc1(K, &w_k));
+        for (PetscInt kk = 0; kk < K; ++kk) {
+          PetscCall(MatCreateVecs(Hg, NULL, &y_k[kk]));
+          PetscCall(MatCreateVecs(Hg, NULL, &r_k[kk]));
+          PetscCall(MatCreateVecs(Hg, NULL, &w_k[kk]));
+          PetscInt rlo, rhi;
+          PetscCall(VecGetOwnershipRange(y_k[kk], &rlo, &rhi));
+          PetscScalar *ya, *wa;
+          PetscCall(VecGetArray(y_k[kk], &ya));
+          PetscCall(VecGetArray(w_k[kk], &wa));
+          for (PetscInt g = rlo; g < rhi; ++g) {
+            PetscReal wse = obs_wse[kk * ngauges + g];
+            if (PetscIsNanReal(wse)) {
+              ya[g - rlo] = 0.0;
+              wa[g - rlo] = 0.0;
+            } else if (obs_above_bed && wse - zbg[g] <= obs_min_depth) {
+              // the observed water surface is at or below the cell bed: the
+              // cell does not contain this water, so the observation says
+              // nothing about the model's roughness there
+              ya[g - rlo] = 0.0;
+              wa[g - rlo] = 0.0;
+              n_below_bed++;
+            } else {
+              ya[g - rlo] = PetscMax(wse - zbg[g], 0.0);
+              wa[g - rlo] = 1.0;
+              n_present++;
+            }
+          }
+          PetscCall(VecRestoreArray(y_k[kk], &ya));
+          PetscCall(VecRestoreArray(w_k[kk], &wa));
+        }
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &n_present, 1, MPIU_INT, MPI_SUM, comm));  // each rank counted its owned rows
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &n_below_bed, 1, MPIU_INT, MPI_SUM, comm));
+        if (obs_above_bed)
+          PetscCall(PetscPrintf(comm,
+                                "gauge observations: %" PetscInt_FMT " kept, %" PetscInt_FMT " masked with observed WSE within %g m of the cell bed "
+                                "(-adjoint_obs_above_bed), of %" PetscInt_FMT " gauges x %" PetscInt_FMT " times\n",
+                                n_present, n_below_bed, (double)obs_min_depth, ngauges, K));
+      }
+
+      cc.pc = (PerCellCtx){.base        = {.rdy = rdy, .H = Hg, .u_ic = u_ic, .sigma = sigma, .t_final = t_final},
+                           .beta        = beta,
+                           .total_steps = total_steps,
+                           .obs_freq    = obs_freq,
+                           .K           = K,
+                           .y_k         = y_k,
+                           .r_k         = r_k,
+                           .w_k         = w_k,
+                           .hwm         = have_hwm_file,
+                           .y_hwm       = y_hwm,
+                           .w_hwm       = w_hwm};
+      PetscCall(MatCreateVecs(Hg, NULL, &cc.pc.base.r_work));
+      PetscCall(VecDuplicate(rdy->u_global, &cc.pc.base.lambda));
+      PetscCall(MatCreateVecs(rdy->rhs_jac_p, &cc.pc.base.mu, NULL));
+
+      // -adjoint_hwm_eval_only: evaluate the PRIOR field (e.g. the NLCD
+      // Manning map) against the mark table -- one forward, peak extraction,
+      // MAE -- with no adjoint and no optimization. This is how the
+      // uncalibrated model's peak-WSE MAE against the real survey is
+      // measured (the number reported beside calibrated benchmarks).
+      PetscBool hwm_eval_only = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_hwm_eval_only", &hwm_eval_only, NULL));
+      if (have_hwm_file && hwm_eval_only) {
+        // by default this evaluates the PRIOR field; with -adjoint_classes_init
+        // it evaluates a dumped calibration solution instead, so the MAE at any
+        // iterate can be had for one forward (~a third of an objective+gradient)
+        // without regenerating a per-cell Manning file
+        char      eval_init[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_eval_init                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_init", eval_init, sizeof(eval_init), &have_eval_init));
+        if (have_eval_init) {
+          PetscReal *nk;
+          PetscCall(PetscCalloc1(nclass, &nk));
+          PetscCall(ReadClassTable(comm, eval_init, nclass, cc.class_codes, nk));
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = nk[cc.cell_class[i]];
+          PetscCall(PetscPrintf(comm, "hwm eval: evaluating the class table %s, not the prior field\n", eval_init));
+          PetscCall(PetscFree(nk));
+        } else {
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        }
+        PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
+        PetscReal Jp, mae;
+        PetscInt  ndry;
+        char      dump_file[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_dump                     = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_hwm_dump", dump_file, sizeof(dump_file), &have_dump));
+        PetscCall(ForwardObservePeak(rdy, u_ic, total_steps, obs_freq, Hg, K, y_k, y_hwm, w_hwm, sigma, r_k, &Jp, &mae, &ndry,
+                                     have_dump ? dump_file : NULL));
+        PetscCall(CheckTruthForward(rdy, "hwm eval"));
+        PetscCall(PetscPrintf(comm,
+                              "hwm eval (%s): J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT
+                              " marks (%" PetscInt_FMT " obs times over %" PetscInt_FMT " steps)\n",
+                              have_eval_init ? "class table" : "prior field", (double)Jp, (double)mae, ndry, ngauges, K,
+                              total_steps));
+        PetscCall(RDyDestroy(&rdy));
+        PetscCall(RDyFinalize());
+        return 0;
+      }
+
+      // -adjoint_obs_eval_only: the gauge analogue of -adjoint_hwm_eval_only.
+      // One forward of the prior field (or of a -adjoint_classes_init class
+      // table) against the gauge table: J and RMSE over the kept observations,
+      // no adjoint, no TAO. The forward runs in RECORD mode into its own
+      // vectors, so the modelled water height is kept at every (gauge, time),
+      // masked or not, and J is formed here with the kept-observation weights.
+      // With -adjoint_obs_model_dump <file> the modelled WSE table is written
+      // in the observation-table format (ReadObsTable reads it back), plus
+      // <file>.zb with each gauge's cell and bed elevation, so the above-bed
+      // mask and any observation weighting can be rebuilt offline. Sixteen
+      // such forwards (the prior + one per perturbed class) are the
+      // observation-sensitivity matrix of the gauge Gauss-Newton spectrum,
+      // the gauge counterpart of the -adjoint_hwm_dump columns; the prior's
+      // dump minus the table is the per-gauge residual.
+      PetscBool obs_eval_only = PETSC_FALSE;
+      PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_obs_eval_only", &obs_eval_only, NULL));
+      if (!have_hwm_file && obs_eval_only) {
+        char      eval_init[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_eval_init                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_init", eval_init, sizeof(eval_init), &have_eval_init));
+        if (have_eval_init) {
+          PetscReal *nk;
+          PetscCall(PetscCalloc1(nclass, &nk));
+          PetscCall(ReadClassTable(comm, eval_init, nclass, cc.class_codes, nk));
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = nk[cc.cell_class[i]];
+          PetscCall(PetscPrintf(comm, "gauge eval: evaluating the class table %s, not the prior field\n", eval_init));
+          PetscCall(PetscFree(nk));
+        } else {
+          for (PetscInt i = 0; i < n_owned; ++i) cc.n_scratch[i] = prior_field[i];
+        }
+        PetscCall(RDySetDomainManningsN(rdy, n_owned, cc.n_scratch));
+
+        Vec *ym, tmp;
+        PetscCall(PetscMalloc1(K, &ym));
+        for (PetscInt kk = 0; kk < K; ++kk) PetscCall(MatCreateVecs(Hg, NULL, &ym[kk]));
+        PetscCall(MatCreateVecs(Hg, NULL, &tmp));
+        PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, ym, NULL, NULL, sigma, NULL));  // record mode
+        PetscCall(CheckTruthForward(rdy, "gauge eval"));
+        PetscReal Jg = 0.0;
+        for (PetscInt kk = 0; kk < K; ++kk) {  // J = 1/2 sigma^-2 sum_k |w_k (H u_k - y_k)|^2, as ObsMonitor forms it
+          PetscReal nrm;
+          PetscCall(VecWAXPY(tmp, -1.0, y_k[kk], ym[kk]));
+          PetscCall(VecPointwiseMult(tmp, tmp, w_k[kk]));
+          PetscCall(VecNorm(tmp, NORM_2, &nrm));
+          Jg += 0.5 * nrm * nrm / (sigma * sigma);
+        }
+        PetscCall(PetscPrintf(comm,
+                              "gauge eval (%s): J %.6e, RMSE %.4f m over %" PetscInt_FMT " kept observations (%" PetscInt_FMT " gauges x %" PetscInt_FMT
+                              " times, %" PetscInt_FMT " steps)\n",
+                              have_eval_init ? "class table" : "prior field", (double)Jg,
+                              (double)(n_present > 0 ? sigma * PetscSqrtReal(2.0 * Jg / (PetscReal)n_present) : 0.0), n_present, ngauges, K,
+                              total_steps));
+
+        char      model_dump[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_model_dump                = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_obs_model_dump", model_dump, sizeof(model_dump), &have_model_dump));
+        if (have_model_dump) {
+          PetscCall(WriteObsTable(comm, model_dump, ngauges, gauge_cells, K, obs_freq * rdy->dt, ym, zbg));
+          PetscMPIInt rank;
+          PetscCallMPI(MPI_Comm_rank(comm, &rank));
+          if (rank == 0) {
+            char  zb_path[PETSC_MAX_PATH_LEN];
+            FILE *fp;
+            PetscCall(PetscSNPrintf(zb_path, sizeof(zb_path), "%s.zb", model_dump));
+            fp = fopen(zb_path, "w");
+            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write %s", zb_path);
+            fprintf(fp, "# gauge_index cell bed_elevation[m]\n");
+            for (PetscInt g = 0; g < ngauges; ++g) fprintf(fp, "%d %" PetscInt_FMT " %.10g\n", (int)g, gauge_cells[g], (double)zbg[g]);
+            fclose(fp);
+          }
+          PetscCall(PetscPrintf(comm, "gauge eval: modelled WSE table written to %s (+ .zb)\n", model_dump));
+        }
+        for (PetscInt kk = 0; kk < K; ++kk) PetscCall(VecDestroy(&ym[kk]));
+        PetscCall(PetscFree(ym));
+        PetscCall(VecDestroy(&tmp));
+        PetscCall(RDyDestroy(&rdy));
+        PetscCall(RDyFinalize());
+        return 0;
+      }
+
+      Vec p, lb, ub;
+      PetscCall(VecCreate(comm, &p));
+      PetscCall(VecSetSizes(p, PETSC_DECIDE, nclass));
+      PetscCall(VecSetFromOptions(p));
+      PetscCall(VecDuplicate(p, &cc.p_prior));
+      PetscCall(VecDuplicate(p, &lb));
+      PetscCall(VecDuplicate(p, &ub));
+      {
+        PetscInt lo, hi;
+        PetscCall(VecGetOwnershipRange(p, &lo, &hi));
+        for (PetscInt kk = lo; kk < hi; ++kk) PetscCall(VecSetValue(cc.p_prior, kk, cc.prior_k[kk], INSERT_VALUES));
+        PetscCall(VecAssemblyBegin(cc.p_prior));
+        PetscCall(VecAssemblyEnd(cc.p_prior));
+      }
+      // relative mode: the variable is alpha = n/n_prior, so the start point IS
+      // the prior (alpha = 1) and the bounds are relative roughness changes. A
+      // bound in alpha is a physically meaningful statement -- and it keeps the
+      // optimizer out of the region where the implicit solve fails, which a
+      // bound in n (0.005 everywhere) did not: a uniform alpha of 0.2 diverges.
+      PetscReal alpha_min = 0.3, alpha_max = 3.0;
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_classes_alpha_min", &alpha_min, NULL));
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_classes_alpha_max", &alpha_max, NULL));
+      if (cc.relative) {
+        PetscCall(VecSet(p, 1.0));
+        PetscCall(VecSet(lb, alpha_min));
+        PetscCall(VecSet(ub, alpha_max));
+      } else {
+        PetscCall(VecSet(p, n0));  // start from a uniform guess (default 0.03)
+        PetscCall(VecSet(lb, 0.005));
+        PetscCall(VecSet(ub, 0.30));
+      }
+
+      // -adjoint_classes_active <code,code,...>: calibrate ONLY the listed
+      // land-cover classes and hold the rest at their prior, by pinning
+      // lb = ub = prior for the frozen ones (TAO treats an equal-bound
+      // component as fixed). A sensitivity scan can show that nearly all of
+      // the observable's response lives in a few classes; asking the data
+      // for the others then buys nothing and costs the bound-pinning of
+      // weakly constrained parameters. Freezing them is the structural fix
+      // -- fewer, better-determined parameters -- as opposed to leaning on
+      // the Tikhonov weight to suppress them after the fact.
+      {
+        PetscInt  active[64], nactive = 64;
+        PetscBool have_active = PETSC_FALSE;
+        PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-adjoint_classes_active", active, &nactive, &have_active));
+        if (have_active) {
+          PetscCheck(nactive > 0, comm, PETSC_ERR_USER, "-adjoint_classes_active needs at least one class code");
+          PetscInt lo, hi, nfroz = 0;
+          PetscCall(VecGetOwnershipRange(p, &lo, &hi));
+          for (PetscInt kk = 0; kk < nclass; ++kk) {
+            PetscBool on = PETSC_FALSE;
+            for (PetscInt a = 0; a < nactive; ++a)
+              if (cc.class_codes[kk] == active[a]) on = PETSC_TRUE;
+            if (on) continue;
+            ++nfroz;
+            if (kk >= lo && kk < hi) {
+              PetscReal v = cc.relative ? 1.0 : cc.prior_k[kk];  // the prior, in the optimizer's variable
+              PetscCall(VecSetValue(lb, kk, v, INSERT_VALUES));
+              PetscCall(VecSetValue(ub, kk, v, INSERT_VALUES));
+              PetscCall(VecSetValue(p, kk, v, INSERT_VALUES));
+            }
+          }
+          Vec fixed_vecs[3] = {lb, ub, p};
+          for (PetscInt v = 0; v < 3; ++v) {
+            PetscCall(VecAssemblyBegin(fixed_vecs[v]));
+            PetscCall(VecAssemblyEnd(fixed_vecs[v]));
+          }
+          PetscCall(PetscPrintf(comm, "class calibration: %" PetscInt_FMT " of %" PetscInt_FMT " classes active, %" PetscInt_FMT " frozen at prior\n",
+                                nclass - nfroz, nclass, nfroz));
+        }
+      }
+
+      // -adjoint_classes_init <file>: start TAO from a previously dumped
+      // parameter vector instead of the uniform n0. A production calibration
+      // window needs more TAO iterations than fit in one queue slot, so a run
+      // dumps its solution (-adjoint_classes_dump) and the next job resumes
+      // from it. This is a warm start in the PARAMETERS only -- BLMVM's
+      // quasi-Newton history does not survive, so a chain of jobs is not
+      // step-for-step identical to one long run. Values are matched by NLCD
+      // code, not by position, so a differing class ordering is not silently
+      // misapplied.
+      {
+        char      init_file[PETSC_MAX_PATH_LEN] = {0};
+        PetscBool have_init                     = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_init", init_file, sizeof(init_file), &have_init));
+        if (have_init) {
+          PetscReal *pin;
+          PetscCall(PetscCalloc1(nclass, &pin));
+          PetscCall(ReadClassTable(comm, init_file, nclass, cc.class_codes, pin));
+          PetscInt lo, hi;
+          PetscCall(VecGetOwnershipRange(p, &lo, &hi));
+          // the file is in physical Manning units whatever the optimizer's
+          // variable is, so a chain of jobs and the NLCD prior table are
+          // interchangeable across the two modes
+          for (PetscInt kk = lo; kk < hi; ++kk)
+            PetscCall(VecSetValue(p, kk, cc.relative ? pin[kk] / cc.prior_k[kk] : pin[kk], INSERT_VALUES));
+          PetscCall(VecAssemblyBegin(p));
+          PetscCall(VecAssemblyEnd(p));
+          PetscCall(PetscFree(pin));
+          PetscCall(PetscPrintf(comm, "class calibration: warm start from %s (%" PetscInt_FMT " classes)\n", init_file, nclass));
+        }
+      }
+
+      // beta is dimensional, so report the prior std dev it corresponds to
+      PetscCall(PetscPrintf(comm, "class calibration: prior sigma_%s = %.4f (beta = %.4e)%s\n", cc.rel_prior ? "alpha" : "n",
+                            (double)(1.0 / PetscSqrtReal(beta)), (double)beta,
+                            cc.relative ? ", relative variables alpha = n/n_prior" : ""));
+      if (cc.relative)
+        PetscCall(PetscPrintf(comm, "class calibration: alpha bounds [%.3f, %.3f]\n", (double)alpha_min, (double)alpha_max));
+      if (have_hwm_file) {
+        PetscCall(PetscPrintf(comm,
+                              "class calibration (hwm peaks): %" PetscInt_FMT " classes, %" PetscInt_FMT " marks, start n = %g, beta = %.1e\n",
+                              nclass, ngauges, (double)n0, (double)beta));
+      } else {
+        PetscCall(PetscPrintf(comm,
+                              "class calibration: %" PetscInt_FMT " classes, %" PetscInt_FMT " gauges, %" PetscInt_FMT
+                              " obs times (every %" PetscInt_FMT " steps), %d observations, start n = %g, beta = %.1e\n",
+                              nclass, ngauges, K, obs_freq, (int)n_present, (double)n0, (double)beta));
+      }
+
+      char      grad_file[PETSC_MAX_PATH_LEN] = {0};
+      PetscBool have_grad_dump                = PETSC_FALSE;
+      PetscBool have_dump_p                   = PETSC_FALSE;
+      PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_grad_dump", grad_file, sizeof(grad_file), &have_grad_dump));
+      PetscCall(PetscOptionsGetString(NULL, NULL, "-adjoint_classes_dump", cc.dump_path, sizeof(cc.dump_path), &have_dump_p));
+
+      PetscReal J_class_init = -1.0;  // < 0 = not evaluated (no reduction gate)
+      if (have_hwm_file || hwm_fd || cc.relative || have_grad_dump) {
+        // initial misfit + peak-WSE MAE (the HWM benchmark number), and the
+        // optional FD gate on the class-parameter gradient (valid for either
+        // observation mode). Relative mode always evaluates here: it needs
+        // J(start) to scale the objective.
+        Vec       g0;
+        PetscReal J0;
+        PetscCall(VecDuplicate(p, &g0));
+        PetscCall(FormObjectiveAndGradientClasses(NULL, p, &J0, g0, &cc));
+        J_class_init = J0;
+        if (have_hwm_file)
+          PetscCall(PetscPrintf(comm, "hwm init: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
+                                (double)J0, (double)cc.pc.hwm_mae, cc.pc.hwm_ndry, ngauges));
+        // -adjoint_classes_grad_dump <file>: the start point and its gradient,
+        // in physical Manning units. An objective+gradient costs a forward plus
+        // an adjoint sweep while a forward alone is a third of that, so with
+        // this in hand a line search along -g can be run as a series of cheap
+        // -adjoint_hwm_eval_only forwards instead of full TAO trial points.
+        {
+          if (have_grad_dump) {
+            Vec                g_all;
+            VecScatter         gsc;
+            const PetscScalar *ga;
+            PetscMPIInt        rank;
+            PetscCall(VecScatterCreateToAll(g0, &gsc, &g_all));
+            PetscCall(VecScatterBegin(gsc, g0, g_all, INSERT_VALUES, SCATTER_FORWARD));
+            PetscCall(VecScatterEnd(gsc, g0, g_all, INSERT_VALUES, SCATTER_FORWARD));
+            PetscCall(VecGetArrayRead(g_all, &ga));
+            PetscCallMPI(MPI_Comm_rank(comm, &rank));
+            if (rank == 0) {
+              FILE *fp = fopen(grad_file, "w");
+              PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot write -adjoint_classes_grad_dump file %s", grad_file);
+              fprintf(fp, "# NLCD_code  manning_n  dJ/dn   (J %.6e, peak-WSE MAE %.4f m)\n", (double)J0, (double)cc.pc.hwm_mae);
+              for (PetscInt kk = 0; kk < nclass; ++kk) {
+                // g0 is in the optimizer's variable; report dJ/dn either way
+                PetscReal gn = PetscRealPart(ga[kk]) / (cc.relative ? cc.prior_k[kk] : 1.0);
+                fprintf(fp, "%d %.10g %.10g\n", (int)cc.class_codes[kk], (double)cc.n_k[kk], (double)gn);
+              }
+              fclose(fp);
+            }
+            PetscCall(VecRestoreArrayRead(g_all, &ga));
+            PetscCall(VecScatterDestroy(&gsc));
+            PetscCall(VecDestroy(&g_all));
+            PetscCall(PetscPrintf(comm, "class calibration: start-point gradient written to %s\n", grad_file));
+          }
+        }
+        // -adjoint_classes_grad_only: stop here, having written the gradient.
+        // A Gauss-Newton Hessian over K classes is K+1 gradients, and without
+        // this each one would also pay TAO's own start-point evaluation and a
+        // line search -- three evaluations where one is wanted.
+        {
+          PetscBool grad_only = PETSC_FALSE;
+          PetscCall(PetscOptionsGetBool(NULL, NULL, "-adjoint_classes_grad_only", &grad_only, NULL));
+          if (grad_only) {
+            PetscCall(PetscPrintf(comm, "class calibration: gradient-only, exiting after the dump\n"));
+            PetscCall(VecDestroy(&g0));
+            PetscCall(RDyDestroy(&rdy));
+            PetscCall(RDyFinalize());
+            return 0;
+          }
+        }
+        // the FD probe moves the evaluation point, so it comes after anything
+        // that reports the start point
+        if (hwm_fd) {
+          if (have_hwm_file) PetscCall(HwmProbeEnable(cc.pc.y_hwm, cc.pc.w_hwm, sigma));  // kink diagnosis (peak observable only)
+          PetscCall(FDCheckParamGradient(FormObjectiveAndGradientClasses, &cc, p, g0, fd_samples, fd_eps, fd_tol, "hwm-classes"));
+          if (have_hwm_file) PetscCall(HwmProbeDisable());
+        }
+        // scale the objective by 1/J(start) so that it, like the relative
+        // variables, is O(1). BLMVM's first trial point is x - g (its initial
+        // inverse-Hessian estimate is the identity), which is only a sensible
+        // step if g is O(1) in the units of x; unscaled it was 5 orders too
+        // large and projected onto the bounds, where the model cannot solve.
+        if (cc.relative && J0 > 0.0) {
+          cc.Jscale = 1.0 / J0;
+          PetscReal gnorm;
+          PetscCall(VecNorm(g0, NORM_2, &gnorm));
+          PetscCall(PetscPrintf(comm, "class calibration: objective scaled by 1/J0 = %.4e; first trial step |g|/J0 = %.4f in alpha\n",
+                                (double)cc.Jscale, (double)(gnorm * cc.Jscale)));
+        }
+        PetscCall(VecDestroy(&g0));
+      }
+
+      Tao tao;
+      PetscCall(TaoCreate(comm, &tao));
+      PetscCall(TaoSetType(tao, TAOBLMVM));
+      PetscCall(TaoSetSolution(tao, p));
+      PetscCall(TaoSetVariableBounds(tao, lb, ub));
+      PetscCall(TaoSetObjectiveAndGradient(tao, NULL, FormObjectiveAndGradientClasses, &cc));
+      PetscCall(TaoSetTolerances(tao, 1e-12, 1e-12, 1e-12));
+      PetscCall(TaoSetMaximumIterations(tao, 100));
+      // dump after every iteration, not only at the end: a production window
+      // fits ~3 iterations in a 12-hour slot and each one costs ~2 hours, so a
+      // job stopped by the queue wall must still leave the chain a start point
+      if (have_dump_p) PetscCall(TaoMonitorSet(tao, ClassDumpMonitor, &cc, NULL));
+      PetscCall(TaoSetFromOptions(tao));
+      PetscCall(TaoSolve(tao));
+
+      PetscInt  its;
+      PetscReal J_final;
+      PetscCall(TaoGetIterationNumber(tao, &its));
+      PetscCall(TaoGetSolutionStatus(tao, NULL, &J_final, NULL, NULL, NULL, NULL));
+      J_final /= cc.Jscale;  // report J in the units the misfit is defined in
+
+      if (have_hwm_file) {  // re-evaluate AT the solution for the final MAE
+        Vec       gf;
+        PetscReal Jf;
+        PetscCall(VecDuplicate(p, &gf));
+        PetscCall(FormObjectiveAndGradientClasses(NULL, p, &Jf, gf, &cc));
+        PetscCall(PetscPrintf(comm, "hwm final: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
+                              (double)(Jf / cc.Jscale), (double)cc.pc.hwm_mae, cc.pc.hwm_ndry, ngauges));
+        PetscCall(VecDestroy(&gf));
+      }
+
+      // report per class: prior (NLCD) vs recovered
+      Vec        p_all, prior_all;
+      VecScatter sc;
+      PetscCall(VecScatterCreateToAll(p, &sc, &p_all));
+      PetscCall(VecScatterBegin(sc, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(sc, p, p_all, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterDestroy(&sc));
+      PetscCall(VecScatterCreateToAll(cc.p_prior, &sc, &prior_all));
+      PetscCall(VecScatterBegin(sc, cc.p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(sc, cc.p_prior, prior_all, INSERT_VALUES, SCATTER_FORWARD));
+      const PetscScalar *pa, *pp;
+      PetscCall(VecGetArrayRead(p_all, &pa));
+      PetscCall(VecGetArrayRead(prior_all, &pp));
+      PetscCall(PetscPrintf(comm, "  NLCD  prior_n  recovered_n   rel_err   cells\n"));
+      PetscReal max_rel = 0.0, l2num = 0.0, l2den = 0.0;
+      for (PetscInt kk = 0; kk < nclass; ++kk) {
+        PetscReal pr = PetscRealPart(pp[kk]), rc = ClassN(&cc, kk, PetscRealPart(pa[kk]));
+        PetscReal rel = PetscAbsReal(rc - pr) / PetscMax(pr, 1e-12);
+        l2num += Square(rc - pr);
+        l2den += Square(pr);
+        if (rel > max_rel) max_rel = rel;
+        PetscCall(PetscPrintf(comm, "  %4d  %7.4f  %10.4f  %8.3f  %6.0f\n", (int)cc.class_codes[kk], (double)pr, (double)rc, (double)rel,
+                              (double)pcnt[kk]));
+      }
+      if (have_dump_p) {  // final rewrite of the per-iteration dump
+        PetscCall(WriteClassSolution(&cc, p, cc.dump_path, its, J_final));
+        PetscCall(PetscPrintf(comm, "class calibration: solution written to %s\n", cc.dump_path));
+      }
+
+      PetscCall(VecRestoreArrayRead(p_all, &pa));
+      PetscCall(VecRestoreArrayRead(prior_all, &pp));
+      PetscCall(VecDestroy(&p_all));
+      PetscCall(VecDestroy(&prior_all));
+      PetscCall(VecScatterDestroy(&sc));
+      PetscCall(PetscPrintf(comm, "class recovery: %d TAO its, J_final %.6e, rel L2 vs prior %.4f, max class rel err %.4f\n", (int)its,
+                            (double)J_final, (double)PetscSqrtReal(l2num / PetscMax(l2den, 1e-30)), (double)max_rel));
+
+      // -adjoint_jred_gate: require the optimizer to have actually moved. The
+      // first real-data calibration did zero TAO iterations -- every trial
+      // point was rejected -- and reported a "final" objective equal to its
+      // initial one, which no test then caught.
+      {
+        PetscReal jred_gate = 0.0;
+        PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_jred_gate", &jred_gate, NULL));
+        if (jred_gate > 0.0 && J_class_init > 0.0)
+          PetscCheck(J_final < jred_gate * J_class_init, comm, PETSC_ERR_PLIB,
+                     "class calibration misfit reduction too small: %g -> %g over %d TAO iterations", (double)J_class_init,
+                     (double)J_final, (int)its);
+      }
+
+      if (have_map_file) {
+        Vec p_cells;
+        PetscCall(VecDuplicate(cc.pc.base.mu, &p_cells));
+        PetscScalar *pcv;
+        PetscCall(VecGetArray(p_cells, &pcv));
+        for (PetscInt i = 0; i < n_owned; ++i) pcv[i] = cc.n_scratch[i];
+        PetscCall(VecRestoreArray(p_cells, &pcv));
+        PetscCall(WriteCellFieldVTK(rdy, p_cells, "manning_n", map_file));
+        PetscCall(VecDestroy(&p_cells));
+        PetscCall(PetscPrintf(comm, "wrote Manning map: %s\n", map_file));
+      }
+
+      for (PetscInt kk = 0; kk < K; ++kk) {
+        PetscCall(VecDestroy(&y_k[kk]));
+        PetscCall(VecDestroy(&r_k[kk]));
+        if (w_k) PetscCall(VecDestroy(&w_k[kk]));
+      }
+      PetscCall(PetscFree(y_k));
+      PetscCall(PetscFree(r_k));
+      PetscCall(PetscFree(w_k));
+      PetscCall(VecDestroy(&y_hwm));
+      PetscCall(VecDestroy(&w_hwm));
+      PetscCall(PetscFree(psum));
+      PetscCall(PetscFree(pcnt));
+      PetscCall(PetscFree(zbg));
+      PetscCall(PetscFree(gauge_cells));
+      PetscCall(PetscFree(obs_times));
+      PetscCall(PetscFree(obs_wse));
+      PetscCall(PetscFree(class_field));
+      PetscCall(PetscFree(prior_field));
+      PetscCall(PetscFree(cc.class_codes));
+      PetscCall(PetscFree(cc.prior_k));
+      PetscCall(PetscFree(cc.n_k));
+      PetscCall(PetscFree(cc.cell_class));
+      PetscCall(PetscFree(cc.n_scratch));
+      PetscCall(TaoDestroy(&tao));
+      PetscCall(VecDestroy(&p));
+      PetscCall(VecDestroy(&lb));
+      PetscCall(VecDestroy(&ub));
+      PetscCall(VecDestroy(&cc.p_prior));
+      PetscCall(VecDestroy(&cc.pc.base.r_work));
+      PetscCall(VecDestroy(&cc.pc.base.lambda));
+      PetscCall(VecDestroy(&cc.pc.base.mu));
+      PetscCall(MatDestroy(&Hg));
+      PetscCall(VecDestroy(&u_ic));
+      PetscCall(VecDestroy(&y));
+      PetscCall(VecDestroy(&r_work));
+      PetscCall(MatDestroy(&H));
+      PetscCall(RDyDestroy(&rdy));
+      PetscCall(RDyFinalize());
+      return 0;
+    }
+
+    if (sensitivity) {
+      // ------------------------------------------------------------------
+      // Observation-time sensitivity: how much do the observables at time
+      // t_k respond to Manning's n? For each k we solve forward to t_k, seed
+      // the adjoint with a UNIT residual on every gauge (lambda(t_k) = H^T 1,
+      // i.e. the functional J_k = sum_g h_g(t_k)), and sweep back to t=0.
+      // The resulting mu = dJ_k/dn is the sensitivity of the gauge readings
+      // at t_k to the roughness field, so |mu| vs t_k says which part of the
+      // flood actually constrains n -- and which observation hours would be
+      // paid for with no return.
+      // ------------------------------------------------------------------
+      PetscInt total_steps = rdy->config.time.stop_n;
+      if (obs_freq <= 0) obs_freq = PetscMax(1, total_steps / 12);
+      PetscInt K = total_steps / obs_freq;
+
+      Vec ones, obs, lambda, mu;
+      PetscCall(MatCreateVecs(H, NULL, &ones));
+      PetscCall(VecDuplicate(ones, &obs));
+      PetscCall(VecSet(ones, 1.0));
+      PetscCall(VecDuplicate(rdy->u_global, &lambda));
+      PetscCall(MatCreateVecs(rdy->rhs_jac_p, &mu, NULL));
+
+      PetscCall(PetscPrintf(comm, "# observation-time sensitivity of gauge height to Manning n\n"));
+      PetscCall(PetscPrintf(comm, "# %d observation times, every %d steps (dt = %g s), %d gauges\n", (int)K, (int)obs_freq,
+                            (double)rdy->dt, (int)nobs));
+      PetscCall(PetscPrintf(comm, "#   t[s]      mean_h[m]     |dJ/dn|_1      |dJ/dn|_2\n"));
+
+      for (PetscInt k = 1; k <= K; ++k) {
+        PetscCall(ResetTrajectory(rdy->ts));
+        PetscCall(VecCopy(u_ic, rdy->u_global));
+        PetscCall(TSSetTime(rdy->ts, 0.0));
+        PetscCall(TSSetStepNumber(rdy->ts, 0));
+        PetscCall(TSSetMaxTime(rdy->ts, PETSC_MAX_REAL));
+        PetscCall(TSSetExactFinalTime(rdy->ts, TS_EXACTFINALTIME_STEPOVER));
+        PetscCall(TSSetTimeStep(rdy->ts, rdy->dt));
+        PetscCall(TSSetSolution(rdy->ts, rdy->u_global));
+        PetscCall(TSSetMaxSteps(rdy->ts, k * obs_freq));
+        PetscCall(TSSolve(rdy->ts, rdy->u_global));
+
+        PetscCall(MatMult(H, rdy->u_global, obs));  // gauge heights at t_k
+        PetscReal mean_h;
+        PetscCall(VecSum(obs, &mean_h));
+        mean_h /= PetscMax(nobs, 1);
+
+        PetscCall(MatMultTranspose(H, ones, lambda));  // dJ_k/du(t_k) = H^T 1
+        PetscCall(VecZeroEntries(mu));
+        PetscCall(TSSetCostGradients(rdy->ts, 1, &lambda, &mu));
+        PetscCall(TSAdjointSolve(rdy->ts));
+
+        PetscReal s1, s2;
+        PetscCall(VecNorm(mu, NORM_1, &s1));
+        PetscCall(VecNorm(mu, NORM_2, &s2));
+        PetscCall(PetscPrintf(comm, "%10.1f  %12.6f  %13.6e  %13.6e\n", (double)(k * obs_freq * rdy->dt), (double)mean_h, (double)s1,
+                              (double)s2));
+      }
+
+      PetscCall(VecDestroy(&ones));
+      PetscCall(VecDestroy(&obs));
+      PetscCall(VecDestroy(&lambda));
+      PetscCall(VecDestroy(&mu));
+      PetscCall(VecDestroy(&u_ic));
+      PetscCall(VecDestroy(&y));
+      PetscCall(VecDestroy(&r_work));
+      PetscCall(MatDestroy(&H));
+      PetscCall(RDyDestroy(&rdy));
+      PetscCall(RDyFinalize());
+      return 0;
+    }
+
+    if (calibrate_gauges) {
+      // ------------------------------------------------------------------
+      // gauge-observation calibration: per-cell Manning from a WSE table at
+      // gauge cells (the real-data path; see papers/manning-calibration/data/harvey_gauges/). With
+      // -adjoint_gauges_twin, a synthetic table is first generated from a
+      // two-zone truth and written to -adjoint_obs_file, then read back --
+      // exercising the identical file path the real data uses.
+      // ------------------------------------------------------------------
+      PetscCheck(have_obs_file || have_hwm_file, comm, PETSC_ERR_USER,
+                 "-adjoint_calibrate_gauges requires -adjoint_obs_file <table> or -adjoint_hwm_file");
+      PetscCall(TSSetSaveTrajectory(rdy->ts));
+
+      PetscInt n_owned, total_steps = rdy->config.time.stop_n;
+      PetscCall(RDyGetNumOwnedCells(rdy, &n_owned));
+      if (obs_freq <= 0) obs_freq = PetscMax(1, total_steps / 8);
+
+      if (gauges_twin || (hwm_twin && have_hwm_file)) {
+        // truth: two zones split at mid-x (as in the per-cell twin)
+        PetscReal *xc, *n_true;
+        PetscCall(PetscMalloc1(n_owned, &xc));
+        PetscCall(PetscMalloc1(n_owned, &n_true));
+        PetscCall(RDyMeshGetOwnedCellXCentroids(&rdy->mesh, n_owned, xc));
+        PetscReal x_min = PETSC_MAX_REAL, x_max = -PETSC_MAX_REAL;
+        for (PetscInt i = 0; i < n_owned; ++i) {
+          x_min = PetscMin(x_min, xc[i]);
+          x_max = PetscMax(x_max, xc[i]);
+        }
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_min, 1, MPIU_REAL, MPIU_MIN, comm));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_max, 1, MPIU_REAL, MPIU_MAX, comm));
+        for (PetscInt i = 0; i < n_owned; ++i) n_true[i] = (xc[i] < 0.5 * (x_min + x_max)) ? 0.03 : 0.06;
+        PetscCall(RDySetDomainManningsN(rdy, n_owned, n_true));
+        // hwm twin: the truth field is all SetupHWMObservations needs -- it
+        // synthesizes and writes the mark peaks itself below
+        if (!have_hwm_file) {
+        PetscInt   ng;
+        PetscInt  *gcells;
+        PetscReal *zbg;
+        if (have_gauge_cells) {
+          // real gauge geometry: whitespace-separated natural cell IDs
+          // (e.g. papers/manning-calibration/data/harvey_gauges/gauge_cells_real17.txt)
+          PetscMPIInt rank;
+          PetscCallMPI(MPI_Comm_rank(comm, &rank));
+          PetscInt cells_buf[1024], n_read = 0;
+          if (rank == 0) {
+            FILE *fp = fopen(gauge_cells_file, "r");
+            PetscCheck(fp, PETSC_COMM_SELF, PETSC_ERR_FILE_OPEN, "cannot open %s", gauge_cells_file);
+            while (n_read < 1024 && fscanf(fp, "%" PetscInt_FMT, &cells_buf[n_read]) == 1) ++n_read;
+            fclose(fp);
+            PetscCheck(n_read > 0, PETSC_COMM_SELF, PETSC_ERR_FILE_READ, "no cell IDs in %s", gauge_cells_file);
+          }
+          PetscCallMPI(MPI_Bcast(&n_read, 1, MPIU_INT, 0, comm));
+          PetscCallMPI(MPI_Bcast(cells_buf, n_read, MPIU_INT, 0, comm));
+          ng = n_read;
+          PetscCall(PetscMalloc1(ng, &gcells));
+          PetscCall(PetscMalloc1(ng, &zbg));
+          for (PetscInt g = 0; g < ng; ++g) gcells[g] = cells_buf[g];
+        } else {
+          ng = (ncells_global + gauge_stride - 1) / gauge_stride;
+          PetscCall(PetscMalloc1(ng, &gcells));
+          PetscCall(PetscMalloc1(ng, &zbg));
+          for (PetscInt g = 0; g < ng; ++g) gcells[g] = g * gauge_stride;
+        }
+        Mat Hg;
+        PetscCall(CreateGaugeObservationMatrix(rdy, ng, gcells, &Hg, zbg));
+
+        PetscInt K = total_steps / obs_freq;
+        Vec     *y_rec;
+        PetscCall(PetscMalloc1(K, &y_rec));
+        for (PetscInt k = 0; k < K; ++k) PetscCall(MatCreateVecs(Hg, NULL, &y_rec[k]));
+        PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, Hg, y_rec, NULL, NULL, sigma, NULL));
+        PetscCall(CheckTruthForward(rdy, "gauges twin truth"));
+        PetscCall(AddObservationNoise(y_rec, K, obs_noise));
+        PetscCall(WriteObsTable(comm, obs_file, ng, gcells, K, obs_freq * rdy->dt, y_rec, zbg));
+        PetscCall(PetscPrintf(comm, "gauges twin: wrote %" PetscInt_FMT " gauges x %" PetscInt_FMT " obs times to %s\n", ng, K, obs_file));
+        for (PetscInt k = 0; k < K; ++k) PetscCall(VecDestroy(&y_rec[k]));
+        PetscCall(PetscFree(y_rec));
+        PetscCall(MatDestroy(&Hg));
+        PetscCall(PetscFree(gcells));
+        PetscCall(PetscFree(zbg));
+        }  // !have_hwm_file
+        PetscCall(PetscFree(xc));
+        PetscCall(PetscFree(n_true));
+      }
+
+      // read the observation table and rebuild the operator from its cells
+      PetscInt   ngauges, K;
+      PetscInt  *gauge_cells = NULL;
+      PetscReal *obs_times = NULL, *obs_wse = NULL;
+      Vec        y_hwm = NULL, w_hwm = NULL;
+      Mat        Hg_hwm = NULL;
+      Vec       *yk_hwm = NULL, *rk_hwm = NULL;
+      if (have_hwm_file) {
+        PetscCall(SetupHWMObservations(rdy, u_ic, hwm_file, hwm_twin, obs_noise, gauge_stride, total_steps, obs_freq, sigma, &K, &Hg_hwm,
+                                       &y_hwm, &w_hwm, &yk_hwm, &rk_hwm, &ngauges));
+        total_steps = (total_steps / obs_freq) * obs_freq;  // stop at the last sample
+      } else {
+      PetscCall(ReadObsTable(comm, obs_file, &ngauges, &gauge_cells, &K, &obs_times, &obs_wse));
+
+      // observation cadence must be a whole number of steps, uniform in time
+      PetscInt freq = (PetscInt)llround(obs_times[0] / rdy->dt);
+      PetscCheck(freq >= 1, comm, PETSC_ERR_USER, "first observation time %g is before the first step (dt=%g)", (double)obs_times[0],
+                 (double)rdy->dt);
+      for (PetscInt k = 0; k < K; ++k)
+        PetscCheck(PetscAbsReal(obs_times[k] - (PetscReal)(k + 1) * freq * rdy->dt) < 1e-6 * rdy->dt, comm, PETSC_ERR_USER,
+                   "observation times must be uniform at a whole number of steps (row %" PetscInt_FMT ": t=%g, expected %g)", k,
+                   (double)obs_times[k], (double)((k + 1) * freq * rdy->dt));
+      PetscCheck(K * freq <= total_steps, comm, PETSC_ERR_USER,
+                 "observation window (%" PetscInt_FMT " x %" PetscInt_FMT " steps) exceeds time.stop_n = %" PetscInt_FMT, K, freq,
+                 total_steps);
+      obs_freq    = freq;
+      total_steps = K * freq;  // stop the window at the last observation
+      }  // !have_hwm_file
+
+      Mat        Hg  = Hg_hwm;
+      PetscReal *zbg = NULL;
+      Vec *y_k = yk_hwm, *r_k = rk_hwm, *w_k = NULL;
+      PetscInt n_present = 0, n_neg = 0;
+      if (!have_hwm_file) {
+      PetscCall(PetscMalloc1(ngauges, &zbg));
+      PetscCall(CreateGaugeObservationMatrix(rdy, ngauges, gauge_cells, &Hg, zbg));
+
+      // y_k = observed WSE - zb (i.e. observed h); w_k = 0 for missing (nan)
+      PetscCall(PetscMalloc1(K, &y_k));
+      PetscCall(PetscMalloc1(K, &r_k));
+      PetscCall(PetscMalloc1(K, &w_k));
+      for (PetscInt k = 0; k < K; ++k) {
+        PetscCall(MatCreateVecs(Hg, NULL, &y_k[k]));
+        PetscCall(MatCreateVecs(Hg, NULL, &r_k[k]));
+        PetscCall(MatCreateVecs(Hg, NULL, &w_k[k]));
+        PetscInt rlo, rhi;
+        PetscCall(VecGetOwnershipRange(y_k[k], &rlo, &rhi));
+        PetscScalar *ya, *wa;
+        PetscCall(VecGetArray(y_k[k], &ya));
+        PetscCall(VecGetArray(w_k[k], &wa));
+        for (PetscInt g = rlo; g < rhi; ++g) {
+          PetscReal wse = obs_wse[k * ngauges + g];
+          if (PetscIsNanReal(wse)) {
+            ya[g - rlo] = 0.0;
+            wa[g - rlo] = 0.0;
+          } else {
+            PetscReal h_obs = wse - zbg[g];
+            if (h_obs < 0.0) n_neg++;         // gauge below cell-mean bed (incised channel):
+            ya[g - rlo] = PetscMax(h_obs, 0.0);  // clamp; the QC count is reported below
+            wa[g - rlo] = 1.0;
+            n_present++;
+          }
+        }
+        PetscCall(VecRestoreArray(y_k[k], &ya));
+        PetscCall(VecRestoreArray(w_k[k], &wa));
+      }
+      PetscReal counts[2] = {(PetscReal)n_present, (PetscReal)n_neg};
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, counts, 2, MPIU_REAL, MPIU_SUM, comm));
+      PetscCall(PetscPrintf(comm,
+                            "gauge calibration: %" PetscInt_FMT " gauges, %" PetscInt_FMT " obs times (every %" PetscInt_FMT
+                            " steps), %d observations present, %d below cell-mean bed (clamped)\n",
+                            ngauges, K, obs_freq, (int)counts[0], (int)counts[1]));
+      }  // !have_hwm_file
+
+      PerCellCtx pc = {.base        = {.rdy = rdy, .H = Hg, .y = y, .r_work = NULL, .u_ic = u_ic, .sigma = sigma, .t_final = t_final},
+                       .beta        = beta,
+                       .total_steps = total_steps,
+                       .obs_freq    = obs_freq,
+                       .K           = K,
+                       .y_k         = y_k,
+                       .r_k         = r_k,
+                       .w_k         = w_k,
+                       .hwm         = have_hwm_file,
+                       .y_hwm       = y_hwm,
+                       .w_hwm       = w_hwm};
+      PetscCall(MatCreateVecs(Hg, NULL, &pc.base.r_work));
+      PetscCall(VecDuplicate(rdy->u_global, &pc.base.lambda));
+      PetscCall(MatCreateVecs(rdy->rhs_jac_p, &pc.base.mu, NULL));
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &pc.n_prior));
+      PetscCall(VecSet(pc.n_prior, n0));
+
+      Tao tao;
+      Vec p, lb, ub, g_scratch;
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &p));
+      PetscCall(VecCopy(pc.n_prior, p));
+      PetscCall(VecDuplicate(p, &lb));
+      PetscCall(VecDuplicate(p, &ub));
+      PetscCall(VecDuplicate(p, &g_scratch));
+      PetscCall(VecSet(lb, 0.01));
+      PetscCall(VecSet(ub, 0.2));
+
+      PetscReal J_init;
+      PetscCall(FormObjectiveAndGradientPerCell(NULL, p, &J_init, g_scratch, &pc));
+      if (have_hwm_file) {
+        PetscCall(PetscPrintf(comm, "hwm init: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
+                              (double)J_init, (double)pc.hwm_mae, pc.hwm_ndry, ngauges));
+        if (hwm_fd) {
+          PetscCall(HwmProbeEnable(pc.y_hwm, pc.w_hwm, sigma));  // kink diagnosis
+          PetscCall(FDCheckParamGradient(FormObjectiveAndGradientPerCell, &pc, p, g_scratch, fd_samples, fd_eps, fd_tol, "hwm-percell"));
+          PetscCall(HwmProbeDisable());
+        }
+      }
+
+      PetscCall(TaoCreate(comm, &tao));
+      PetscCall(TaoSetType(tao, TAOBLMVM));
+      PetscCall(TaoSetSolution(tao, p));
+      PetscCall(TaoSetVariableBounds(tao, lb, ub));
+      PetscCall(TaoSetObjectiveAndGradient(tao, NULL, FormObjectiveAndGradientPerCell, &pc));
+      PetscCall(TaoSetTolerances(tao, 1e-14, 1e-14, 1e-14));
+      PetscCall(TaoSetMaximumIterations(tao, 200));
+      PetscCall(TaoSetFromOptions(tao));
+      PetscCall(TaoSolve(tao));
+
+      PetscInt  tao_its;
+      PetscReal J_final;
+      PetscCall(TaoGetIterationNumber(tao, &tao_its));
+      PetscCall(TaoGetSolutionStatus(tao, NULL, &J_final, NULL, NULL, NULL, NULL));
+      PetscCall(PetscPrintf(comm, "gauge calibration: %d TAO its, J %.6e -> %.6e (reduction %.2fx, beta %.1e)\n", (int)tao_its,
+                            (double)J_init, (double)J_final, (double)(J_init / PetscMax(J_final, PETSC_MACHINE_EPSILON)),
+                            (double)beta));
+      if (have_hwm_file) {  // re-evaluate AT the solution for the final MAE
+        PetscReal Jf;
+        PetscCall(FormObjectiveAndGradientPerCell(NULL, p, &Jf, g_scratch, &pc));
+        PetscCall(PetscPrintf(comm, "hwm final: J %.6e, peak-WSE MAE %.4f m, model dry at %" PetscInt_FMT " of %" PetscInt_FMT " marks\n",
+                              (double)Jf, (double)pc.hwm_mae, pc.hwm_ndry, ngauges));
+      }
+
+      if (have_map_file) {
+        PetscCall(WriteCellFieldVTK(rdy, p, "manning_n", map_file));
+        PetscCall(PetscPrintf(comm, "wrote Manning map: %s\n", map_file));
+      }
+
+      // optional gate on misfit reduction (twin CI): J_final < gate * J_init
+      PetscReal jred_gate = 0.0;
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_jred_gate", &jred_gate, NULL));
+      if (jred_gate > 0.0)
+        PetscCheck(J_final < jred_gate * J_init, comm, PETSC_ERR_PLIB, "gauge calibration misfit reduction too small: %g -> %g",
+                   (double)J_init, (double)J_final);
+
+      if (gauges_twin || (hwm_twin && have_hwm_file)) {  // recovery error vs the two-zone truth used to generate the table
+        PetscInt n_owned_rec;
+        PetscCall(RDyGetNumOwnedCells(rdy, &n_owned_rec));
+        PetscReal *xc_rec;
+        PetscCall(PetscMalloc1(n_owned_rec, &xc_rec));
+        PetscCall(RDyMeshGetOwnedCellXCentroids(&rdy->mesh, n_owned_rec, xc_rec));
+        PetscReal x_lo = PETSC_MAX_REAL, x_hi = -PETSC_MAX_REAL;
+        for (PetscInt i = 0; i < n_owned_rec; ++i) {
+          x_lo = PetscMin(x_lo, xc_rec[i]);
+          x_hi = PetscMax(x_hi, xc_rec[i]);
+        }
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_lo, 1, MPIU_REAL, MPIU_MIN, comm));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_hi, 1, MPIU_REAL, MPIU_MAX, comm));
+        const PetscScalar *p_rec;
+        PetscCall(VecGetArrayRead(p, &p_rec));
+        PetscReal sums[2] = {0.0, 0.0};
+        for (PetscInt i = 0; i < n_owned_rec; ++i) {
+          PetscReal nt = (xc_rec[i] < 0.5 * (x_lo + x_hi)) ? 0.03 : 0.06;
+          PetscReal d  = PetscRealPart(p_rec[i]) - nt;
+          sums[0] += d * d;
+          sums[1] += nt * nt;
+        }
+        PetscCall(VecRestoreArrayRead(p, &p_rec));
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, sums, 2, MPIU_REAL, MPIU_SUM, comm));
+        PetscCall(PetscPrintf(comm, "gauges twin recovery: rel L2 err %.3e (%" PetscInt_FMT " gauges, %" PetscInt_FMT " parameters)\n",
+                              (double)PetscSqrtReal(sums[0] / sums[1]), ngauges, ncells_global));
+        PetscCall(PetscFree(xc_rec));
+      }
+
+      for (PetscInt k = 0; k < K; ++k) {
+        PetscCall(VecDestroy(&y_k[k]));
+        PetscCall(VecDestroy(&r_k[k]));
+        if (w_k) PetscCall(VecDestroy(&w_k[k]));
+      }
+      PetscCall(PetscFree(y_k));
+      PetscCall(PetscFree(r_k));
+      PetscCall(PetscFree(w_k));
+      PetscCall(VecDestroy(&y_hwm));
+      PetscCall(VecDestroy(&w_hwm));
+      PetscCall(PetscFree(gauge_cells));
+      PetscCall(PetscFree(obs_times));
+      PetscCall(PetscFree(obs_wse));
+      PetscCall(PetscFree(zbg));
+      PetscCall(TaoDestroy(&tao));
+      PetscCall(VecDestroy(&p));
+      PetscCall(VecDestroy(&lb));
+      PetscCall(VecDestroy(&ub));
+      PetscCall(VecDestroy(&g_scratch));
+      PetscCall(VecDestroy(&pc.base.r_work));
+      PetscCall(VecDestroy(&pc.base.lambda));
+      PetscCall(VecDestroy(&pc.base.mu));
+      PetscCall(VecDestroy(&pc.n_prior));
+      PetscCall(MatDestroy(&Hg));
+      PetscCall(VecDestroy(&u_ic));
+      PetscCall(VecDestroy(&y));
+      PetscCall(VecDestroy(&r_work));
+      PetscCall(MatDestroy(&H));
+      PetscCall(RDyDestroy(&rdy));
+      PetscCall(RDyFinalize());
+      return 0;
+    }
+
+    if (calibrate_percell) {
+      // ------------------------------------------------------------------
+      // increment 6: per-cell twin calibration with Tikhonov
+      // regularization. Truth is a two-zone field split at the median x
+      // centroid; TAO/BLMVM recovers a distributed field from a constant
+      // prior. Dry/motionless cells are unobservable (dJ/dn = 0) and stay
+      // at the prior; the recovery is assessed over observable cells.
+      // ------------------------------------------------------------------
+      PetscCall(TSSetSaveTrajectory(rdy->ts));
+
+      PetscInt n_owned;
+      PetscCall(RDyGetNumOwnedCells(rdy, &n_owned));
+
+      // truth field: two zones split at the mid-x of the domain
+      PetscReal *xc, *n_true;
+      PetscCall(PetscMalloc1(n_owned, &xc));
+      PetscCall(PetscMalloc1(n_owned, &n_true));
+      PetscCall(RDyMeshGetOwnedCellXCentroids(&rdy->mesh, n_owned, xc));
+      PetscReal x_min = PETSC_MAX_REAL, x_max = -PETSC_MAX_REAL;
+      for (PetscInt i = 0; i < n_owned; ++i) {
+        x_min = PetscMin(x_min, xc[i]);
+        x_max = PetscMax(x_max, xc[i]);
+      }
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_min, 1, MPIU_REAL, MPIU_MIN, comm));
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &x_max, 1, MPIU_REAL, MPIU_MAX, comm));
+      PetscReal x_split = 0.5 * (x_min + x_max);
+      for (PetscInt i = 0; i < n_owned; ++i) n_true[i] = (xc[i] < x_split) ? 0.03 : 0.06;
+
+      // multi-time observations: default to 8 observation windows
+      PetscInt total_steps = rdy->config.time.stop_n;
+      if (obs_freq <= 0) obs_freq = PetscMax(1, total_steps / 8);
+      PetscInt K = total_steps / obs_freq;
+      Vec     *y_k, *r_k;
+      PetscCall(PetscMalloc1(K, &y_k));
+      PetscCall(PetscMalloc1(K, &r_k));
+      for (PetscInt k = 0; k < K; ++k) {
+        PetscCall(MatCreateVecs(H, NULL, &y_k[k]));
+        PetscCall(MatCreateVecs(H, NULL, &r_k[k]));
+      }
+
+      PetscCall(RDySetDomainManningsN(rdy, n_owned, n_true));
+      PetscCall(ForwardObserve(rdy, u_ic, total_steps, obs_freq, H, y_k, NULL, NULL, sigma, NULL));  // record y_k
+      PetscCall(CheckTruthForward(rdy, "per-cell twin truth"));
+      PetscCall(AddObservationNoise(y_k, K, obs_noise));
+
+      // observability mask from the truth terminal state: wet and moving
+      PetscBool *observable;
+      PetscCall(PetscMalloc1(n_owned, &observable));
+      {
+        const PetscScalar *u_ptr;
+        PetscCall(VecGetArrayRead(rdy->u_global, &u_ptr));
+        PetscReal tiny_h = rdy->config.physics.flow.tiny_h;
+        for (PetscInt i = 0; i < n_owned; ++i) {
+          PetscReal h = PetscRealPart(u_ptr[3 * i]);
+          PetscReal m = PetscHypotReal(PetscRealPart(u_ptr[3 * i + 1]), PetscRealPart(u_ptr[3 * i + 2]));
+          observable[i] = (h >= tiny_h && m > 1e-12) ? PETSC_TRUE : PETSC_FALSE;
+        }
+        PetscCall(VecRestoreArrayRead(rdy->u_global, &u_ptr));
+      }
+
+      PerCellCtx pc = {.base        = {.rdy = rdy, .H = H, .y = y, .r_work = r_work, .u_ic = u_ic, .sigma = sigma, .t_final = t_final},
+                       .beta        = beta,
+                       .total_steps = total_steps,
+                       .obs_freq    = obs_freq,
+                       .K           = K,
+                       .y_k         = y_k,
+                       .r_k         = r_k};
+      PetscCall(VecDuplicate(rdy->u_global, &pc.base.lambda));
+      PetscCall(MatCreateVecs(rdy->rhs_jac_p, &pc.base.mu, NULL));
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &pc.n_prior));
+      PetscCall(VecSet(pc.n_prior, 0.03));
+
+      Tao tao;
+      Vec p, lb, ub;
+      PetscCall(VecDuplicateHostLayout(pc.base.mu, &p));
+      PetscCall(VecCopy(pc.n_prior, p));
+      PetscCall(VecDuplicate(p, &lb));
+      PetscCall(VecDuplicate(p, &ub));
+      PetscCall(VecSet(lb, 0.01));
+      PetscCall(VecSet(ub, 0.2));
+
+      PetscCall(TaoCreate(comm, &tao));
+      PetscCall(TaoSetType(tao, TAOBLMVM));
+      PetscCall(TaoSetSolution(tao, p));
+      PetscCall(TaoSetVariableBounds(tao, lb, ub));
+      PetscCall(TaoSetObjectiveAndGradient(tao, NULL, FormObjectiveAndGradientPerCell, &pc));
+      PetscCall(TaoSetTolerances(tao, 1e-14, 1e-14, 1e-14));
+      PetscCall(TaoSetMaximumIterations(tao, 200));
+      PetscCall(TaoSetFromOptions(tao));
+      PetscCall(TaoSolve(tao));
+
+      PetscInt tao_its;
+      PetscCall(TaoGetIterationNumber(tao, &tao_its));
+
+      // recovery assessment over observable cells
+      const PetscScalar *p_ptr;
+      PetscCall(VecGetArrayRead(p, &p_ptr));
+      PetscReal err2 = 0.0, ref2 = 0.0;
+      PetscInt  n_obs_cells = 0;
+      for (PetscInt i = 0; i < n_owned; ++i) {
+        if (observable[i]) {
+          err2 += Square(PetscRealPart(p_ptr[i]) - n_true[i]);
+          ref2 += Square(n_true[i]);
+          n_obs_cells++;
+        }
+      }
+      PetscCall(VecRestoreArrayRead(p, &p_ptr));
+      PetscReal reduce[3] = {err2, ref2, (PetscReal)n_obs_cells};
+      PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, reduce, 3, MPIU_REAL, MPIU_SUM, comm));
+      PetscReal rel = PetscSqrtReal(reduce[0] / reduce[1]);
+      PetscCall(PetscPrintf(comm,
+                            "per-cell recovery: %d TAO its, %" PetscInt_FMT " observable cells, %" PetscInt_FMT
+                            " obs times, rel L2 err %.3e (beta %.1e)\n",
+                            (int)tao_its, (PetscInt)reduce[2], K, (double)rel, (double)beta));
+
+      if (have_map_file) {
+        PetscCall(WriteCellFieldVTK(rdy, p, "manning_n", map_file));
+        PetscCall(PetscPrintf(comm, "wrote Manning map: %s\n", map_file));
+      }
+
+      // gate set from the validated baseline run (see RESULTS log): the fast
+      // CI setting (8 obs times, 200-it cap) measured 0.199; the converged
+      // setting (20 obs times, beta 1e-5) reaches 0.080. Overridable for
+      // exploratory runs (e.g. larger cases run iteration-capped).
+      PetscReal recovery_gate = 0.25;
+      PetscCall(PetscOptionsGetReal(NULL, NULL, "-adjoint_recovery_gate", &recovery_gate, NULL));
+      PetscCheck(rel < recovery_gate, comm, PETSC_ERR_PLIB, "per-cell recovery err too large: %g", (double)rel);
+
+      for (PetscInt k = 0; k < K; ++k) {
+        PetscCall(VecDestroy(&y_k[k]));
+        PetscCall(VecDestroy(&r_k[k]));
+      }
+      PetscCall(PetscFree(y_k));
+      PetscCall(PetscFree(r_k));
+      PetscCall(PetscFree(observable));
+      PetscCall(PetscFree(xc));
+      PetscCall(PetscFree(n_true));
+      PetscCall(TaoDestroy(&tao));
+      PetscCall(VecDestroy(&p));
+      PetscCall(VecDestroy(&lb));
+      PetscCall(VecDestroy(&ub));
+      PetscCall(VecDestroy(&pc.base.lambda));
+      PetscCall(VecDestroy(&pc.base.mu));
+      PetscCall(VecDestroy(&pc.n_prior));
+      PetscCall(VecDestroy(&u_ic));
+      PetscCall(VecDestroy(&y));
+      PetscCall(VecDestroy(&r_work));
+      PetscCall(MatDestroy(&H));
+      PetscCall(RDyDestroy(&rdy));
+      PetscCall(RDyFinalize());
+      return 0;
+    }
+
+    if (calibrate) {
+      // ------------------------------------------------------------------
+      // increment 5: two-zone twin calibration. Truth uses n_true[r]
+      // distinct per region; TAO/BLMVM recovers them from n0 = 0.02.
+      // ------------------------------------------------------------------
+      PetscInt n_regions = rdy->num_regions;
+      PetscCheck(n_regions >= 2, comm, PETSC_ERR_USER, "calibration twin needs >= 2 regions");
+
+      PetscCall(TSSetSaveTrajectory(rdy->ts));
+
+      PetscReal *n_true;
+      PetscCall(PetscMalloc1(n_regions, &n_true));
+      for (PetscInt r = 0; r < n_regions; ++r) n_true[r] = 0.03 + 0.03 * r;  // 0.03, 0.06, ...
+      PetscCall(ApplyRegionManning(rdy, n_true));
+      PetscCall(ForwardSolve(rdy, u_ic, t_final));
+      PetscCall(CheckTruthForward(rdy, "per-region twin truth"));
+      PetscCall(MatMult(H, rdy->u_global, y));  // synthetic observations (noise-free unless -adjoint_obs_noise)
+      PetscCall(AddObservationNoise(&y, 1, obs_noise));
+
+      CalibrationCtx cal = {.rdy = rdy, .H = H, .y = y, .r_work = r_work, .u_ic = u_ic, .sigma = sigma, .t_final = t_final};
+      PetscCall(VecDuplicate(rdy->u_global, &cal.lambda));
+      PetscCall(MatCreateVecs(rdy->rhs_jac_p, &cal.mu, NULL));
+
+      Tao tao;
+      Vec p, lb, ub;
+      PetscCall(VecCreate(comm, &p));
+      PetscCall(VecSetSizes(p, PETSC_DECIDE, n_regions));
+      PetscCall(VecSetFromOptions(p));
+      PetscCall(VecSet(p, 0.02));  // initial guess
+      PetscCall(VecDuplicate(p, &lb));
+      PetscCall(VecDuplicate(p, &ub));
+      PetscCall(VecSet(lb, 0.01));
+      PetscCall(VecSet(ub, 0.2));
+
+      PetscCall(TaoCreate(comm, &tao));
+      PetscCall(TaoSetType(tao, TAOBLMVM));
+      PetscCall(TaoSetSolution(tao, p));
+      PetscCall(TaoSetVariableBounds(tao, lb, ub));
+      PetscCall(TaoSetObjectiveAndGradient(tao, NULL, FormObjectiveAndGradient, &cal));
+      PetscCall(TaoSetTolerances(tao, 1e-12, 1e-12, 1e-12));
+      PetscCall(TaoSetMaximumIterations(tao, 100));
+      PetscCall(TaoSetFromOptions(tao));
+      PetscCall(TaoSolve(tao));
+
+      // report and gate: recovered n within 2% of truth per region
+      Vec        p_all_vec;
+      VecScatter scatter;
+      PetscCall(VecScatterCreateToAll(p, &scatter, &p_all_vec));
+      PetscCall(VecScatterBegin(scatter, p, p_all_vec, INSERT_VALUES, SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(scatter, p, p_all_vec, INSERT_VALUES, SCATTER_FORWARD));
+      const PetscScalar *p_rec;
+      PetscCall(VecGetArrayRead(p_all_vec, &p_rec));
+      PetscReal max_rel = 0.0;
+      for (PetscInt r = 0; r < n_regions; ++r) {
+        PetscReal rel = PetscAbsReal(PetscRealPart(p_rec[r]) - n_true[r]) / n_true[r];
+        PetscCall(PetscPrintf(comm, "region %" PetscInt_FMT ": n_true %.6f  n_recovered %.6f  rel err %.3e\n", r, (double)n_true[r],
+                              (double)PetscRealPart(p_rec[r]), (double)rel));
+        if (rel > max_rel) max_rel = rel;
+      }
+      PetscCall(VecRestoreArrayRead(p_all_vec, &p_rec));
+      PetscCall(PetscPrintf(comm, "two-zone recovery max rel err: %.3e (gate 2e-2)\n", (double)max_rel));
+      PetscCheck(max_rel < 2e-2, comm, PETSC_ERR_PLIB, "calibration failed to recover the two-zone Manning field: %g", (double)max_rel);
+
+      PetscCall(VecScatterDestroy(&scatter));
+      PetscCall(VecDestroy(&p_all_vec));
+      PetscCall(TaoDestroy(&tao));
+      PetscCall(VecDestroy(&p));
+      PetscCall(VecDestroy(&lb));
+      PetscCall(VecDestroy(&ub));
+      PetscCall(VecDestroy(&cal.lambda));
+      PetscCall(VecDestroy(&cal.mu));
+      PetscCall(PetscFree(n_true));
+      PetscCall(VecDestroy(&u_ic));
+      PetscCall(VecDestroy(&y));
+      PetscCall(VecDestroy(&r_work));
+      PetscCall(MatDestroy(&H));
+      PetscCall(RDyDestroy(&rdy));
+      PetscCall(RDyFinalize());
+      return 0;
+    }
+
+    // 1. truth solve -> observations
+    PetscCall(ForwardSolve(rdy, u_ic, t_final));
+    PetscCall(MatMult(H, rdy->u_global, y));
+
+    // 2. perturbed IC: scale heights by (1 + ic_perturb)
+    PetscCall(VecDuplicate(u_ic, &u_ic_pert));
+    PetscCall(VecCopy(u_ic, u_ic_pert));
+    {
+      PetscScalar *u_ptr;
+      PetscInt     n_local;
+      PetscCall(VecGetLocalSize(u_ic_pert, &n_local));
+      PetscCall(VecGetArray(u_ic_pert, &u_ptr));
+      for (PetscInt i = 0; i < n_local; i += NDOF) u_ptr[i] *= (1.0 + ic_perturb);
+      PetscCall(VecRestoreArray(u_ic_pert, &u_ptr));
+    }
+
+    PetscCall(ForwardSolve(rdy, u_ic_pert, t_final));
+    PetscReal J0;
+    PetscCall(Misfit(H, rdy->u_global, y, sigma, r_work, &J0));
+    PetscCall(PetscPrintf(comm, "terminal misfit J = %g (%" PetscInt_FMT " observations)\n", (double)J0, nobs));
+
+    // 3. adjoint sweep: lambda(T) = H^T R^-1 (H u(T) - y), mu(T) = 0
+    //    one backward sweep yields both dJ/du0 (lambda) and dJ/dn (mu)
+    Vec lambda, mu;
+    PetscCall(VecDuplicate(rdy->u_global, &lambda));
+    PetscCall(VecScale(r_work, 1.0 / (sigma * sigma)));  // r_work = R^-1 (H u(T) - y)
+    PetscCall(MatMultTranspose(H, r_work, lambda));
+    PetscCall(MatCreateVecs(rdy->rhs_jac_p, &mu, NULL));
+    PetscCall(VecZeroEntries(mu));
+    PetscCall(TSSetCostGradients(rdy->ts, 1, &lambda, &mu));
+    PetscCall(TSAdjointSolve(rdy->ts));
+    // lambda now holds dJ/du0; mu holds dJ/dn (per owned cell)
+
+    PetscReal grad_norm, mu_sum;
+    PetscCall(VecNorm(lambda, NORM_2, &grad_norm));
+    PetscCall(VecSum(mu, &mu_sum));
+    PetscCall(PetscPrintf(comm, "|dJ/du0|_2 = %g   sum(dJ/dn) = %g\n", (double)grad_norm, (double)mu_sum));
+
+    // 4. FD check on sampled components of u0
+    if (fd_samples > 0) {
+      PetscInt state_size = ncells_global * NDOF;
+      if (fd_samples > state_size) fd_samples = state_size;
+
+      PetscReal err2 = 0.0, ref2 = 0.0;
+      for (PetscInt k = 0; k < fd_samples; ++k) {
+        // sample height dofs spread across the domain (heights: index % 3 == 0)
+        PetscInt  cell = (PetscInt)(((PetscInt64)k * ncells_global) / fd_samples);
+        PetscInt  idx  = cell * NDOF;
+        PetscReal eps  = fd_eps;
+
+        Vec up, um;
+        PetscCall(VecDuplicate(u_ic_pert, &up));
+        PetscCall(VecDuplicate(u_ic_pert, &um));
+        PetscCall(VecCopy(u_ic_pert, up));
+        PetscCall(VecCopy(u_ic_pert, um));
+        // perturb from ONE rank only: ADD_VALUES contributions are summed
+        // across ranks, so an every-rank call scales the FD slope by nproc
+        PetscMPIInt fd_rank;
+        PetscCallMPI(MPI_Comm_rank(comm, &fd_rank));
+        if (fd_rank == 0) {
+          PetscCall(VecSetValue(up, idx, eps, ADD_VALUES));
+          PetscCall(VecSetValue(um, idx, -eps, ADD_VALUES));
+        }
+        PetscCall(VecAssemblyBegin(up));
+        PetscCall(VecAssemblyEnd(up));
+        PetscCall(VecAssemblyBegin(um));
+        PetscCall(VecAssemblyEnd(um));
+
+        PetscReal Jp, Jm;
+        PetscCall(ForwardSolve(rdy, up, t_final));
+        PetscCall(Misfit(H, rdy->u_global, y, sigma, r_work, &Jp));
+        PetscCall(ForwardSolve(rdy, um, t_final));
+        PetscCall(Misfit(H, rdy->u_global, y, sigma, r_work, &Jm));
+        PetscReal g_fd = (Jp - Jm) / (2.0 * eps);
+
+        // fetch lambda[idx] (owned by exactly one rank; share it)
+        PetscReal   g_adj = 0.0;
+        PetscInt    lo, hi;
+        PetscCall(VecGetOwnershipRange(lambda, &lo, &hi));
+        if (idx >= lo && idx < hi) {
+          const PetscScalar *l_ptr;
+          PetscCall(VecGetArrayRead(lambda, &l_ptr));
+          g_adj = PetscRealPart(l_ptr[idx - lo]);
+          PetscCall(VecRestoreArrayRead(lambda, &l_ptr));
+        }
+        PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, &g_adj, 1, MPIU_REAL, MPIU_SUM, comm));
+
+        err2 += (g_adj - g_fd) * (g_adj - g_fd);
+        ref2 += g_fd * g_fd;
+        PetscCall(PetscPrintf(comm, "  u0[%" PetscInt_FMT "] (cell %" PetscInt_FMT " h): adjoint %14.8e  fd %14.8e\n", idx, cell, (double)g_adj,
+                              (double)g_fd));
+        PetscCall(VecDestroy(&up));
+        PetscCall(VecDestroy(&um));
+      }
+      PetscReal rel = PetscSqrtReal(err2 / (ref2 > 0.0 ? ref2 : 1.0));
+      PetscCall(PetscPrintf(comm, "adjoint-vs-FD relative L2 error over %" PetscInt_FMT " samples: %.3e (gate %.1e)\n", fd_samples, (double)rel,
+                            (double)fd_tol));
+      PetscCheck(rel < fd_tol, comm, PETSC_ERR_PLIB, "adjoint gradient failed the FD gate: %g >= %g", (double)rel, (double)fd_tol);
+
+      // FD check of the domain-aggregate Manning gradient: perturb n
+      // uniformly over the domain, so d/deps J(n + eps 1) = sum_c dJ/dn_c
+      PetscInt n_local_cells;
+      PetscCall(RDyGetNumOwnedCells(rdy, &n_local_cells));
+      PetscReal *n_vals;
+      PetscCall(PetscMalloc1(n_local_cells, &n_vals));
+      PetscScalar *mp_ptr;
+      PetscCall(VecGetArray(rdy->operator->petsc.material_properties, &mp_ptr));
+      PetscReal n0 = PetscRealPart(mp_ptr[MATERIAL_PROPERTY_MANNINGS]);  // uniform in the test configs
+      PetscCall(VecRestoreArray(rdy->operator->petsc.material_properties, &mp_ptr));
+
+      // eps sized against FD cancellation: the n-perturbation changes J by
+      // ~2 eps |dJ/dn|, which must clear macheps*J by several digits
+      PetscReal eps_n = 1e-4, Jp_n, Jm_n;
+      for (PetscInt i = 0; i < n_local_cells; ++i) n_vals[i] = n0 + eps_n;
+      PetscCall(RDySetDomainManningsN(rdy, n_local_cells, n_vals));
+      PetscCall(ForwardSolve(rdy, u_ic_pert, t_final));
+      PetscCall(Misfit(H, rdy->u_global, y, sigma, r_work, &Jp_n));
+      for (PetscInt i = 0; i < n_local_cells; ++i) n_vals[i] = n0 - eps_n;
+      PetscCall(RDySetDomainManningsN(rdy, n_local_cells, n_vals));
+      PetscCall(ForwardSolve(rdy, u_ic_pert, t_final));
+      PetscCall(Misfit(H, rdy->u_global, y, sigma, r_work, &Jm_n));
+      for (PetscInt i = 0; i < n_local_cells; ++i) n_vals[i] = n0;  // restore
+      PetscCall(RDySetDomainManningsN(rdy, n_local_cells, n_vals));
+      PetscCall(PetscFree(n_vals));
+
+      PetscReal g_fd_n  = (Jp_n - Jm_n) / (2.0 * eps_n);
+      PetscReal rel_n   = PetscAbsReal(mu_sum - g_fd_n) / PetscMax(PetscAbsReal(g_fd_n), 1e-30);
+      // degenerate-gradient guard: when the flow is (nearly) motionless the
+      // drag gradient is genuinely ~0 and both sides are solver/FD noise --
+      // accept when the absolute discrepancy is negligible against J
+      PetscBool n_grad_ok = (rel_n < fd_tol) || (PetscAbsReal(mu_sum - g_fd_n) <= fd_tol * PetscMax(J0, 1.0));
+      PetscCall(PetscPrintf(comm, "dJ/dn (domain aggregate): adjoint %14.8e  fd %14.8e  rel %.3e (gate %.1e%s)\n", (double)mu_sum, (double)g_fd_n,
+                            (double)rel_n, (double)fd_tol, n_grad_ok && rel_n >= fd_tol ? ", passed on absolute floor" : ""));
+      PetscCheck(n_grad_ok, comm, PETSC_ERR_PLIB, "Manning gradient failed the FD gate: %g >= %g", (double)rel_n, (double)fd_tol);
+    }
+
+    PetscCall(VecDestroy(&mu));
+    PetscCall(VecDestroy(&lambda));
+    PetscCall(VecDestroy(&u_ic));
+    PetscCall(VecDestroy(&u_ic_pert));
+    PetscCall(VecDestroy(&y));
+    PetscCall(VecDestroy(&r_work));
+    PetscCall(MatDestroy(&H));
+    PetscCall(DestroyRainSchedule());
+    PetscCall(RDyDestroy(&rdy));
+  }
+
+  PetscCall(RDyFinalize());
+  return 0;
+}

@@ -19,6 +19,7 @@ set(RDYCORE_C_SOURCE_FILES
   operator_sources_petsc.c
   petsc_operator.c
   swe/swe_ceed.c
+  swe/swe_jacobian_petsc.c
   swe/swe_petsc.c
   tracer/tracer_ceed.c
   tracer/tracer_petsc.c
@@ -41,8 +42,38 @@ foreach(physics swe;tracer)
   )
 endforeach()
 
+# Device assembly TU for the SWE analytic Jacobian: compiled OUTSIDE CMake by
+# PETSc's .kokkos.cxx rule (kokkos_compile.mk), which picks nvcc_wrapper on
+# CUDA builds; the resulting object is linked into rdycore_c.
+if (RDY_HAVE_KOKKOS_JACOBIAN)
+  set(swe_jk_obj ${CMAKE_CURRENT_BINARY_DIR}/swe_jacobian_kokkos.o)
+  add_custom_command(
+    OUTPUT ${swe_jk_obj}
+    COMMAND make -f ${CMAKE_CURRENT_SOURCE_DIR}/swe/kokkos_compile.mk
+            PETSC_DIR=${PETSC_DIR} PETSC_ARCH=${PETSC_ARCH}
+            OBJ=${swe_jk_obj}
+            SRC=${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_jacobian_kokkos.kokkos.cxx
+            "RDY_INCLUDES=-I${PROJECT_SOURCE_DIR}/include -I${PROJECT_BINARY_DIR}/include"
+            ${swe_jk_obj}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_jacobian_kokkos.kokkos.cxx
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_jacobian_kokkos.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_roe_flux_jacobian_petsc.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_roe_flux_petsc.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_types_petsc.h
+            ${PROJECT_SOURCE_DIR}/include/private/rdymathimpl.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/swe/kokkos_compile.mk
+    COMMENT "Compiling swe_jacobian_kokkos.kokkos.cxx with PETSc's Kokkos rule"
+    VERBATIM
+  )
+  set_source_files_properties(${swe_jk_obj} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+  list(APPEND RDYCORE_C_SOURCE_FILES ${swe_jk_obj})
+endif()
+
 add_library(rdycore_c ${RDYCORE_C_SOURCE_FILES})
 target_link_libraries(rdycore_c cyaml yaml muparser hdf5 ceed ${SYSTEM_LIBRARIES})
+if (RDY_HAVE_KOKKOS_JACOBIAN)
+  target_link_libraries(rdycore_c ${RDY_KOKKOS_LIB_FLAGS})
+endif()
 add_dependencies(rdycore_c cyaml yaml)
 
 install(

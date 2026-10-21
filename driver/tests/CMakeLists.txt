@@ -4,6 +4,7 @@
 set(rdycore_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore)
 set(mms_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_mms)
 set(amr_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_amr)
+set(adjoint_driver ${CMAKE_CURRENT_BINARY_DIR}/../rdycore_adjoint)
 
 add_test(c_driver_usage ${MPIEXEC} ${MPIEXEC_OPTIONS} -n 1 ${rdycore_driver})
 set(supported_languages c)
@@ -21,6 +22,9 @@ add_subdirectory(amr)
 
 # shallow water equations with roe riemann solver
 add_subdirectory(swe_roe)
+
+# tests for the adjoint sensitivity driver
+add_subdirectory(adjoint)
 
 # sediment dynamics
 add_subdirectory(sediment)

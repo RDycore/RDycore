@@ -5,6 +5,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdyoperatorimpl.h>
+#include <private/rdysweimpl.h>
 #include <rdycore.h>
 #include <stdio.h>      // for getchar()
 #include <sys/types.h>  // for getpid()
@@ -1191,6 +1192,9 @@ PetscErrorCode InitSolver(RDy rdy) {
     case TEMPORAL_BEULER:
       PetscCall(TSSetType(rdy->ts, TSBEULER));
       break;
+    case TEMPORAL_ARK_IMEX:
+      PetscCall(TSSetType(rdy->ts, TSARKIMEX));
+      break;
     default:
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported time discretization");
   }
@@ -1199,6 +1203,8 @@ PetscErrorCode InitSolver(RDy rdy) {
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
+  if (rdy->config.numerics.jacobian != JACOBIAN_NONE) PetscCall(RegisterSWERHSJacobian(rdy));
+  if (rdy->config.numerics.temporal == TEMPORAL_ARK_IMEX) PetscCall(RegisterSWEIMEXFriction(rdy));
 
   if (!rdy->config.time.adaptive.enable) {
     PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.stop_n));
@@ -1241,6 +1247,8 @@ PetscErrorCode InitDirichletBoundaryConditions(RDy rdy) {
         break;
       case CONDITION_CRITICAL_OUTFLOW:
         break;
+      case CONDITION_FREE_OUTFLOW:
+        break;
       default:
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Invalid boundary condition encountered for boundary %" PetscInt_FMT "\n",
                    boundary.id);
@@ -1263,7 +1271,12 @@ PetscErrorCode InitSourceConditions(RDy rdy) {
 
       RDyFlowCondition *flow_src = src.flow;
       if (flow_src) {
-        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, r, mupEval(flow_src->value)));
+        // NB: pass the region's ID, not its index -- RDySetHomogeneous*
+        // resolves an ID via GetRegionIndexFromID and silently does nothing
+        // when no region matches. Passing the loop index made every
+        // YAML-configured `sources:` runoff a no-op for the usual 1-based
+        // grid_region_id (verified: 1e-2 m/s of rain changed nothing).
+        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, rdy->regions[r].id, mupEval(flow_src->value)));
       }
     }
   }

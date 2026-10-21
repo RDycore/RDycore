@@ -53,6 +53,7 @@ typedef enum {
   SOURCE_SEMI_IMPLICIT = 0,  // semi-implicit treatment
   SOURCE_IMPLICIT_XQ2018,    // implicit treatment using Xilin and Qiuhua (2018)
   SOURCE_ARK_IMEX,           // fully implicit treatment via ARK-IMEX method
+  SOURCE_EXPLICIT,           // plain explicit treatment (dt-free RHS; required on the adjoint/Jacobian path)
 } RDyFlowSourceMethod;
 
 typedef enum {
@@ -121,6 +122,13 @@ typedef enum {
   RIEMANN_HLLC         // Harten, Lax, van Leer Contact solver
 } RDyNumericsRiemann;
 
+// RHS Jacobian assembly methods (for adjoint sensitivity and implicit stepping)
+typedef enum {
+  JACOBIAN_NONE = 0,  // no Jacobian (default) -- explicit stepping only
+  JACOBIAN_FD,        // finite-difference coloring Jacobian (verification baseline)
+  JACOBIAN_ANALYTIC   // assembled analytic Jacobian
+} RDyNumericsJacobian;
+
 // all numerics parmeters
 typedef struct {
   RDyNumericsSpatial  spatial;
@@ -129,6 +137,7 @@ typedef struct {
   PetscBool           second_order;  // enable MUSCL second-order reconstruction
   PetscBool           no_limiter;    // (deprecated) disable the slope limiter; equivalent to limiter = none
   RDyLimiterType      limiter;       // MUSCL slope limiter (default minmod when second_order is set)
+  RDyNumericsJacobian jacobian;      // RHS Jacobian assembly method (default: none)
 } RDyNumericsSection;
 
 // ------------

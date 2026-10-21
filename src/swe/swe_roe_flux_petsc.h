@@ -1,7 +1,18 @@
 #ifndef SWE_ROE_FLUX_PETSC_H
 #define SWE_ROE_FLUX_PETSC_H
 
+#include <private/rdymathimpl.h>  // Square
+
 #include "swe_types_petsc.h"
+
+// Qualifier for the per-edge flux math below, which is shared VERBATIM by the
+// host loops and the Kokkos device RHS kernels: plain C sees static inline;
+// the .kokkos.cxx TU defines RDY_MATH_FN to `static KOKKOS_INLINE_FUNCTION`
+// before including this header. The functions are pure scalar math (no PETSc
+// objects, no error paths), so they carry no PetscErrorCode plumbing.
+#ifndef RDY_MATH_FN
+#define RDY_MATH_FN static inline
+#endif
 
 // silence unused function warnings
 #pragma GCC diagnostic push
@@ -12,11 +23,9 @@
 
 // Computes eigenvalues lambda, right eigenvectors R, parameter change dW, and
 // the maximum wave speed for the shallow water equations
-static PetscErrorCode ComputeSWERoeEigenspectrum(const PetscReal hl, const PetscReal ul, const PetscReal vl, const PetscReal hr, const PetscReal ur,
-                                                 const PetscReal vr, PetscReal sn, PetscReal cn, PetscReal lambda[3], PetscReal R[3][3],
-                                                 PetscReal dW[3], PetscReal *amax) {
-  PetscFunctionBeginUser;
-
+RDY_MATH_FN void ComputeSWERoeEigenspectrum(const PetscReal hl, const PetscReal ul, const PetscReal vl, const PetscReal hr, const PetscReal ur,
+                                            const PetscReal vr, PetscReal sn, PetscReal cn, PetscReal lambda[3], PetscReal R[3][3],
+                                            PetscReal dW[3], PetscReal *amax) {
   // compute Roe averages
   PetscReal duml  = pow(hl, 0.5);
   PetscReal dumr  = pow(hr, 0.5);
@@ -76,8 +85,90 @@ static PetscErrorCode ComputeSWERoeEigenspectrum(const PetscReal hl, const Petsc
 
   // max wave speed
   *amax = chat + fabs(uperp);
+}
 
-  PetscFunctionReturn(PETSC_SUCCESS);
+// Computes the Roe flux fij[3] and maximum wave speed for ONE edge from the
+// left/right primitive states -- the per-edge body of ComputeSWERoeFlux(),
+// shared verbatim with the Kokkos device RHS kernels.
+RDY_MATH_FN void ComputeSWERoeFluxEdge(const PetscReal hl, const PetscReal ul, const PetscReal vl, const PetscReal hr, const PetscReal ur,
+                                       const PetscReal vr, const PetscReal sn, const PetscReal cn, PetscReal fij[3], PetscReal *amax) {
+  // compute eigenspectrum
+  PetscReal A[3], R[3][3], dW[3];
+  ComputeSWERoeEigenspectrum(hl, ul, vl, hr, ur, vr, sn, cn, A, R, dW, amax);
+
+  // compute interface fluxes
+  PetscReal uperpl = ul * cn + vl * sn;
+  PetscReal uperpr = ur * cn + vr * sn;
+  PetscReal FL[3]  = {
+       uperpl * hl,
+       ul * uperpl * hl + 0.5 * GRAVITY * hl * hl * cn,
+       vl * uperpl * hl + 0.5 * GRAVITY * hl * hl * sn,
+  };
+  PetscReal FR[3] = {
+      uperpr * hr,
+      ur * uperpr * hr + 0.5 * GRAVITY * hr * hr * cn,
+      vr * uperpr * hr + 0.5 * GRAVITY * hr * hr * sn,
+  };
+
+  // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
+  fij[0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0] * dW[0] - R[0][1] * A[1] * dW[1] - R[0][2] * A[2] * dW[2]);
+  fij[1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0] * dW[0] - R[1][1] * A[1] * dW[1] - R[1][2] * A[2] * dW[2]);
+  fij[2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0] * dW[0] - R[2][1] * A[1] * dW[1] - R[2][2] * A[2] * dW[2]);
+}
+
+// Computes primitive velocities (u, v) from one conservative state with the
+// ANUGA regularization and tiny_h dry cutoff -- the per-state body of
+// ComputeRiemannVelocities() in swe_petsc.c, shared with the device kernels.
+RDY_MATH_FN void ComputeSWERiemannVelocity(const PetscReal h, const PetscReal hu, const PetscReal hv, const PetscReal tiny_h,
+                                           const PetscReal h_anuga, PetscReal *u, PetscReal *v) {
+  if (h < tiny_h) {
+    *u = 0.0;
+    *v = 0.0;
+  } else {
+    PetscReal denom = Square(h) + Square(h_anuga);
+    *u              = hu * h / denom;
+    *v              = hv * h / denom;
+  }
+}
+
+// Computes the Manning drag (tbx, tby) for one cell state -- the wet branch of
+// ApplySourceExplicit, shared verbatim with the device source kernel.
+//
+// With h_anuga == 0 this is the plain-velocity drag
+//   tb* = g n^2 h^{-7/3} q* |q|
+// evaluated with the historical operation sequence (BITWISE identical to the
+// pre-regularization code). With h_anuga > 0 the velocity inside the drag is
+// ANUGA-regularized, u = q h / (h^2 + h_anuga^2), the same regularization the
+// flux/primitive reconstruction uses:
+//   tb* = g n^2 h^{-1/3} |u| u*,
+// so the drag vanishes smoothly (~h^{5/3}) as h -> 0 instead of switching an
+// O(h^{-7/3}) term on/off at the tiny_h gate -- that discontinuity stalls
+// implicit Newton solves once n^2 is NLCD-scale (see RESULTS-gpu-implicit.md).
+// The tiny_h dry gate is kept in both branches: it protects h^{-1/3} (and
+// negative-h Newton iterates) and its residual jump is O((h/h_anuga)^4) here.
+RDY_MATH_FN void ComputeSWEManningDrag(const PetscReal h, const PetscReal hu, const PetscReal hv, const PetscReal n_manning,
+                                       const PetscReal tiny_h, const PetscReal h_anuga, PetscReal *tbx, PetscReal *tby) {
+  *tbx = 0.0;
+  *tby = 0.0;
+  if (h >= tiny_h) {  // wet conditions
+    // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
+    PetscReal Cd = GRAVITY * Square(n_manning) * PetscPowReal(h, -1.0 / 3.0);
+    if (h_anuga > 0.0) {
+      PetscReal denom    = Square(h) + Square(h_anuga);
+      PetscReal u        = hu * h / denom;
+      PetscReal v        = hv * h / denom;
+      PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+      *tbx               = Cd * velocity * u;
+      *tby               = Cd * velocity * v;
+    } else {
+      PetscReal u        = hu / h;
+      PetscReal v        = hv / h;
+      PetscReal velocity = PetscSqrtReal(Square(u) + Square(v));
+      PetscReal tb       = Cd * velocity / h;  // = g n^2 h^{-4/3} |v|
+      *tbx               = tb * hu;            // = g n^2 h^{-7/3} q_x |q|
+      *tby               = tb * hv;
+    }
+  }
 }
 
 /// Computes flux based on Roe solver
@@ -104,28 +195,7 @@ static PetscErrorCode ComputeSWERoeFlux(RiemannStateData *datal, RiemannStateDat
 
   PetscInt num_states = datal->num_states;
   for (PetscInt i = 0; i < num_states; ++i) {
-    // compute eigenspectrum
-    PetscReal A[3], R[3][3], dW[3];
-    PetscCall(ComputeSWERoeEigenspectrum(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], A, R, dW, &amax[i]));
-
-    // compute interface fluxes
-    PetscReal uperpl = ul[i] * cn[i] + vl[i] * sn[i];
-    PetscReal uperpr = ur[i] * cn[i] + vr[i] * sn[i];
-    PetscReal FL[3]  = {
-         uperpl * hl[i],
-         ul[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * cn[i],
-         vl[i] * uperpl * hl[i] + 0.5 * GRAVITY * hl[i] * hl[i] * sn[i],
-    };
-    PetscReal FR[3] = {
-        uperpr * hr[i],
-        ur[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * cn[i],
-        vr[i] * uperpr * hr[i] + 0.5 * GRAVITY * hr[i] * hr[i] * sn[i],
-    };
-
-    // fij = 0.5*(FL + FR - matmul(R,matmul(A,dW))
-    fij[3 * i + 0] = 0.5 * (FL[0] + FR[0] - R[0][0] * A[0] * dW[0] - R[0][1] * A[1] * dW[1] - R[0][2] * A[2] * dW[2]);
-    fij[3 * i + 1] = 0.5 * (FL[1] + FR[1] - R[1][0] * A[0] * dW[0] - R[1][1] * A[1] * dW[1] - R[1][2] * A[2] * dW[2]);
-    fij[3 * i + 2] = 0.5 * (FL[2] + FR[2] - R[2][0] * A[0] * dW[0] - R[2][1] * A[1] * dW[1] - R[2][2] * A[2] * dW[2]);
+    ComputeSWERoeFluxEdge(hl[i], ul[i], vl[i], hr[i], ur[i], vr[i], sn[i], cn[i], &fij[3 * i], &amax[i]);
   }
 
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -258,6 +258,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   PetscCall(RDyDestroyBoundaries(rdy));
 
   // destroy solver
+  PetscCall(DestroySWERHSJacobian(*rdy));
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
 
   PetscCall(RDyDestroyVectors(rdy));

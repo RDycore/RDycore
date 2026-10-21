@@ -2,6 +2,7 @@
 build/
 build-*/
 build_opt/
+Testing/          # ctest artifacts when ctest is run from the source root
 *.code-workspace
 compile_commands.json
 .cache/
