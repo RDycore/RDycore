@@ -746,8 +746,6 @@ PetscErrorCode CreateCeedEtaVerticesOperator(RDyConfig *config, RDyMesh *mesh, C
   PetscFunctionBegin;
   Ceed ceed = CeedContext();
 
-  PetscCall(CeedOperatorCreateComposite(ceed, op));
-
   RDyCells    *cells    = &mesh->cells;
   RDyVertices *vertices = &mesh->vertices;
 
