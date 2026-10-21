@@ -1,0 +1,336 @@
+@article{zhang2022tsadjoint,
+  author  = {Zhang, Hong and Constantinescu, Emil M. and Smith, Barry F.},
+  title   = {{PETSc TSAdjoint}: A Discrete Adjoint {ODE} Solver for First-Order and Second-Order Sensitivity Analysis},
+  journal = {SIAM Journal on Scientific Computing},
+  volume  = {44},
+  number  = {1},
+  pages   = {C1--C24},
+  year    = {2022},
+  doi     = {10.1137/21M140078X}
+}
+
+@article{ding2004manning,
+  author  = {Ding, Yan and Jia, Yafei and Wang, Sam S. Y.},
+  title   = {Identification of {Manning}'s Roughness Coefficients in Shallow Water Flows},
+  journal = {Journal of Hydraulic Engineering},
+  volume  = {130},
+  number  = {6},
+  pages   = {501--510},
+  year    = {2004},
+  doi     = {10.1061/(ASCE)0733-9429(2004)130:6(501)}
+}
+
+@article{yan2014adjoint,
+  author  = {Chen, Xianqiang and others},
+  title   = {Adjoint Model of Shallow Water Equations Based on the Finite Volume Method and Unstructured Meshes},
+  journal = {Abstract and Applied Analysis},
+  volume  = {2014},
+  pages   = {407468},
+  year    = {2014},
+  note    = {Twin-experiment inversion of Manning roughness; velocity vs.\ stage observation sensitivity},
+  url     = {https://www.hindawi.com/journals/aaa/2014/407468/}
+}
+
+@article{lacasta2016gpu,
+  author  = {Lacasta, Asier and Morales-Hern{\'a}ndez, Mario and Garc{\'i}a-Navarro, Pilar and others},
+  title   = {A {GPU} Accelerated Adjoint-Based Optimizer for Inverse Modeling of the Two-Dimensional Shallow Water Equations},
+  journal = {Computers \& Fluids},
+  year    = {2016},
+  url     = {https://www.researchgate.net/publication/304617786}
+}
+
+@article{brisset2018swot,
+  author  = {Brisset, Pierre and Monnier, J{\'e}r{\^o}me and Garambois, Pierre-Andr{\'e} and Roux, H{\'e}l{\`e}ne},
+  title   = {River Discharge Estimation from Synthetic {SWOT}-Type Observations Using Variational Data Assimilation and the Full {Saint-Venant} Hydraulic Model},
+  journal = {Journal of Hydrology},
+  volume  = {558},
+  pages   = {176--195},
+  year    = {2018},
+  doi     = {10.1016/j.jhydrol.2018.01.017}
+}
+
+@misc{dassflow,
+  author       = {Monnier, J{\'e}r{\^o}me and others},
+  title        = {{DassFlow}: Data Assimilation for Free-Surface Flows ({DassHydro} platform)},
+  howpublished = {\url{https://dasshydro.github.io}},
+  note         = {2D finite-volume shallow water with variational DA; Manning, bathymetry, and discharge inference incl.\ {SWOT}/{AirSWOT} and video-derived surface velocity},
+  year         = {2025}
+}
+
+@article{karna2023baltic,
+  author  = {K{\"a}rn{\"a}, Tuomas and others},
+  title   = {Efficient Optimization of a Regional Water Elevation Model with an Automatically Generated Adjoint},
+  journal = {Journal of Advances in Modeling Earth Systems},
+  volume  = {15},
+  year    = {2023},
+  doi     = {10.1029/2022MS003169},
+  note    = {Spatially varying Manning friction calibrated for the Baltic Sea with Thetis/Firedrake/pyadjoint}
+}
+
+@article{warder2021storm,
+  author  = {Warder, Simon C. and Horsburgh, Kevin J. and Piggott, Matthew D.},
+  title   = {Adjoint-Based Sensitivity Analysis for a Numerical Storm Surge Model},
+  journal = {Ocean Modelling},
+  volume  = {160},
+  pages   = {101766},
+  year    = {2021},
+  doi     = {10.1016/j.ocemod.2021.101766}
+}
+
+@article{clare2022morpho,
+  author  = {Clare, Mariana C. A. and others},
+  title   = {Calibration, Inversion and Sensitivity Analysis for Hydro-Morphodynamic Models Through the Application of Adjoint Methods},
+  journal = {Computers \& Geosciences},
+  volume  = {163},
+  pages   = {105104},
+  year    = {2022},
+  url     = {https://www.sciencedirect.com/science/article/pii/S0098300422000644}
+}
+
+@misc{li2026inunda,
+  author        = {Li, Zhi},
+  title         = {Inunda: A {GPU}-Native, Agent-Enabled, Differentiable Solver for High-Resolution Flood Inundation Modeling},
+  howpublished  = {arXiv:2607.09614},
+  year          = {2026},
+  note          = {PyTorch local-inertial solver; roughness/bed/infiltration by gradient descent; Hurricane Harvey hindcast, Harris County TX}
+}
+
+@article{liu2025uswe,
+  author  = {Liu, Xiaofeng and others},
+  title   = {Scientific Machine Learning of Flow Resistance Using Universal Shallow Water Equations with Differentiable Programming},
+  journal = {Water Resources Research},
+  volume  = {61},
+  year    = {2025},
+  doi     = {10.1029/2025WR040265},
+  note    = {Hydrograd (Julia/SciML): AD-based Manning inversion and neural flow-resistance terms}
+}
+
+@misc{cardoso2026aegir,
+  author       = {Cardoso-Bihlo, Elsa and Bihlo, Alex},
+  title        = {A Solver-in-the-Loop Framework for End-to-End Differentiable Coastal Hydrodynamics},
+  howpublished = {arXiv:2604.07129},
+  year         = {2026},
+  note         = {AegirJAX: differentiable non-hydrostatic shallow-water solver in JAX}
+}
+
+@article{kang2026cama,
+  author  = {Kang, Shengyu and Yin, Jiabo and Yamazaki, Dai},
+  title   = {{CaMa-Flood-GPU}: A {GPU}-Based Hydrodynamic Model Implementation for Scalable Global Simulations},
+  journal = {Geoscientific Model Development},
+  volume  = {19},
+  pages   = {5623--5640},
+  year    = {2026},
+  doi     = {10.5194/gmd-19-5623-2026}
+}
+
+@article{bindas2024routing,
+  author  = {Bindas, Tadd and others},
+  title   = {Improving River Routing Using a Differentiable {Muskingum-Cunge} Model and Physics-Informed Machine Learning},
+  journal = {Water Resources Research},
+  volume  = {60},
+  year    = {2024},
+  note    = {Differentiable routing inferring Manning roughness and channel geometry with neural networks}
+}
+
+@article{radfar2026pinn,
+  author  = {Radfar, Soheil},
+  title   = {How Sparse and How Noisy? {Systematic} Benchmarking of Inverse Physics-Informed Neural Networks for {Manning} Friction Estimation in Shallow Water Equations},
+  journal = {Physics of Fluids},
+  volume  = {38},
+  number  = {8},
+  pages   = {086611},
+  year    = {2026},
+  doi     = {10.1063/5.0349054}
+}
+
+@article{libceed,
+  author  = {Brown, Jed and Abdelfattah, Ahmad and Barra, Valeria and Beams, Natalie and Camier, Jean-Sylvain and Dobrev, Veselin and Dudouit, Yohann and Ghaffari, Leila and Kolev, Tzanio and Medina, David and Pazner, Will and Ratnayaka, Thilina and Thompson, Jeremy and Tomov, Stanimire},
+  title   = {{libCEED}: Fast Algebra for High-Order Element-Based Discretizations},
+  journal = {Journal of Open Source Software},
+  volume  = {6},
+  number  = {63},
+  pages   = {2945},
+  year    = {2021},
+  doi     = {10.21105/joss.02945}
+}
+
+@article{kokkos,
+  author  = {Trott, Christian R. and others},
+  title   = {Kokkos 3: Programming Model Extensions for the Exascale Era},
+  journal = {IEEE Transactions on Parallel and Distributed Systems},
+  volume  = {33},
+  number  = {4},
+  pages   = {805--817},
+  year    = {2022},
+  doi     = {10.1109/TPDS.2021.3097283}
+}
+
+@article{xia2018implicit,
+  author  = {Xia, Xilin and Liang, Qiuhua},
+  title   = {A new efficient implicit scheme for discretising the stiff friction terms in the shallow water equations},
+  journal = {Advances in Water Resources},
+  volume  = {117},
+  pages   = {87--97},
+  year    = {2018},
+  doi     = {10.1016/j.advwatres.2018.05.004}
+}
+
+@techreport{twdb2015cypress,
+  author      = {{Harris County Flood Control District} and {Texas Water Development Board}},
+  title       = {{Final Study Report}: {Cypress Creek} {Overflow Management Plan}},
+  institution = {Texas Water Development Board},
+  number      = {1248321466},
+  year        = {2015},
+  note        = {\url{https://www.twdb.texas.gov/publications/reports/contracted_reports/doc/1248321466_HCFCD.pdf}}
+}
+
+@techreport{benson2001blmvm,
+  author      = {Benson, Steven J. and Mor\'e, Jorge J.},
+  title       = {A Limited Memory Variable Metric Method in Subspaces and
+                 Bound Constrained Optimization Problems},
+  institution = {Argonne National Laboratory, Mathematics and Computer
+                 Science Division},
+  number      = {ANL/MCS-P909-0901},
+  year        = {2001}
+}
+
+@article{perego2014initialization,
+  author  = {Perego, Mauro and Price, Stephen and Stadler, Georg},
+  title   = {Optimal initial conditions for coupling ice sheet models to {E}arth system models},
+  journal = {Journal of Geophysical Research: Earth Surface},
+  volume  = {119},
+  number  = {9},
+  pages   = {1894--1917},
+  year    = {2014},
+  doi     = {10.1002/2014JF003181}
+}
+
+@article{hoffman2018mali,
+  author  = {Hoffman, Matthew J. and Perego, Mauro and Price, Stephen F. and Lipscomb, William H. and Zhang, Tong and Jacobsen, Douglas and Tezaur, Irina and Salinger, Andrew G. and Tuminaro, Raymond and Bertagna, Luca},
+  title   = {{MPAS-Albany Land Ice (MALI)}: a variable-resolution ice sheet model for {E}arth system modeling using {V}oronoi grids},
+  journal = {Geoscientific Model Development},
+  volume  = {11},
+  number  = {9},
+  pages   = {3747--3780},
+  year    = {2018},
+  doi     = {10.5194/gmd-11-3747-2018}
+}
+
+@article{pujol2024urban,
+  author  = {Pujol, L{\'e}o and Garambois, Pierre-Andr{\'e} and Delenne, Carole and Perrin, Jean-Louis},
+  title   = {Adjoint-Based Sensitivity Analysis and Assimilation of Multi-Source Data for the Inference of
+             Spatio-Temporal Parameters in a {2D} Urban Flood Hydraulic Model},
+  journal = {Journal of Hydrology},
+  year    = {2024},
+  note    = {DassFlow2D; adjoint by source-to-source AD (Tapenade). Infers distributed friction from
+             multi-source observations including high-water marks, with derivative-based global
+             sensitivity measures used to choose the friction patch spatialization}
+}
+
+@article{lai2009assimilation,
+  author  = {Lai, Xijun and Monnier, J{\'e}r{\^o}me},
+  title   = {Assimilation of Spatially Distributed Water Levels into a Shallow-Water Flood Model.
+             {Part I}: Mathematical Method and Test Case},
+  journal = {Journal of Hydrology},
+  volume  = {377},
+  number  = {1--2},
+  pages   = {1--11},
+  year    = {2009}
+}
+
+@article{heimbach2005mitgcm,
+  author  = {Heimbach, Patrick and Hill, Chris and Giering, Ralf},
+  title   = {An Efficient Exact Adjoint of the Parallel {MIT} General Circulation Model,
+             Generated via Automatic Differentiation},
+  journal = {Future Generation Computer Systems},
+  volume  = {21},
+  number  = {8},
+  pages   = {1356--1371},
+  year    = {2005}
+}
+
+@article{forget2015ecco,
+  author  = {Forget, Ga{\"e}l and Campin, Jean-Michel and Heimbach, Patrick and Hill, Christopher N. and
+             Ponte, Rui M. and Wunsch, Carl},
+  title   = {{ECCO} version 4: an integrated framework for non-linear inverse modeling and
+             global ocean state estimation},
+  journal = {Geoscientific Model Development},
+  volume  = {8},
+  number  = {10},
+  pages   = {3071--3104},
+  year    = {2015}
+}
+
+@article{beven1992glue,
+  author  = {Beven, Keith and Binley, Andrew},
+  title   = {The Future of Distributed Models: Model Calibration and Uncertainty Prediction},
+  journal = {Hydrological Processes},
+  volume  = {6},
+  number  = {3},
+  pages   = {279--298},
+  year    = {1992}
+}
+
+@article{beven2006equifinality,
+  author  = {Beven, Keith},
+  title   = {A Manifesto for the Equifinality Thesis},
+  journal = {Journal of Hydrology},
+  volume  = {320},
+  number  = {1--2},
+  pages   = {18--36},
+  year    = {2006}
+}
+
+@article{funke2017wetdry,
+  author  = {Funke, S. W. and Farrell, P. E. and Piggott, M. D.},
+  title   = {Reconstructing Wave Profiles from Inundation Data},
+  journal = {Computer Methods in Applied Mechanics and Engineering},
+  volume  = {322},
+  pages   = {167--186},
+  year    = {2017},
+  doi     = {10.1016/j.cma.2017.04.019}
+}
+
+@article{xu2025harvey,
+  author  = {Xu, Donghui and Bisht, Gautam and Engwirda, Darren and Feng, Dongyu and Tan, Zeli and Ivanov, Valeriy Y.},
+  title   = {Uncertainties in Simulating Flooding During {Hurricane Harvey} Using {2D} Shallow Water Equations},
+  journal = {Water Resources Research},
+  volume  = {61},
+  number  = {1},
+  pages   = {e2024WR038032},
+  year    = {2025},
+  doi     = {10.1029/2024WR038032}
+}
+
+@article{kiang2018streamflow,
+  author  = {Kiang, Julie E. and Gazoorian, Chris and McMillan, Hilary and Coxon, Gemma and Le Coz, J{\'e}r{\^o}me and Westerberg, Ida K. and Belleville, Arnaud and Sevrez, Damien and Sikorska, Anna E. and Petersen-{\O}verleir, Asgeir and Reitan, Trond and Freer, Jim and Renard, Benjamin and Mansanarez, Valentin and Mason, Robert},
+  title   = {A Comparison of Methods for Streamflow Uncertainty Estimation},
+  journal = {Water Resources Research},
+  volume  = {54},
+  number  = {9},
+  pages   = {7149--7176},
+  year    = {2018},
+  doi     = {10.1029/2018WR022708}
+}
+
+@article{feng2026sediment,
+  author  = {Feng, Dongyu and Tan, Zeli and Xu, Donghui and Li, Lingcheng and Bisht, Gautam},
+  title   = {An Integrated Modeling Framework for Sediment Dynamics During Urban Flooding: Application to {Hurricane Harvey} in {Houston}},
+  journal = {Water Resources Research},
+  volume  = {62},
+  number  = {5},
+  pages   = {e2025WR042040},
+  year    = {2026},
+  doi     = {10.1029/2025WR042040}
+}
+
+@article{bisht2025development,
+  title={Development of a River Dynamical Core for {E3SM} to simulate compound flooding on {Exascale}-class heterogeneous supercomputers},
+  author={Bisht, Gautam and Xu, Donghui and Johnson, Jeffrey and Brown, Jed and Knepley, Matthew and Adams, Mark and Feng, Dongyu and Hao, Dalei and Engwirda, Darren and Kumar, Mukesh and others},
+  journal={Environmental Modelling \& Software},
+  volume={197},
+  pages={106804},
+  year={2025},
+  publisher={Elsevier},
+  doi={10.1016/j.envsoft.2025.106804}
+}

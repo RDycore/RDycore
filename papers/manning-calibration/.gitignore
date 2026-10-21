@@ -1,0 +1,19 @@
+# LaTeX build artifacts and compiled PDFs in this directory
+/*.aux
+/*.bbl
+/*.blg
+/*.log
+/*.out
+/*.toc
+/*.fdb_latexmk
+/*.fls
+*.pdf
+
+# Raw downloadable datasets (fetched by scripts in data/*)
+data/nlcd/*.tif
+data/nlcd/*.bin
+data/harvey_hwm/hwm_raw.json
+data/harvey_hwm/hwm_raw.csv
+data/harvey_gauges/*.zip
+data/harvey_gauges/height/
+data/harvey_gauges/USGS_Gages_TxLaMsAr.*

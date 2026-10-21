@@ -1,0 +1,2834 @@
+RDycore version 0.1.0 (git hash 3d13eca5)
+Petsc version 3.25.4 (development)
+Ceed version 0.12.0 (development)
+[2] This process is not using the same device it did during gtl_init.
+ Current device_id 2 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[3] This process is not using the same device it did during gtl_init.
+ Current device_id 3 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[1] This process is not using the same device it did during gtl_init.
+ Current device_id 1 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+      0 KSP Residual norm 6.376684846804e+01
+      1 KSP Residual norm 2.153447172396e+01
+      2 KSP Residual norm 6.456667179696e+00
+      3 KSP Residual norm 1.687213851744e+00
+      4 KSP Residual norm 4.420532719788e-01
+      5 KSP Residual norm 1.279879045226e-01
+      6 KSP Residual norm 3.933467756316e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.196638058183e+01
+      1 KSP Residual norm 1.120175060252e+01
+      2 KSP Residual norm 3.249099099363e+00
+      3 KSP Residual norm 8.384032603253e-01
+      4 KSP Residual norm 2.307668619532e-01
+      5 KSP Residual norm 6.900987027930e-02
+      6 KSP Residual norm 2.082505883242e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.164346069557e+00
+      1 KSP Residual norm 8.274820028921e-01
+      2 KSP Residual norm 2.353928515138e-01
+      3 KSP Residual norm 6.749711860865e-02
+      4 KSP Residual norm 1.854897974398e-02
+      5 KSP Residual norm 5.752476111798e-03
+      6 KSP Residual norm 1.442510335697e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.377110823028e-01
+      1 KSP Residual norm 8.984163071904e-02
+      2 KSP Residual norm 1.906037910955e-02
+      3 KSP Residual norm 5.257911098917e-03
+      4 KSP Residual norm 1.445592317835e-03
+      5 KSP Residual norm 4.042054530708e-04
+      6 KSP Residual norm 1.094935552354e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.723763150470e-02
+      1 KSP Residual norm 2.138852996027e-03
+      2 KSP Residual norm 3.927769035500e-04
+      3 KSP Residual norm 1.101383682895e-04
+      4 KSP Residual norm 2.348982725589e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 4
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.239970866717e-02
+      1 KSP Residual norm 2.017270520836e-04
+      2 KSP Residual norm 1.328935090167e-05
+      3 KSP Residual norm 1.603601319464e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 3
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.055500822031e-03
+      1 KSP Residual norm 3.388130964681e-04
+      2 KSP Residual norm 1.259458358386e-05
+      3 KSP Residual norm 1.086487804435e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 3
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.792800965098e-03
+      1 KSP Residual norm 8.045384138623e-05
+      2 KSP Residual norm 2.749977161694e-06
+      3 KSP Residual norm 1.644105714690e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 3
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.629665437410e-04
+      1 KSP Residual norm 1.462075829219e-05
+      2 KSP Residual norm 5.243889832183e-07
+      3 KSP Residual norm 2.829911872921e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 3
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.957454943492e-05
+      1 KSP Residual norm 4.414318501701e-07
+      2 KSP Residual norm 1.475126156448e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 2
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_SNORM_RELATIVE iterations 10
+      0 KSP Residual norm 5.244872589226e+01
+      1 KSP Residual norm 1.704493782013e+01
+      2 KSP Residual norm 5.013514748419e+00
+      3 KSP Residual norm 1.307654647181e+00
+      4 KSP Residual norm 3.408853590778e-01
+      5 KSP Residual norm 9.596009687116e-02
+      6 KSP Residual norm 2.954465357960e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.615135028180e+00
+      1 KSP Residual norm 1.714362566285e+00
+      2 KSP Residual norm 4.974315023882e-01
+      3 KSP Residual norm 1.581299586880e-01
+      4 KSP Residual norm 4.592298712377e-02
+      5 KSP Residual norm 1.327978127332e-02
+      6 KSP Residual norm 3.793496387330e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.190449379843e+00
+      1 KSP Residual norm 3.605409843732e-01
+      2 KSP Residual norm 8.717482740340e-02
+      3 KSP Residual norm 2.533439972126e-02
+      4 KSP Residual norm 7.436789039739e-03
+      5 KSP Residual norm 2.378232177395e-03
+      6 KSP Residual norm 5.848586684043e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.970244401720e-02
+      1 KSP Residual norm 1.702820984015e-02
+      2 KSP Residual norm 4.855515472902e-03
+      3 KSP Residual norm 1.699051367811e-03
+      4 KSP Residual norm 5.062896691462e-04
+      5 KSP Residual norm 9.294344512684e-05
+      6 KSP Residual norm 2.354373339386e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.743032528450e-03
+      1 KSP Residual norm 6.213678097793e-04
+      2 KSP Residual norm 2.256393017062e-04
+      3 KSP Residual norm 8.229864413725e-05
+      4 KSP Residual norm 1.251158069500e-05
+      5 KSP Residual norm 2.607265955733e-06
+      6 KSP Residual norm 7.992558728243e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.622283017485e-06
+      1 KSP Residual norm 2.099515777582e-06
+      2 KSP Residual norm 7.590484582135e-07
+      3 KSP Residual norm 2.588910395800e-07
+      4 KSP Residual norm 9.446516027229e-08
+      5 KSP Residual norm 1.425942629491e-08
+      6 KSP Residual norm 2.797817826875e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 6
+      0 KSP Residual norm 4.639627339405e+01
+      1 KSP Residual norm 1.508763988784e+01
+      2 KSP Residual norm 4.321629415751e+00
+      3 KSP Residual norm 1.086410054395e+00
+      4 KSP Residual norm 2.743389287770e-01
+      5 KSP Residual norm 7.761136870778e-02
+      6 KSP Residual norm 2.391445031126e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.197454291038e+00
+      1 KSP Residual norm 1.573671401995e+00
+      2 KSP Residual norm 4.971962183467e-01
+      3 KSP Residual norm 1.663914882689e-01
+      4 KSP Residual norm 4.604908524710e-02
+      5 KSP Residual norm 1.394827780594e-02
+      6 KSP Residual norm 4.074731587712e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.161342047610e+00
+      1 KSP Residual norm 2.848718969783e-01
+      2 KSP Residual norm 6.568423633234e-02
+      3 KSP Residual norm 1.816693126732e-02
+      4 KSP Residual norm 5.379018333726e-03
+      5 KSP Residual norm 1.677016314388e-03
+      6 KSP Residual norm 5.228654354487e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.050757936767e-01
+      1 KSP Residual norm 3.054503911556e-02
+      2 KSP Residual norm 9.673088893960e-03
+      3 KSP Residual norm 2.601825566387e-03
+      4 KSP Residual norm 6.331290203540e-04
+      5 KSP Residual norm 1.673245969266e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 5
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.493582910944e-02
+      1 KSP Residual norm 1.482694110151e-02
+      2 KSP Residual norm 5.338052242634e-03
+      3 KSP Residual norm 1.466213472226e-03
+      4 KSP Residual norm 3.015671148914e-04
+      5 KSP Residual norm 7.763818840256e-05
+      6 KSP Residual norm 2.228992326332e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.000492549777e-03
+      1 KSP Residual norm 1.130092955673e-03
+      2 KSP Residual norm 4.784559541559e-04
+      3 KSP Residual norm 1.542982121649e-04
+      4 KSP Residual norm 4.234204318044e-05
+      5 KSP Residual norm 9.459530594080e-06
+      6 KSP Residual norm 2.273900891765e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 9.178130146414e-06
+      1 KSP Residual norm 3.061734603223e-06
+      2 KSP Residual norm 9.316886147151e-07
+      3 KSP Residual norm 2.939340368409e-07
+      4 KSP Residual norm 6.711376783096e-08
+      5 KSP Residual norm 1.849173553245e-08
+      6 KSP Residual norm 6.406409716822e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 7
+      0 KSP Residual norm 4.222749804986e+01
+      1 KSP Residual norm 1.376253144492e+01
+      2 KSP Residual norm 3.876561377537e+00
+      3 KSP Residual norm 9.497232859740e-01
+      4 KSP Residual norm 2.491829252959e-01
+      5 KSP Residual norm 7.392302172333e-02
+      6 KSP Residual norm 2.311941464556e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 5.042801874035e+00
+      1 KSP Residual norm 1.269047639549e+00
+      2 KSP Residual norm 4.102784848983e-01
+      3 KSP Residual norm 1.389682221114e-01
+      4 KSP Residual norm 3.676833869259e-02
+      5 KSP Residual norm 1.069871936221e-02
+      6 KSP Residual norm 3.205749168431e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.513182117948e-01
+      1 KSP Residual norm 1.144936264821e-01
+      2 KSP Residual norm 4.109758380308e-02
+      3 KSP Residual norm 1.277534342473e-02
+      4 KSP Residual norm 2.870159474561e-03
+      5 KSP Residual norm 7.366549064173e-04
+      6 KSP Residual norm 2.010885217404e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.179731100904e-02
+      1 KSP Residual norm 6.114572668071e-03
+      2 KSP Residual norm 2.036648488473e-03
+      3 KSP Residual norm 5.535919759739e-04
+      4 KSP Residual norm 1.380431137731e-04
+      5 KSP Residual norm 3.662334849544e-05
+      6 KSP Residual norm 9.578064223715e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.058921103867e-04
+      1 KSP Residual norm 5.107099404376e-05
+      2 KSP Residual norm 1.743559922613e-05
+      3 KSP Residual norm 4.931183661802e-06
+      4 KSP Residual norm 1.727053372867e-06
+      5 KSP Residual norm 5.302473445226e-07
+      6 KSP Residual norm 1.369482083897e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 3.861949543073e+01
+      1 KSP Residual norm 1.267768482300e+01
+      2 KSP Residual norm 3.631731594302e+00
+      3 KSP Residual norm 9.246325212928e-01
+      4 KSP Residual norm 2.463220943557e-01
+      5 KSP Residual norm 7.500293195600e-02
+      6 KSP Residual norm 2.296910706294e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.353700918152e+00
+      1 KSP Residual norm 1.343974119441e+00
+      2 KSP Residual norm 4.340278216741e-01
+      3 KSP Residual norm 1.579566220543e-01
+      4 KSP Residual norm 4.305476201022e-02
+      5 KSP Residual norm 1.404149174615e-02
+      6 KSP Residual norm 4.526556726306e-03
+      7 KSP Residual norm 1.728124417998e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.259781604920e-01
+      1 KSP Residual norm 1.720271525488e-01
+      2 KSP Residual norm 4.894100450276e-02
+      3 KSP Residual norm 1.642434385068e-02
+      4 KSP Residual norm 4.553275785657e-03
+      5 KSP Residual norm 1.438077095928e-03
+      6 KSP Residual norm 4.917092783630e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.142948612485e-02
+      1 KSP Residual norm 3.352146359665e-03
+      2 KSP Residual norm 9.337837170064e-04
+      3 KSP Residual norm 2.391828398440e-04
+      4 KSP Residual norm 6.764395628662e-05
+      5 KSP Residual norm 1.776462250434e-05
+      6 KSP Residual norm 4.869189821462e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.486086902559e-05
+      1 KSP Residual norm 7.646518792306e-06
+      2 KSP Residual norm 2.245469648184e-06
+      3 KSP Residual norm 6.902169545745e-07
+      4 KSP Residual norm 2.132517356403e-07
+      5 KSP Residual norm 6.000646375562e-08
+      6 KSP Residual norm 1.525914938071e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 3.542861213977e+01
+      1 KSP Residual norm 1.158653809481e+01
+      2 KSP Residual norm 3.509430360805e+00
+      3 KSP Residual norm 8.879507133739e-01
+      4 KSP Residual norm 2.355795894475e-01
+      5 KSP Residual norm 7.252430909679e-02
+      6 KSP Residual norm 2.203314690120e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.064423398539e+00
+      1 KSP Residual norm 1.059958335154e+00
+      2 KSP Residual norm 3.427654466951e-01
+      3 KSP Residual norm 1.060373572005e-01
+      4 KSP Residual norm 2.897874049302e-02
+      5 KSP Residual norm 9.324165149321e-03
+      6 KSP Residual norm 2.912337345892e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.749316515743e-01
+      1 KSP Residual norm 7.649241643351e-02
+      2 KSP Residual norm 2.365831311343e-02
+      3 KSP Residual norm 6.958923077364e-03
+      4 KSP Residual norm 1.929060835628e-03
+      5 KSP Residual norm 5.182834001167e-04
+      6 KSP Residual norm 1.604512550878e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.348732481481e-02
+      1 KSP Residual norm 2.662778172104e-03
+      2 KSP Residual norm 7.844839053777e-04
+      3 KSP Residual norm 2.689648598071e-04
+      4 KSP Residual norm 8.429026187021e-05
+      5 KSP Residual norm 2.327171784694e-05
+      6 KSP Residual norm 6.733452966747e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 7.820103300920e-05
+      1 KSP Residual norm 1.026241185516e-05
+      2 KSP Residual norm 3.109027821675e-06
+      3 KSP Residual norm 1.113587117953e-06
+      4 KSP Residual norm 4.005095714501e-07
+      5 KSP Residual norm 1.180150088958e-07
+      6 KSP Residual norm 3.306138054877e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 3.249452593876e+01
+      1 KSP Residual norm 1.074628470674e+01
+      2 KSP Residual norm 3.295234559641e+00
+      3 KSP Residual norm 8.190427116416e-01
+      4 KSP Residual norm 2.115278896365e-01
+      5 KSP Residual norm 6.648297100887e-02
+      6 KSP Residual norm 2.078517725400e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.175724436242e+00
+      1 KSP Residual norm 8.446889067499e-01
+      2 KSP Residual norm 2.680623071255e-01
+      3 KSP Residual norm 8.435868136795e-02
+      4 KSP Residual norm 2.304511788155e-02
+      5 KSP Residual norm 7.115730474792e-03
+      6 KSP Residual norm 2.300195504750e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.608334410083e-01
+      1 KSP Residual norm 4.965829140691e-02
+      2 KSP Residual norm 1.194168926021e-02
+      3 KSP Residual norm 3.634024647159e-03
+      4 KSP Residual norm 1.237784147230e-03
+      5 KSP Residual norm 2.966413246784e-04
+      6 KSP Residual norm 7.747472051952e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.510904687018e-03
+      1 KSP Residual norm 4.031968781174e-04
+      2 KSP Residual norm 1.228100972664e-04
+      3 KSP Residual norm 2.700186392486e-05
+      4 KSP Residual norm 8.549923124619e-06
+      5 KSP Residual norm 2.453194772638e-06
+      6 KSP Residual norm 4.910129624782e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.031606039626e-07
+      1 KSP Residual norm 2.212602536021e-07
+      2 KSP Residual norm 8.120393435830e-08
+      3 KSP Residual norm 2.592107800079e-08
+      4 KSP Residual norm 5.741840546741e-09
+      5 KSP Residual norm 1.471565822575e-09
+      6 KSP Residual norm 4.235888571241e-10
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 2.968216474172e+01
+      1 KSP Residual norm 1.006438144276e+01
+      2 KSP Residual norm 3.039227752695e+00
+      3 KSP Residual norm 7.260480340375e-01
+      4 KSP Residual norm 1.908580969212e-01
+      5 KSP Residual norm 6.003329154831e-02
+      6 KSP Residual norm 1.909923417820e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.938614159352e+00
+      1 KSP Residual norm 8.861098507420e-01
+      2 KSP Residual norm 3.178166214570e-01
+      3 KSP Residual norm 8.931490716843e-02
+      4 KSP Residual norm 2.726224126792e-02
+      5 KSP Residual norm 8.415959418805e-03
+      6 KSP Residual norm 2.767872677068e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.849691230967e-01
+      1 KSP Residual norm 8.561429532162e-02
+      2 KSP Residual norm 3.096033592710e-02
+      3 KSP Residual norm 1.040088760288e-02
+      4 KSP Residual norm 2.998041407528e-03
+      5 KSP Residual norm 8.036024247625e-04
+      6 KSP Residual norm 2.301996563999e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.183690297987e-02
+      1 KSP Residual norm 6.201006241196e-03
+      2 KSP Residual norm 1.765550829365e-03
+      3 KSP Residual norm 4.746096333114e-04
+      4 KSP Residual norm 1.644578688844e-04
+      5 KSP Residual norm 4.651471255690e-05
+      6 KSP Residual norm 1.610329084442e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.100846934897e-04
+      1 KSP Residual norm 2.824361974119e-05
+      2 KSP Residual norm 8.937739324361e-06
+      3 KSP Residual norm 2.730576289267e-06
+      4 KSP Residual norm 1.050845952668e-06
+      5 KSP Residual norm 2.784485682195e-07
+      6 KSP Residual norm 8.822902126315e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 2.718363002856e+01
+      1 KSP Residual norm 9.430863081765e+00
+      2 KSP Residual norm 2.845028233902e+00
+      3 KSP Residual norm 6.667220859238e-01
+      4 KSP Residual norm 1.847522014565e-01
+      5 KSP Residual norm 5.707390344969e-02
+      6 KSP Residual norm 1.816699178201e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.480967671603e+00
+      1 KSP Residual norm 9.054272752618e-01
+      2 KSP Residual norm 3.267076112357e-01
+      3 KSP Residual norm 9.446416952161e-02
+      4 KSP Residual norm 3.156451163945e-02
+      5 KSP Residual norm 1.084731398046e-02
+      6 KSP Residual norm 3.378418200419e-03
+      7 KSP Residual norm 1.183434196802e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.794799225588e-01
+      1 KSP Residual norm 5.177405704744e-02
+      2 KSP Residual norm 1.709631344334e-02
+      3 KSP Residual norm 6.030748275552e-03
+      4 KSP Residual norm 1.898911776118e-03
+      5 KSP Residual norm 5.543329890590e-04
+      6 KSP Residual norm 1.733441819177e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.343308997111e-03
+      1 KSP Residual norm 6.735325772318e-04
+      2 KSP Residual norm 2.344561988820e-04
+      3 KSP Residual norm 7.849844566084e-05
+      4 KSP Residual norm 1.801340367605e-05
+      5 KSP Residual norm 4.489444644295e-06
+      6 KSP Residual norm 1.208629721942e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.776519937327e-06
+      1 KSP Residual norm 5.236025586958e-07
+      2 KSP Residual norm 2.021390146847e-07
+      3 KSP Residual norm 5.865754291436e-08
+      4 KSP Residual norm 1.471308485369e-08
+      5 KSP Residual norm 5.528533831982e-09
+      6 KSP Residual norm 1.432678136973e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 2.512716988490e+01
+      1 KSP Residual norm 8.862694079174e+00
+      2 KSP Residual norm 2.653109994919e+00
+      3 KSP Residual norm 6.895232846163e-01
+      4 KSP Residual norm 1.909613395854e-01
+      5 KSP Residual norm 5.904344854122e-02
+      6 KSP Residual norm 1.979556527374e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.198288019069e+00
+      1 KSP Residual norm 7.206488057127e-01
+      2 KSP Residual norm 2.396643900585e-01
+      3 KSP Residual norm 6.764509313237e-02
+      4 KSP Residual norm 2.112133468388e-02
+      5 KSP Residual norm 7.835272915591e-03
+      6 KSP Residual norm 2.128366809368e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.483566006027e-01
+      1 KSP Residual norm 4.681935746143e-02
+      2 KSP Residual norm 1.563616828348e-02
+      3 KSP Residual norm 5.574666150824e-03
+      4 KSP Residual norm 1.560758155184e-03
+      5 KSP Residual norm 4.077101301501e-04
+      6 KSP Residual norm 1.325064312276e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 5.428061321857e-03
+      1 KSP Residual norm 1.642088000198e-03
+      2 KSP Residual norm 4.520631515095e-04
+      3 KSP Residual norm 1.419868665629e-04
+      4 KSP Residual norm 4.271471065340e-05
+      5 KSP Residual norm 1.109788821424e-05
+      6 KSP Residual norm 2.986762561027e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.586980766169e-05
+      1 KSP Residual norm 4.930255429060e-06
+      2 KSP Residual norm 1.403500797277e-06
+      3 KSP Residual norm 4.586800898730e-07
+      4 KSP Residual norm 1.316262345160e-07
+      5 KSP Residual norm 3.494882047206e-08
+      6 KSP Residual norm 9.196198285097e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 2.342174499404e+01
+      1 KSP Residual norm 8.205180522887e+00
+      2 KSP Residual norm 2.353920899741e+00
+      3 KSP Residual norm 6.248843404208e-01
+      4 KSP Residual norm 1.802671671590e-01
+      5 KSP Residual norm 5.651890313397e-02
+      6 KSP Residual norm 1.821786034600e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.788961442205e+00
+      1 KSP Residual norm 5.296809177239e-01
+      2 KSP Residual norm 1.630364849520e-01
+      3 KSP Residual norm 5.495325096419e-02
+      4 KSP Residual norm 1.562365187052e-02
+      5 KSP Residual norm 4.982055472258e-03
+      6 KSP Residual norm 1.434822642464e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 7.202922918206e-02
+      1 KSP Residual norm 2.021343223638e-02
+      2 KSP Residual norm 7.505487149110e-03
+      3 KSP Residual norm 2.432135862793e-03
+      4 KSP Residual norm 6.076581464615e-04
+      5 KSP Residual norm 1.639800965001e-04
+      6 KSP Residual norm 4.636634249427e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.839591845521e-03
+      1 KSP Residual norm 4.429624253298e-04
+      2 KSP Residual norm 1.768468444130e-04
+      3 KSP Residual norm 7.460218057900e-05
+      4 KSP Residual norm 1.589163630898e-05
+      5 KSP Residual norm 4.216517193968e-06
+      6 KSP Residual norm 1.111276807359e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.109029681158e-06
+      1 KSP Residual norm 7.284339130891e-07
+      2 KSP Residual norm 2.745575450267e-07
+      3 KSP Residual norm 1.056560900762e-07
+      4 KSP Residual norm 2.496854812636e-08
+      5 KSP Residual norm 6.895344694863e-09
+      6 KSP Residual norm 1.603515037408e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 2.182922712270e+01
+      1 KSP Residual norm 7.524202310197e+00
+      2 KSP Residual norm 2.118355241143e+00
+      3 KSP Residual norm 5.505567109042e-01
+      4 KSP Residual norm 1.632613272529e-01
+      5 KSP Residual norm 5.015528084087e-02
+      6 KSP Residual norm 1.571786266931e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.789227053488e+00
+      1 KSP Residual norm 5.919054972631e-01
+      2 KSP Residual norm 2.451812825152e-01
+      3 KSP Residual norm 7.467993667978e-02
+      4 KSP Residual norm 2.281309062910e-02
+      5 KSP Residual norm 7.326487726249e-03
+      6 KSP Residual norm 2.304658722280e-03
+      7 KSP Residual norm 7.874846475081e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.115623125580e-01
+      1 KSP Residual norm 3.513789856153e-02
+      2 KSP Residual norm 1.121018107711e-02
+      3 KSP Residual norm 3.655616852000e-03
+      4 KSP Residual norm 1.230350910529e-03
+      5 KSP Residual norm 3.352124453754e-04
+      6 KSP Residual norm 1.016655526411e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.974304636700e-03
+      1 KSP Residual norm 4.603953980347e-04
+      2 KSP Residual norm 1.579537814376e-04
+      3 KSP Residual norm 4.692962445303e-05
+      4 KSP Residual norm 1.189677190230e-05
+      5 KSP Residual norm 3.333720198644e-06
+      6 KSP Residual norm 7.836164577180e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.444769020495e-06
+      1 KSP Residual norm 8.855512903117e-07
+      2 KSP Residual norm 2.881931801100e-07
+      3 KSP Residual norm 7.659275572527e-08
+      4 KSP Residual norm 2.357785035147e-08
+      5 KSP Residual norm 7.571273926058e-09
+      6 KSP Residual norm 1.593540196436e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 2.016416532361e+01
+      1 KSP Residual norm 6.747189485532e+00
+      2 KSP Residual norm 1.912746290825e+00
+      3 KSP Residual norm 5.168129059655e-01
+      4 KSP Residual norm 1.472481637800e-01
+      5 KSP Residual norm 4.379373159395e-02
+      6 KSP Residual norm 1.510970305331e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.398582729196e+00
+      1 KSP Residual norm 4.164009207402e-01
+      2 KSP Residual norm 1.305031034835e-01
+      3 KSP Residual norm 4.164309011712e-02
+      4 KSP Residual norm 1.216900305212e-02
+      5 KSP Residual norm 3.601401748823e-03
+      6 KSP Residual norm 1.106682755052e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 5.400926971911e-02
+      1 KSP Residual norm 1.680861318257e-02
+      2 KSP Residual norm 6.042326915410e-03
+      3 KSP Residual norm 2.002621268275e-03
+      4 KSP Residual norm 6.138845275795e-04
+      5 KSP Residual norm 1.579028503103e-04
+      6 KSP Residual norm 4.643322447117e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.209065226584e-04
+      1 KSP Residual norm 6.845324660802e-05
+      2 KSP Residual norm 2.335859618409e-05
+      3 KSP Residual norm 8.350397955770e-06
+      4 KSP Residual norm 2.180030110338e-06
+      5 KSP Residual norm 5.499661406520e-07
+      6 KSP Residual norm 1.751926308207e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 4
+      0 KSP Residual norm 1.858718612851e+01
+      1 KSP Residual norm 6.120929461755e+00
+      2 KSP Residual norm 1.775656182070e+00
+      3 KSP Residual norm 4.665364958006e-01
+      4 KSP Residual norm 1.245735956914e-01
+      5 KSP Residual norm 3.999701277200e-02
+      6 KSP Residual norm 1.402894904810e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.225816246854e+00
+      1 KSP Residual norm 4.264709158222e-01
+      2 KSP Residual norm 1.501462203735e-01
+      3 KSP Residual norm 4.459691824392e-02
+      4 KSP Residual norm 1.569856690998e-02
+      5 KSP Residual norm 4.775834891689e-03
+      6 KSP Residual norm 1.559979124067e-03
+      7 KSP Residual norm 5.835610452346e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 9.351233232127e-02
+      1 KSP Residual norm 3.108105018011e-02
+      2 KSP Residual norm 1.154084599088e-02
+      3 KSP Residual norm 4.048875243412e-03
+      4 KSP Residual norm 9.289177621554e-04
+      5 KSP Residual norm 2.466545964354e-04
+      6 KSP Residual norm 6.920797944378e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.860174193269e-03
+      1 KSP Residual norm 8.871266051097e-04
+      2 KSP Residual norm 2.642558838377e-04
+      3 KSP Residual norm 7.174595099791e-05
+      4 KSP Residual norm 2.201340564702e-05
+      5 KSP Residual norm 6.111623025264e-06
+      6 KSP Residual norm 1.481096091321e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.899759553205e-06
+      1 KSP Residual norm 1.297268567657e-06
+      2 KSP Residual norm 5.066925450952e-07
+      3 KSP Residual norm 1.688569183224e-07
+      4 KSP Residual norm 4.442807248198e-08
+      5 KSP Residual norm 1.153201923551e-08
+      6 KSP Residual norm 2.479139164706e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 1.703884033353e+01
+      1 KSP Residual norm 5.669127576948e+00
+      2 KSP Residual norm 1.644660761749e+00
+      3 KSP Residual norm 4.319730839952e-01
+      4 KSP Residual norm 1.163823571829e-01
+      5 KSP Residual norm 3.689654561862e-02
+      6 KSP Residual norm 1.337248112849e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.053425812469e+00
+      1 KSP Residual norm 3.582229221651e-01
+      2 KSP Residual norm 1.142620780874e-01
+      3 KSP Residual norm 3.540225480243e-02
+      4 KSP Residual norm 1.266916546691e-02
+      5 KSP Residual norm 4.260261920543e-03
+      6 KSP Residual norm 1.203065816516e-03
+      7 KSP Residual norm 4.614983420032e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.468143786521e-02
+      1 KSP Residual norm 1.409134001745e-02
+      2 KSP Residual norm 4.356263740794e-03
+      3 KSP Residual norm 1.380806374907e-03
+      4 KSP Residual norm 4.288508727545e-04
+      5 KSP Residual norm 1.052172772882e-04
+      6 KSP Residual norm 2.811301268132e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.823597078582e-04
+      1 KSP Residual norm 5.099461309690e-05
+      2 KSP Residual norm 1.662893540006e-05
+      3 KSP Residual norm 5.416415541766e-06
+      4 KSP Residual norm 1.507283235921e-06
+      5 KSP Residual norm 3.551432929384e-07
+      6 KSP Residual norm 8.997343620385e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 4
+      0 KSP Residual norm 1.563119801377e+01
+      1 KSP Residual norm 5.299291804069e+00
+      2 KSP Residual norm 1.484855092070e+00
+      3 KSP Residual norm 3.871663992902e-01
+      4 KSP Residual norm 1.071380898237e-01
+      5 KSP Residual norm 3.672675626078e-02
+      6 KSP Residual norm 1.254682654057e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.079620205464e+00
+      1 KSP Residual norm 4.136342210991e-01
+      2 KSP Residual norm 1.590792518141e-01
+      3 KSP Residual norm 4.465147118925e-02
+      4 KSP Residual norm 1.352748578202e-02
+      5 KSP Residual norm 4.326968062344e-03
+      6 KSP Residual norm 1.270532889481e-03
+      7 KSP Residual norm 4.274422950225e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.957467960988e-02
+      1 KSP Residual norm 1.515756720124e-02
+      2 KSP Residual norm 6.044565833013e-03
+      3 KSP Residual norm 2.551067987254e-03
+      4 KSP Residual norm 7.547489016295e-04
+      5 KSP Residual norm 2.162089774606e-04
+      6 KSP Residual norm 5.832186662630e-05
+      7 KSP Residual norm 1.715067369916e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.167283768899e-03
+      1 KSP Residual norm 3.067261433531e-04
+      2 KSP Residual norm 1.114974358017e-04
+      3 KSP Residual norm 3.750008623883e-05
+      4 KSP Residual norm 8.642719269634e-06
+      5 KSP Residual norm 2.257870095518e-06
+      6 KSP Residual norm 6.484796073327e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.971893265887e-06
+      1 KSP Residual norm 5.052167015221e-07
+      2 KSP Residual norm 1.704432105950e-07
+      3 KSP Residual norm 4.369951343543e-08
+      4 KSP Residual norm 1.210699465527e-08
+      5 KSP Residual norm 3.175566418873e-09
+      6 KSP Residual norm 7.339822983913e-10
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 1.443260779958e+01
+      1 KSP Residual norm 4.911449138084e+00
+      2 KSP Residual norm 1.375252734781e+00
+      3 KSP Residual norm 3.539010499001e-01
+      4 KSP Residual norm 9.831262860998e-02
+      5 KSP Residual norm 3.301633359797e-02
+      6 KSP Residual norm 1.029474624582e-02
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 7.647888967060e-01
+      1 KSP Residual norm 2.675517723709e-01
+      2 KSP Residual norm 8.925854210945e-02
+      3 KSP Residual norm 2.685783922814e-02
+      4 KSP Residual norm 8.228526037164e-03
+      5 KSP Residual norm 2.467993750263e-03
+      6 KSP Residual norm 7.817627662188e-04
+      7 KSP Residual norm 2.995363985732e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.576620032217e-02
+      1 KSP Residual norm 1.470028213267e-02
+      2 KSP Residual norm 6.272500045681e-03
+      3 KSP Residual norm 1.970277177171e-03
+      4 KSP Residual norm 5.632719598823e-04
+      5 KSP Residual norm 1.639924447329e-04
+      6 KSP Residual norm 4.689142154693e-05
+      7 KSP Residual norm 1.445101468699e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.480733971308e-04
+      1 KSP Residual norm 1.922309355227e-04
+      2 KSP Residual norm 5.573698538606e-05
+      3 KSP Residual norm 1.913943960021e-05
+      4 KSP Residual norm 6.630012392403e-06
+      5 KSP Residual norm 1.734078899529e-06
+      6 KSP Residual norm 4.448419142484e-07
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.707486155959e-07
+      1 KSP Residual norm 1.291567105951e-07
+      2 KSP Residual norm 4.917029055086e-08
+      3 KSP Residual norm 1.410536981119e-08
+      4 KSP Residual norm 3.895826438184e-09
+      5 KSP Residual norm 1.093131801443e-09
+      6 KSP Residual norm 2.619728034561e-10
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 5
+      0 KSP Residual norm 1.339310963389e+01
+      1 KSP Residual norm 4.536180166456e+00
+      2 KSP Residual norm 1.264340673347e+00
+      3 KSP Residual norm 3.281798835459e-01
+      4 KSP Residual norm 9.062471110037e-02
+      5 KSP Residual norm 2.958484087976e-02
+      6 KSP Residual norm 9.302124981217e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 6.794605285686e-01
+      1 KSP Residual norm 2.116799727774e-01
+      2 KSP Residual norm 7.110056054363e-02
+      3 KSP Residual norm 2.336398215255e-02
+      4 KSP Residual norm 6.692923438172e-03
+      5 KSP Residual norm 2.216068333413e-03
+      6 KSP Residual norm 6.975427218790e-04
+      7 KSP Residual norm 2.134509379355e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 3.280788882649e-02
+      1 KSP Residual norm 1.046887935903e-02
+      2 KSP Residual norm 3.758106666105e-03
+      3 KSP Residual norm 1.139852560588e-03
+      4 KSP Residual norm 3.390003551864e-04
+      5 KSP Residual norm 8.031348995298e-05
+      6 KSP Residual norm 2.288940176260e-05
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.803537522350e-04
+      1 KSP Residual norm 4.910329813131e-05
+      2 KSP Residual norm 1.757304454377e-05
+      3 KSP Residual norm 6.126255681529e-06
+      4 KSP Residual norm 1.778736429197e-06
+      5 KSP Residual norm 3.773948495001e-07
+      6 KSP Residual norm 9.857089230822e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 4
+      0 KSP Residual norm 1.242863487542e+01
+      1 KSP Residual norm 4.150465516984e+00
+      2 KSP Residual norm 1.155120808655e+00
+      3 KSP Residual norm 3.042082340358e-01
+      4 KSP Residual norm 8.410892775743e-02
+      5 KSP Residual norm 2.628418422533e-02
+      6 KSP Residual norm 8.473569001233e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 5.864903743071e-01
+      1 KSP Residual norm 2.214760095819e-01
+      2 KSP Residual norm 8.607085185013e-02
+      3 KSP Residual norm 2.572765685435e-02
+      4 KSP Residual norm 8.167027139963e-03
+      5 KSP Residual norm 2.921959405598e-03
+      6 KSP Residual norm 7.889018150315e-04
+      7 KSP Residual norm 2.959753142849e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.367450858727e-02
+      1 KSP Residual norm 3.756567490737e-03
+      2 KSP Residual norm 1.166631492640e-03
+      3 KSP Residual norm 3.813866348359e-04
+      4 KSP Residual norm 1.470690264020e-04
+      5 KSP Residual norm 4.176629027738e-05
+      6 KSP Residual norm 1.555521464565e-05
+      7 KSP Residual norm 5.792152745235e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 1.451627278514e-05
+      1 KSP Residual norm 4.065554208302e-06
+      2 KSP Residual norm 1.302877199669e-06
+      3 KSP Residual norm 4.251917333002e-07
+      4 KSP Residual norm 1.427299512339e-07
+      5 KSP Residual norm 4.921805295940e-08
+      6 KSP Residual norm 1.468009565927e-08
+      7 KSP Residual norm 6.479800228100e-09
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 4
+      0 KSP Residual norm 1.149977117262e+01
+      1 KSP Residual norm 3.787934556033e+00
+      2 KSP Residual norm 1.070466064645e+00
+      3 KSP Residual norm 2.789203967808e-01
+      4 KSP Residual norm 7.606490969798e-02
+      5 KSP Residual norm 2.446189488735e-02
+      6 KSP Residual norm 7.951015908945e-03
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 4.430371318061e-01
+      1 KSP Residual norm 1.443666301949e-01
+      2 KSP Residual norm 5.181321395865e-02
+      3 KSP Residual norm 1.806616680207e-02
+      4 KSP Residual norm 5.173249042468e-03
+      5 KSP Residual norm 1.580737131462e-03
+      6 KSP Residual norm 4.522695870141e-04
+      7 KSP Residual norm 1.573946266318e-04
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 2.700915994632e-02
+      1 KSP Residual norm 9.184015970596e-03
+      2 KSP Residual norm 3.642994749326e-03
+      3 KSP Residual norm 1.264825116133e-03
+      4 KSP Residual norm 4.150128756463e-04
+      5 KSP Residual norm 1.056404544060e-04
+      6 KSP Residual norm 2.720986981979e-05
+      7 KSP Residual norm 7.705687116567e-06
+      Linear solve converged due to CONVERGED_RTOL iterations 7
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+      0 KSP Residual norm 7.844927534043e-05
+      1 KSP Residual norm 2.147171484077e-05
+      2 KSP Residual norm 7.995786848567e-06
+      3 KSP Residual norm 2.918897391247e-06
+      4 KSP Residual norm 1.006481351064e-06
+      5 KSP Residual norm 2.498273880303e-07
+      6 KSP Residual norm 6.505362089679e-08
+      Linear solve converged due to CONVERGED_RTOL iterations 6
+KSP Object: 4 MPI processes
+  type: fgmres
+    restart=30, using classical (unmodified) Gram-Schmidt orthogonalization with no iterative refinement
+    happy breakdown tolerance=1e-30
+  maximum iterations=300, initial guess is zero
+  tolerances: relative=0.001, absolute=1e-50, divergence=10000.
+  right preconditioning
+  using UNPRECONDITIONED norm type for convergence test
+PC Object: 4 MPI processes
+  type: pbjacobi
+    point-block size 3
+  linear system matrix, which is also used to construct the preconditioner:
+  Mat Object: swe_rhs_jacobian (rhs_jac_) 4 MPI processes
+    type: mpibaijkokkos
+    rows=8779596, cols=8779596, bs=3
+    total: nonzeros=105299370, allocated nonzeros=105299370
+    total number of mallocs used during MatSetValues calls=0
+    Nonlinear solve converged due to CONVERGED_FNORM_RELATIVE iterations 4
+****************************************************************************************************************************************************************
+***                                WIDEN YOUR WINDOW TO 160 CHARACTERS.  Use 'enscript -r -fCourier9' to print this document                                 ***
+****************************************************************************************************************************************************************
+
+------------------------------------------------------------------ PETSc Performance Summary: ------------------------------------------------------------------
+
+/global/homes/m/madams/Codes/rdycore-manning/build-claude-gpu/driver/rdycore on a arch-perlmutter-claude-kokkos-cuda-O named nid001200 with 4 processes and CUDA architecture 80, by madams on Sat Aug 22 08:07:22 2026
+Using PETSc Development Git Revision: 5d7d999727522806f5a08aebf80302b592fdd2eb Git Date: 2026-08-20 17:14:53 -0700
+
+                         Max       Max/Min     Avg       Total
+Time (sec):           1.065e+02     1.000   1.065e+02
+Objects:              0.000e+00     0.000   0.000e+00
+Flops:                8.070e+10     1.001   8.068e+10  3.227e+11
+Flops/sec:            7.580e+08     1.001   7.578e+08  3.031e+09
+MPI Msg Count:        2.221e+03     2.023   1.634e+03  6.537e+03
+MPI Msg Len (bytes):  1.241e+09     2.982   3.846e+05  2.514e+09
+MPI Reductions:       1.650e+02     1.000
+
+Flop counting convention: 1 flop = 1 real number operation of type (multiply/divide/add/subtract)
+                            e.g., VecAXPY() for real vectors of length N --> 2N flops
+                            and VecAXPY() for complex vectors of length N --> 8N flops
+
+Summary of Stages:   ----- Time ------  ----- Flop ------  --- Messages ---  -- Message Lengths --  -- Reductions --
+                        Avg     %Total     Avg     %Total    Count   %Total     Avg         %Total    Count   %Total
+ 0:      Main Stage: 1.0466e+02  98.3%  1.3174e+07   0.0%  8.670e+02  13.3%  2.746e+06       94.7%  1.480e+02  89.7%
+ 1: RDyAdvance solve: 1.8174e+00   1.7%  3.2272e+11 100.0%  5.670e+03  86.7%  2.352e+04        5.3%  0.000e+00   0.0%
+
+------------------------------------------------------------------------------------------------------------------------
+See the 'Profiling' chapter of the users' manual for details on interpreting output.
+Phase summary info:
+   Count: number of times phase was executed
+   Time and Flop: Max - maximum over all processes
+                  Ratio - ratio of maximum to minimum over all processes
+   Mess: number of messages sent
+   AvgLen: average message length (bytes)
+   Reduct: number of global reductions
+   Global: entire computation
+   Stage: stages of a computation. Set stages with PetscLogStagePush() and PetscLogStagePop().
+      %T - percent time in this phase         %F - percent flop in this phase
+      %M - percent messages in this phase     %L - percent message lengths in this phase
+      %R - percent reductions in this phase
+   Total Mflop/s: 1e-6 * (sum of flop over all processes)/(max time over all processes)
+   GPU Mflop/s: 1e-6 * (sum of flop on GPU over all processes)/(max GPU time over all processes)
+   CpuToGpu Count: total number of CPU to GPU copies per processor
+   CpuToGpu Size (Mbytes): 1e-6 * (total size of CPU to GPU copies per processor)
+   GpuToCpu Count: total number of GPU to CPU copies per processor
+   GpuToCpu Size (Mbytes): 1e-6 * (total size of GPU to CPU copies per processor)
+   GPU %F: percent flops on GPU in this event
+------------------------------------------------------------------------------------------------------------------------
+Event                Count      Time (sec)     Flop                              --- Global ---  --- Stage ----  Total   GPU    - CpuToGpu -   - GpuToCpu - GPU
+                   Max Ratio  Max     Ratio   Max  Ratio  Mess   AvgLen  Reduct  %T %F %M %L %R  %T %F %M %L %R Mflop/s Mflop/s Count   Size   Count   Size  %F
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--- Event Stage 0: Main Stage
+
+PetscBarrier           1 1.0 3.1261e-05 1.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+BuildTwoSided         44 1.0 1.1833e+00 1.1 0.00e+00 0.0 1.6e+02 5.8e+00 0.0e+00  1  0  2  0  0   1  0 19  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+BuildTwoSidedF         4 1.0 4.3595e-03 1.7 0.00e+00 0.0 1.1e+02 3.5e+05 0.0e+00  0  0  2  2  0   0  0 12  2  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexCrFromFile       1 1.0 3.0057e+01 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 4.0e+00 28  0  0  0  2  29  0  0  0  3     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexCrFromOpts       1 1.0 3.0057e+01 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 5.0e+00 28  0  0  0  3  29  0  0  0  3     0       0      0 0.00e+00    0 0.00e+00  0
+Mesh Partition         2 1.0 6.4037e+00 1.0 0.00e+00 0.0 8.4e+01 1.7e+06 9.0e+00  6  0  1  6  5   6  0 10  6  6     0       0      0 0.00e+00    0 0.00e+00  0
+Mesh Migration         2 1.0 4.3336e+00 1.0 0.00e+00 0.0 2.6e+02 2.3e+06 3.9e+01  4  0  4 23 24   4  0 30 25 26     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexPartSelf         1 1.0 1.3839e+00 155018.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexPartLblInv       2 1.0 1.5449e+00 10.9 0.00e+00 0.0 0.0e+00 0.0e+00 4.0e+00  1  0  0  1  2   1  0  0  1  3     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexPartLblSF        2 1.0 6.2330e-01 1.3 0.00e+00 0.0 1.8e+01 1.5e+06 0.0e+00  0  0  0  1  0   1  0  2  1  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexPartStrtSF       2 1.0 1.6857e-01 1.0 0.00e+00 0.0 9.0e+00 5.9e+06 0.0e+00  0  0  0  2  0   0  0  1  2  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexPointSF          2 1.0 5.1615e+01 1.0 0.00e+00 0.0 1.2e+01 1.1e+07 0.0e+00 48  0  0  5  0  49  0  1  6  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexInterp          21 1.1 4.2791e+00 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  4  0  0  0  0   4  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexDistribute       1 1.0 6.0706e+01 1.0 0.00e+00 0.0 1.0e+02 8.7e+06 2.4e+01 57  0  2 36 15  58  0 12 38 16     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexDistCones        2 1.0 8.4369e-01 1.0 0.00e+00 0.0 5.4e+01 3.9e+06 0.0e+00  1  0  1  8  0   1  0  6  9  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexDistLabels       2 1.0 1.1956e+00 1.0 0.00e+00 0.0 1.1e+02 2.1e+06 2.8e+01  1  0  2  9 17   1  0 13 10 19     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexDistOvrlp        1 1.0 1.7764e+00 1.0 0.00e+00 0.0 2.6e+02 1.7e+04 2.8e+01  2  0  4  0 17   2  0 29  0 19     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexDistField        3 1.0 1.3392e+00 1.0 0.00e+00 0.0 6.9e+01 1.7e+06 1.0e+00  1  0  1  5  1   1  0  8  5  1     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexGToNBegin        5 1.0 3.9515e-01 2.3 0.00e+00 0.0 2.7e+01 6.8e+06 0.0e+00  0  0  0  7  0   0  0  3  8  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexGToNEnd          5 1.0 2.4712e-01 7.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexNToGBegin        2 1.0 3.6920e-01 3.4 0.00e+00 0.0 1.2e+01 1.1e+07 0.0e+00  0  0  0  5  0   0  0  1  6  0     0       0      0 0.00e+00    2 3.51e+01  0
+DMPlexNToGEnd          2 1.0 2.6874e-01 42.6 4.39e+06 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0 100  0  0  0    49       0      0 0.00e+00    0 0.00e+00  0
+DMPlexStratify        30 1.1 3.2563e+00 11.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  2  0  0  0  0   2  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DMPlexSymmetrize      30 1.1 4.8128e-01 4.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFSetGraph            47 1.0 6.8404e-01 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  1  0  0  0  0   1  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFSetUp               40 1.0 5.4039e+00 2.9 0.00e+00 0.0 2.5e+02 1.7e+06 0.0e+00  3  0  4 17  0   3  0 29 18  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFBcastBegin         101 1.0 3.4787e-01 4.0 0.00e+00 0.0 4.2e+02 3.1e+06 0.0e+00  0  0  6 52  0   0  0 49 55  0     0       0      1 2.84e-02    0 0.00e+00  0
+SFBcastEnd           101 1.0 4.0899e+01 267.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00 29  0  0  0  0  29  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFReduceBegin         20 1.0 1.2925e+01 30741.0 0.00e+00 0.0 5.4e+01 1.0e+07 0.0e+00  3  0  1 22  0   3  0  6 23  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFReduceEnd           20 1.0 3.8766e+01 2.8 4.39e+06 0.0 0.0e+00 0.0e+00 0.0e+00 19  0  0  0  0  19 100  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFFetchOpBegin         3 1.0 5.7271e-05 3.4 0.00e+00 0.0 3.0e+00 6.3e+03 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFFetchOpEnd           3 1.0 1.7827e-03 23.7 0.00e+00 0.0 3.0e+00 6.3e+03 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFDistSection         20 1.0 2.3246e+00 1.1 0.00e+00 0.0 2.0e+02 5.0e+06 0.0e+00  2  0  3 39  0   2  0 22 41  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFSectionSF           15 1.0 3.0327e+00 2.9 0.00e+00 0.0 1.0e+02 1.7e+06 0.0e+00  1  0  2  7  0   2  0 12  8  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFPack               124 1.0 2.3533e-01 5.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      1 2.84e-02    0 0.00e+00  0
+SFUnpack             127 1.0 3.8768e+01 12170.3 4.39e+06 0.0 0.0e+00 0.0e+00 0.0e+00  9  0  0  0  0   9 100  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecCopy                1 1.0 2.1744e-03 532.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecSet                 8 1.0 1.2416e-02 4.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecAssemblyBegin       3 1.0 1.4748e-02 1.1 0.00e+00 0.0 1.1e+02 3.5e+05 0.0e+00  0  0  2  2  0   0  0 12  2  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecAssemblyEnd         3 1.0 2.7495e-03 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecLoad                1 1.0 6.8624e-01 1.0 0.00e+00 0.0 6.0e+00 2.0e+00 7.0e+00  1  0  0  0  4   1  0  1  0  5     0       0      0 0.00e+00    0 0.00e+00  0
+DualSpaceSetUp        10 1.0 1.7698e-02 1.0 9.60e+01 1.1 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+FESetUp               10 1.0 2.1200e-01 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatConvert             2 1.0 1.3469e-02 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatAssemblyBegin      63 1.1 2.1336e-03 27.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatAssemblyEnd        63 1.1 3.2835e-02 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatZeroEntries         1 1.0 2.4427e-05 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatSetPreallCOO       26 1.0 4.4518e-01 1.0 0.00e+00 0.0 2.4e+01 3.2e+03 5.0e+00  0  0  0  0  3   0  0  3  0  3     0       0      0 0.00e+00    0 0.00e+00  0
+MatSetValuesCOO       24 1.0 3.2526e-05 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DCtxCreate             1 1.0 1.5560e-05 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DCtxDestroy            1 1.0 2.5960e-05 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DCtxSetUp              1 1.0 8.9570e-06 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+DCtxSetDevice          1 1.0 9.6446e-05 1.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+
+--- Event Stage 1: RDyAdvance solve
+
+SFBcastBegin         228 1.0 1.6381e-02 1.1 0.00e+00 0.0 1.4e+03 3.8e+04 0.0e+00  0  0 21  2  0   1  0 24 39  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFBcastEnd           228 1.0 7.2911e-03 1.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFReduceBegin        103 1.0 2.1923e-04 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFReduceEnd          103 1.0 7.9919e-05 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SFPack              1048 1.0 4.1462e-03 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      1 1.42e-02    0 0.00e+00  0
+SFUnpack            1048 1.0 1.0320e-04 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecDot               103 1.0 6.4204e-02 1.0 4.52e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  1  0  0  0   4  1  0  0  0 28170       0      0 0.00e+00    0 0.00e+00 100
+VecMDot              614 1.0 4.0332e-01 1.0 9.54e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0 12  0  0  0  22 12  0  0  0 94606       0      0 0.00e+00  614 1.74e-02 100
+VecNorm              945 1.0 1.2427e-01 1.1 4.15e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0  5  0  0  0   7  5  0  0  0 133524       0      0 0.00e+00    0 0.00e+00 100
+VecScale             717 1.0 3.5994e-03 1.1 1.57e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0  2  0  0  0   0  2  0  0  0 1748903       0      0 0.00e+00    0 0.00e+00 100
+VecCopy              514 1.0 6.5661e-03 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecSet               331 1.0 1.5121e-03 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecAXPY              353 1.5 8.9500e-04 1.1 4.54e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  1  0  0  0   0  1  0  0  0 2025981       0      0 0.00e+00    0 0.00e+00 100
+VecAYPX              125 1.0 5.9497e-03 1.1 5.49e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  1  0  0  0   0  1  0  0  0 368908       0      0 0.00e+00    0 0.00e+00 100
+VecAXPBYCZ           145 1.0 4.9554e-03 1.0 1.59e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0  2  0  0  0   0  2  0  0  0 1284500       0      0 0.00e+00    0 0.00e+00 100
+VecWAXPY             105 1.0 5.8295e-04 1.1 4.61e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  1  0  0  0   0  1  0  0  0 3162755       0      0 0.00e+00    0 0.00e+00 100
+VecMAXPY             717 1.0 3.8431e-03 1.1 1.22e+10 1.0 0.0e+00 0.0e+00 0.0e+00  0 15  0  0  0   0 15  0  0  0 12733710       0      0 0.00e+00    0 0.00e+00 100
+VecScatterBegin      717 1.0 5.0810e-01 1.0 0.00e+00 0.0 4.3e+03 1.9e+04 0.0e+00  0  0 66  3  0  28  0 76 61  0     0       0      2 4.26e-02    0 0.00e+00  0
+VecScatterEnd        717 1.0 1.6505e-02 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   1  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+VecReduceArith       206 1.0 1.5092e-02 1.1 9.05e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  1  0  0  0   1  1  0  0  0 239673       0      0 0.00e+00    0 0.00e+00 100
+VecReduceComm        103 1.0 3.1360e-03 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatMult              717 1.0 5.3379e-01 1.0 3.78e+10 1.0 4.3e+03 1.9e+04 0.0e+00  0 47 66  3  0  29 47 76 61  0 282879       0      2 4.26e-02    0 0.00e+00 100
+MatScale             103 1.0 4.5072e-02 1.0 2.71e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0  3  0  0  0   2  3  0  0  0 240635       0      0 0.00e+00    0 0.00e+00 100
+MatAssemblyBegin     103 1.0 1.9649e-05 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatAssemblyEnd       103 1.0 4.8820e-05 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatView              103 1.0 7.4760e-03 1.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+MatSetValuesCOO      103 1.0 1.1879e-02 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   1  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+TSStep                20 1.0 1.8066e+00 1.0 8.07e+10 1.0 5.7e+03 2.4e+04 0.0e+00  2 100 87  5  0  99 100 100 100  0 178635       0      4 2.35e+01  739 4.67e+00 100
+TSFunctionEval       125 1.0 8.2104e-02 1.0 5.51e+08 1.0 7.5e+02 3.8e+04 0.0e+00  0  1 11  1  0   4  1 13 21  0 26790       0      2 2.34e+01  125 4.65e+00 100
+TSJacobianEval       103 1.0 3.2827e-01 1.0 2.94e+09 1.0 6.2e+02 3.8e+04 0.0e+00  0  4  9  1  0  18  4 11 18  0 35795       0      0 0.00e+00    0 0.00e+00 100
+KSPSetUp             103 1.0 7.6161e-02 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   4  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+KSPSolve             103 1.0 1.0284e+00 1.0 6.74e+10 1.0 3.7e+03 1.9e+04 0.0e+00  1 83 56  3  0  56 83 65 52  0 261990       0      2 4.26e-02  614 1.74e-02 100
+KSPGMRESOrthog       614 1.0 4.0734e-01 1.0 1.91e+10 1.0 0.0e+00 0.0e+00 0.0e+00  0 24  0  0  0  22 24  0  0  0 187341       0      0 0.00e+00  614 1.74e-02 100
+SNESSolve             20 1.0 1.7994e+00 1.0 8.05e+10 1.0 5.7e+03 2.4e+04 0.0e+00  2 100 87  5  0  99 100 100 100  0 178864       0      4 2.35e+01  739 4.67e+00 100
+SNESSetUp              1 1.0 2.7904e-05 1.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+SNESFunctionEval     125 1.0 8.5690e-02 1.0 1.92e+09 1.0 7.5e+02 3.8e+04 0.0e+00  0  2 11  1  0   5  2 13 21  0 89705       0      2 2.34e+01  125 4.65e+00 100
+SNESJacobianEval     103 1.0 3.2839e-01 1.0 2.94e+09 1.0 6.2e+02 3.8e+04 0.0e+00  0  4  9  1  0  18  4 11 18  0 35781       0      0 0.00e+00    0 0.00e+00 100
+SNESLineSearch       103 1.0 2.3713e-01 1.0 9.77e+09 1.0 1.2e+03 2.9e+04 0.0e+00  0 12 19  1  0  13 12 22 27  0 164765       0      0 0.00e+00  105 3.90e+00 100
+PCSetUp              103 1.0 8.5800e-02 1.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   5  0  0  0  0     0       0      0 0.00e+00    0 0.00e+00  0
+PCApply              614 1.0 1.2626e-02 1.0 8.09e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0 10  0  0  0   1 10  0  0  0 2561721       0      0 0.00e+00    0 0.00e+00 100
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Object Type          Creations   Destructions. Reports information only for process 0.
+
+--- Event Stage 0: Main Stage
+
+           Container    66             66
+    Distributed Mesh    79             79
+            DM Label   198            198
+          Quadrature   130            130
+           Index Set   745            745
+   IS L to G Mapping   204            204
+             Section   269            269
+   Star Forest Graph   243            243
+     Discrete System   120            120
+           Weak Form   120            120
+    GraphPartitioner    29             29
+              Vector    84            127
+        Linear Space    14             14
+          Dual Space    34             34
+            FE Space    10             10
+              Matrix   144            144
+  PetscDeviceContext     1              0
+              Viewer     4              4
+             TSAdapt     1              1
+                  TS     1              1
+                DMTS     1              1
+                SNES     1              1
+              DMSNES     3              3
+      SNESLineSearch     1              1
+       Krylov Solver     1              1
+     DMKSP interface     0              1
+      Preconditioner     1              1
+
+--- Event Stage 1: RDyAdvance solve
+
+              Vector    43              0
+     DMKSP interface     1              0
+========================================================================================================================
+Average time to get PetscTime(): 3.11e-08
+Average time for MPI_Barrier(): 1.43196e-05
+Average time for zero size MPI_Send(): 4.867e-06
+#PETSc Option Table entries:
+-dist_dm_distribute_save_sf true # (source: code)
+-dm_mat_type baijkokkos # (source: command line)
+-dm_plex_filename Turning_30m_with_z.updated.with_sidesets.exo # (source: code)
+-dm_vec_type kokkos # (source: command line)
+-ksp_converged_reason # (source: command line)
+-ksp_max_it 300 # (source: command line)
+-ksp_monitor # (source: command line)
+-ksp_rtol 1e-3 # (source: command line)
+-ksp_type fgmres # (source: command line)
+-ksp_view # (source: command line)
+-log_view # (source: command line)
+-pc_type pbjacobi # (source: command line)
+-snes_converged_reason # (source: command line)
+-snes_max_it 50 # (source: command line)
+-ts_adapt_type none # (source: command line)
+#End of PETSc Option Table entries
+Compiled without FORTRAN kernels
+Compiled with full precision matrices (default)
+sizeof(short) 2 sizeof(int) 4 sizeof(long) 8 sizeof(void*) 8 sizeof(PetscScalar) 8 sizeof(PetscInt) 4
+Configure options: --download-kokkos --download-kokkos-kernels --download-metis --download-parmetis --download-triangle=1 --download-exodusii --download-hdf5 --download-libceed --download-muparser --download-netcdf --download-pnetcdf --download-zlib --download-revolve --with-batch=0 --with-cc=cc --with-cuda-arch=80 --with-cuda=1 --with-cxx=CC --with-debugging=0 COPTFLAGS=-O2 CXXOPTFLAGS=-O2 --with-fc=0 --with-kokkos-kernels-tpl=0 --with-make-np=8 --with-mpiexec="srun -G4 --gpu-bind=none" PETSC_ARCH=arch-perlmutter-claude-kokkos-cuda-O
+-----------------------------------------
+Libraries compiled on 2026-08-21 15:46:12 on login04
+Machine characteristics: Linux-6.4.0-150600.23.125_15.0.27-cray_shasta_c-x86_64-with-glibc2.3.4
+Using PETSc directory: /global/homes/m/madams/Codes/petsc-claude
+Using PETSc arch: arch-perlmutter-claude-kokkos-cuda-O
+-----------------------------------------
+
+Using C compiler: cc  -fPIC -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -O2 
+-----------------------------------------
+
+Using include paths: -I/global/homes/m/madams/Codes/petsc-claude/include -I/global/homes/m/madams/Codes/petsc-claude/arch-perlmutter-claude-kokkos-cuda-O/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/cuda/13.2/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/math_libs/13.2/include
+-----------------------------------------
+
+Using C linker: cc
+Using libraries: -Wl,-rpath,/global/homes/m/madams/Codes/petsc-claude/arch-perlmutter-claude-kokkos-cuda-O/lib -L/global/homes/m/madams/Codes/petsc-claude/arch-perlmutter-claude-kokkos-cuda-O/lib -lpetsc -Wl,-rpath,/global/homes/m/madams/Codes/petsc-claude/arch-perlmutter-claude-kokkos-cuda-O/lib -L/global/homes/m/madams/Codes/petsc-claude/arch-perlmutter-claude-kokkos-cuda-O/lib -Wl,-rpath,/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/cuda/13.2/lib64 -L/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/cuda/13.2/lib64 -Wl,-rpath,/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/math_libs/13.2/lib64 -L/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/math_libs/13.2/lib64 -L/opt/nvidia/hpc_sdk/Linux_x86_64/26.5/cuda/13.2/lib64/stubs -lkokkoskernels -lkokkoscontainers -lkokkoscore -lkokkossimd -lexodus -lnetcdf -lhdf5_hl -lhdf5 -lparmetis -lmetis -lceed -lmuparser -lpnetcdf -ltriangle -lz -lrevolve -lcudart -lnvtx3interop -lcufft -lcublas -lcusparse -lcusolver -lcurand -lcuda -lnvidia-ml -lX11 -lstdc++ -lquadmath
+-----------------------------------------
+

@@ -1,0 +1,2908 @@
+# GPU-implicit session log (P2-P4 of PLAN-fv-gpu-adaptation)
+
+Branch `adams/gpu-implicit` (off `adams/manning-draft` @ 6765cd86). Second
+agent, per plans/gpu-session-kickoff.md.
+
+## P2 — device matrices, host physics
+
+### Code (laptop-verified, commits c1487f6d + 054717cb)
+
+- `CreateAnalyticJacobianCOO` no longer hardwires MATAIJ: type comes from
+  `DMGetMatType` (`-dm_mat_type`; default unchanged), plus a prefixed
+  `MatSetFromOptions` so `-rhs_jac_mat_type` overrides THIS matrix alone.
+  (A bare `-mat_type` is also consumed inside DMCreateMatrix_Plex and flips
+  the FD twin in the jacobian tests — segfaults MATCOLORINGSL on an empty
+  BAIJKokkos, whose host CSR is only built at assembly.)
+- Blocked COO for BAIJ types via the fork's `MatCOOUseBlockIndices`:
+  block-index pattern (9x fewer index entries), values = one dense row-major
+  3x3 block per entry == exactly the P1 values layout, so the assembly loop
+  is untouched. Detected at configure time by grepping petscmat.h ->
+  `RDY_HAVE_MAT_COO_BLOCK_INDICES` (config.h); builds against stock PETSc
+  unchanged.
+- Only types that IMPLEMENT blocked COO opt in: `*baijkokkos`, `*baijcuda`,
+  `mpibaij` (host twin). Plain `seqbaij` ignores the flag by design and
+  would misread block indices as scalar (verified: rel err ~1) — it keeps
+  scalar COO. Serial host blocked-COO testing: force `mpibaij`.
+
+### Laptop verification (fork stack)
+
+New PETSc arch `arch-macosx-gnu-rdycore-kokkos-O` of ~/Codes/petsc-claude
+(RDycore dep set + kokkos host); RDycore worktree build `build-claude`.
+- `ctest -R "adjoint|calibrate|jacobian"`: 14/14 (both this stack and the
+  petsc_gem `build_rev` stack).
+- `test_swe_jacobian_global` FD-vs-analytic rel err 1.5-1.9e-8 (gate 1e-6),
+  IDENTICAL across `-rhs_jac_mat_type` in {aij, baij, mpibaij, aijkokkos,
+  baijkokkos}, np 1 and 2.
+- Standalone fork check: blocked COO on seqbaijkokkos is exact (0.0 diff vs
+  MatSetValuesBlocked reference, repeated blocks summed). NB
+  MatSetPreallocationCOO may permute its index arrays in place.
+
+### Perlmutter status / environment findings (IMPORTANT)
+
+- PM moved to CPE 26.03: default `cudatoolkit/13.2`, `cray-mpich/9.1.0`
+  whose `libmpi_gtl_cuda.so` REQUIRES `libcudart.so.13` — CUDA 12 builds of
+  new arches are no longer linkable with the default MPICH. The
+  `--download-cudss` archive is cuda12-only => cudss is OFF in the new arch
+  until a cuda13 archive is wired (P4 coarse-solve fallback: host lu).
+- `arch-perlmutter-opt-gcc-kokkos-cuda` (shared with the other agent) was
+  STALE w.r.t. the 3 stale-cache-fix commits; incrementally rebuilt Aug 21
+  (touched the 14 device TUs including changed headers first — header-dep
+  gotcha). CAVEAT: that arch records `CUDAC = nvcc` (PATH-resolved), so the
+  rebuilt objects compiled under nvcc 13.2 into a 12.9-configured arch. It
+  links; a from-scratch reconfigure under the new CPE is the clean fix if
+  anything smells.
+- New arch for RDycore: `arch-perlmutter-claude-kokkos-cuda-O` = device
+  pipeline (kokkos/kokkos-kernels/metis/parmetis/triangle, cuda 13.2,
+  minus cudss) + RDycore deps (exodus/hdf5/libceed/muparser/netcdf/pnetcdf/
+  zlib/revolve), COPTFLAGS=-O2. Config script:
+  ~/Codes/petsc-configs/arch-perlmutter-claude-kokkos-cuda-O.py (+ build
+  script build-claude-kokkos-cuda.sh). Building at session time.
+- RDycore worktree ~/Codes/rdycore-manning now on `adams/gpu-implicit`;
+  `cmake-claude-gpu.sh` stages `build-claude-gpu` against the new arch.
+- Run dir: `$SCRATCH/gpu-implicit` (mesh+IC linked, beuler_dt1.yaml,
+  `p2_ab.sbatch` staged: CPU baseline, GPU-binary/host-mats sanity, then
+  aijkokkos and baijkokkos at n4 and n64, all dt=1 20 steps, fgmres+pbjacobi
+  rtol 1e-3, solution monitors for trajectory comparison).
+- The OTHER agent was actively iterating the dt>=5 robustness question this
+  morning in $SCRATCH/manning-beuler (d_dt5_*, b_dt5_* logs; interactive job
+  on nid001000): at dt=5 with basic LS the FIRST Newton linear solve
+  diverges (300 its, pbjacobi) — a linear-solver hardness problem, not just
+  the line search. P4 waits on that thread; staying out of their dir.
+
+## P3 — device assembly (design sketch, not started)
+
+- swe_roe_flux_jacobian_petsc.h is pure self-contained scalar math — ports
+  to KOKKOS_INLINE_FUNCTION nearly mechanically (drop PetscFunctionBegin/
+  PetscCall error plumbing, keep branches).
+- Setup-time: per-edge and per-cell OFFSET tables into the COO values array
+  (host cursor replay), device views of static geometry (l, r, wl, wr, sn,
+  cn per edge; dz_dx, dz_dy per cell; owned flags folded in).
+- Assembly: parallel_for internal edges -> interior region; parallel_for
+  owned cells -> diagonal region; boundary edges stay HOST (O(surface)) in
+  a contiguous slice of the values array, deep_copied in.
+- MatSetValuesCOO with a device pointer (kokkos impls detect memtype).
+- State: -dm_vec_type kokkos + VecKokkosGetDeviceView of u_local after
+  DMGlobalToLocal; manning via device view of material_properties.
+
+## Session updates (2026-08-21, later)
+
+- **petsc-claude reconciliation (now owned by this session)**: three
+  lineages — laptop main a5fbbf51c88 (33 ahead of GitLab 18bdd7fc26b, an
+  ancestor), PM main 5d7d9997275 (11ef47e1f04 + 3 recovered commits).
+  Verified: the two PM cache-fix commits are content-identical cherry-picks
+  of laptop's 9c4fd83f3fb/d10463c1824, and PM-unique 5d7d9997275 is a
+  content twin of laptop's 1f8484fdbe7 (MatFlatABSchedBuildDevice + ex322
+  gates present on both). Merge commit 6e627442cdd joins the histories
+  (tree == laptop main); laptop AND PM main fast-forwarded to it, so all
+  three PM commits are ancestors — nothing lost by construction. GitLab
+  push is fast-forward and PENDING (permission-blocked for the agent):
+  `cd ~/Codes/petsc-claude && git push origin main`.
+  Only source delta 5d7d9997275 -> merge: src/ksp/pc/impls/gamg/
+  agg_device.kokkos.cxx (the shared opt-gcc-kokkos-cuda arch needs an
+  incremental make for it; delegated as a QA job).
+- **arch-perlmutter-claude-kokkos-cuda-O BUILT** on the merged tree
+  (cuda 13.2, no cudss). RDycore `build-claude-gpu` built against it
+  (RDY_HAVE_MAT_COO_BLOCK_INDICES=1); CPU `build-claude` rebuilt at
+  054717cb on arch-perlmutter-claude-O.
+- **P2 gate job 57369566** submitted ($SCRATCH/gpu-implicit/p2_ab.sbatch):
+  dt=1 x20 steps, fgmres+pbjacobi rtol 1e-3, MPICH_GPU_SUPPORT_ENABLED=1;
+  runs: CPU baseline n64, GPU-binary/host-mats n64 (build sanity),
+  aijkokkos and baijkokkos each at n4 and n64 (-dm_vec_type kokkos);
+  -ts_monitor_solution binary dumps -> compare_traj.py (n64-vs-n64 is the
+  apples-to-apples trajectory pair; n4 runs differ by partition/reductions
+  at Newton-tolerance level, expected).
+
+### Fork bug found & fixed: MatShift/MatNorm on BAIJKokkos (fdaf8ca2c1a)
+
+PM baijkokkos smoke SEGV'd at startup; reproduced on the laptop (np>=2
+driver run, then a 60-line unit test). Root cause: the device-native
+BAIJKokkos classes INHERITED MatShift_SeqBAIJ(), which reads the base
+Mat_SeqBAIJ->nz (0 for device-built matrices), concludes the matrix is
+empty, and re-preallocates it 1 block/row -- destroying the device
+structure/values (serial: Jacobian degenerates to shift*I; parallel:
+dangling COO struct -> SEGV). Trigger: TSComputeIJacobianDefault() =
+MatScale+MatShift every Newton step of the BEULER path -- the fork's
+FE/SNES pipelines never called MatShift, so it went unseen. MatNorm was
+also inherited and silently returned 0 (reads empty base arrays).
+
+Fix (petsc-claude fdaf8ca2c1a, laptop+PM): device MatShift_SeqBAIJKokkos
+(in-place add on each block-row's diagonal block; SUP if a diagonal block
+is missing from the pattern), MatShift_MPIBAIJKokkos (delegates to the
+diag sub-block), MatNorm_SeqBAIJKokkos (frobenius from synced values;
+1/inf via temporary SEQAIJ), + lifecycle gate ex337 (blocked COO cycled
+with Norm/Scale/Shift/Mult vs an AIJ reference; seq, mpi, and the MPIBAIJ
+host twin). Verified: ex337 3/3, ex311/322/334/335 all ok, cycle repro
+np1-4 exact, RDycore ctest 14/14, adjoint_beuler full solve 40/40 at
+np1/2/4 baijkokkos, PM 4-GPU baijkokkos smoke converges. NB for the QA
+agent: the SHARED arch needs an incremental make to pick this up, and the
+cuda-gated blocked-COO tests (ex313/314/316/319/320) + ex337 should run
+on a GPU node.
+
+P2 job 57369566 held during the PM relink and released; queued with the
+fixed lib.
+
+## P2 GATE: PASSED (2026-08-21, interactive runs; batch 57369566 redundant/queued for n4 data)
+
+dt=1 x20 steps, n64 (4 A100s shared for device runs), fgmres+pbjacobi
+rtol 1e-3, no EW. All three runs take IDENTICAL Newton paths (20 snes
+conv, 717 total linear its) and identical state norms to 16 digits at
+every dumped step; aijkokkos vs baijkokkos trajectories are bit-identical
+(rel diff <= 2e-16). CPU-vs-device entry ORDER differs only because
+arch-perlmutter-claude-O has no parmetis (different partition) — compare
+norms, not raw dumps. Logs/dumps: $SCRATCH/gpu-implicit/p2i_*.log,
+usol.*.bin, compare_traj.py.
+
+| metric (s)          | CPU aij | aijkokkos | baijkokkos |
+|---------------------|---------|-----------|------------|
+| SNESSolve           | 116.7   | 60.6      | 29.5       |
+| SNESJacobianEval    | 80.1    | 24.2      | 8.9        |
+| KSPSolve            | 13.0    | 22.7      | 15.6       |
+| MatMult (717)       | 10.8    | 9.1 GPU100| 8.6 GPU100 |
+| PCApply (614)       | 1.31    | 0.039     | 0.019      |
+| MatSetValuesCOO(103)| 3.5     | 13.4      | 4.5        |
+| TSFunctionEval(125) | 20.5    | 10.1      | 3.7        |
+
+- Device residency: MatMult/PCApply GPU %F = 100; KSPSolve GpuToCpu =
+  511 transfers x 0.017 MB TOTAL (convergence scalars). Gate condition
+  "no per-iteration GpuToCpu in the solve" met.
+- Fork's device PBJacobi: 1.31 -> 0.019 s (~68x on the apply).
+- baijkokkos beats aijkokkos 2x overall: scalar COO uploads 23 MB/assembly
+  through a 9x larger index/perm scatter (logged 2.37 GB H2D total);
+  blocked COO's leaner scatter cuts JacEval 24.2 -> 8.9 s.
+- KSPSolve is SLOWER on device than CPU at n64 (context thrash: 16
+  ranks/GPU, no MPS) — the n4 batch runs + P3/P4 are where device KSP
+  perf gets its fair shot. CPU MatAssemblyEnd showed a 62 s / 23000x
+  imbalance spike in this interactive session (worse than the 7.7 s
+  charter number) — device runs sidestep it entirely.
+- CPU JacEval 80.1 s is the P3 target: values are still host-computed
+  (flux-tangent loop + DMGlobalToLocal + upload). P3 moves the fill to a
+  device kernel over the precomputed COO offsets.
+
+## P3 GATE: PASSED (2026-08-21) -- device assembly
+
+Implementation (commit 375b9067 + this log): swe_jacobian_kokkos.kokkos.cxx
+fills the COO values buffer on device (interior-edge, boundary-edge, and
+cell kernels writing at setup-precomputed offsets; math shared verbatim
+with the host loop via RDY_MATH_FN); MatSetValuesCOO consumes the device
+pointer. TU compiled by PETSc's .kokkos.cxx rule (nvcc_wrapper) driven
+from CMake (src/swe/kokkos_compile.mk); host loop kept for non-Kokkos
+types. Laptop FD gates: jacobian_global FD-limited & digit-identical to
+host assembly, np 1/2, device path PetscInfo-confirmed; full BEULER
+solves 40/40 np 1/2/4; ctest 14/14; host adjoint gates unchanged.
+
+PM A/B (dt=1 x20, protocol of the P2 table; trajectory BIT-IDENTICAL to
+the P2 device runs, rel diff 2.3e-16; same 20 snes / 717 lin its):
+
+| SNESJacobianEval (103) | total  | per-assembly |
+|------------------------|--------|--------------|
+| CPU (P1 COO)           | 80.1 s | 0.78 s       |
+| P2 baijkokkos n64      | 8.9 s  | 86 ms        |
+| P3 baijkokkos n64      | 1.86 s | 18 ms        |
+| P3 aijkokkos n64       | 1.53 s | 15 ms        |
+| P3 baijkokkos n4       | 0.35 s | 3.4 ms       |
+
+- The charter's A/B target (0.77 s/assembly P1 baseline): 226x faster
+  per assembly at n4, 43x at n64. JacEval GPU %F = 100, ZERO CpuToGpu in
+  the event (only Dirichlet ghosts + material props are staged, ~KBs).
+- MatSetValuesCOO: 4.5 s (P2 host upload) -> 14 ms (device pointer).
+- SNESSolve n64: 116.7 (CPU) -> 29.5 (P2) -> 22.0 s (P3). At n4: 29.1 s,
+  now dominated by TSFunctionEval 21.6 s = the HOST RHS physics on 4
+  ranks -- the remaining host component (stays host per charter: no CEED
+  entanglement; at n64 it spreads to 3.6 s).
+- Known limitation (recorded in the P3 commit): TSAdjoint with kokkos VEC
+  types hangs in trajectory machinery -- adjoint stays on host types per
+  the charter invariant (forward-solve-first).
+- Batch job 57369566 cancelled as redundant (all gate data collected via
+  interactive runs).
+
+## P4 status: BLOCKED on the dt>=5 nonlinear robustness question
+
+Charter prerequisite not met: the other agent's morning runs show the
+FIRST Newton linear solve diverging at dt=5 (300 its, pbjacobi, basic LS)
+-- a linear-solver hardness problem upstream of the line-search question.
+P4's device-GAMG parameter menu waits for that CPU-side resolution.
+Useful P4 prep that can proceed: device GAMG machinery validation at dt=1
+(PtAP/smoother path), and the delegated cudss-on-CUDA-13 job for the
+coarse solve.
+
+### P4 prep: device GAMG machinery validation at dt=1 (n4, baijkokkos)
+
+Config: fgmres + gamg, gmres(4)+pbjacobi smoothers, nsmooths {0,1},
+aggressive_coarsening 0, coarse solve host LU (cudss pending), NO other
+gamg tuning. Logs: $SCRATCH/gpu-implicit/p4prep_gamg{0,1}_n4.log.
+
+- WORKS end-to-end: 20/20 Newton both variants, 206 total linear its
+  (pbjacobi: 717 -- GAMG already cuts iterations 3.5x at dt=1).
+- Device PtAP validated under per-Newton reassembly: PtAPSymbolic once
+  (14 products, 0.57 s), PtAPNumeric re-run 1442x in 1.63 s; the
+  Galerkin products show ~zero transfers.
+- SNESSolve 41.4/38.9 s vs pbjacobi's 29.1 at n4 -- GAMG loses at dt=1
+  as expected (easy problem); the machinery, not the crown, was the point.
+- FINDING for P4: PCSetUp moves ~82 MB/setup EACH WAY (8.5 GB per run,
+  1484 transfers) and PCApply logs GPU %F ~10 -- some hierarchy stage
+  still host-resident with the BARE option set. The elasticity canon adds
+  -pc_gamg_threshold 0.05 -pc_gamg_threshold_scale 0.5
+  -pc_gamg_prolongator_filter 0.03 -pc_gamg_aggressive_coarsening 1
+  -pc_gamg_process_eq_limit 1000; first move when P4 unblocks is to rerun
+  with the canon set + chase the remaining transfers (and wire cudss for
+  the coarse solve -- delegated).
+
+### P4 prep #2 + shared-arch QA (post-cert-renewal session)
+
+- **Shared-arch GPU QA: 66 ok / 0 fail** — the full cuda-gated fork suite
+  (ex311/313/314/316/319/320/322/334/335/337) on an A100 against
+  arch-perlmutter-opt-gcc-kokkos-cuda rebuilt at the reconciled main +
+  fdaf8ca fix. CAVEATS for anyone running it: (a) that arch is
+  CUDA-chimeric until reconfigured — needs `module load cudatoolkit/12.9`
+  AND 13.2's cuda/math lib64 appended to LD_LIBRARY_PATH; (b) its
+  configured python (~/cutile-venv) is gone — pass PYTHON=python3; (c) the
+  fork's query_tests chokes on multi-pattern search= — one pattern per
+  invocation, and use gmakefile.test directly (the top-level wrapper
+  dropped my search var); (d) generated test scripts honor $PETSCMPIEXEC
+  for redirecting mpiexec into an existing allocation.
+- **GAMG earlier "GPU %F ~10" was a TRUNCATION artifact in my log
+  extraction — KSPSolve/PCSetUp/PCApply all report GPU %F = 100.** The
+  genuine P4 lead is narrower: PCSetUp moves ~66-82 MB per Newton setup
+  (6.8-8.5 GB per 103-setup run) — chase in the aggregation/graph or
+  coarse-op construction path.
+- **SWE-vs-elasticity GAMG delta found**: `-pc_gamg_threshold 0.05` makes
+  the VALUE-filtered graph asymmetric on the upwinded SWE operator and
+  GAMG errors ("un-symmetric graph"); `-pc_gamg_sym_graph true` is NOT
+  honored on this path (likely the device CreateGraph lacks symmetrize —
+  fork follow-up). Working SWE canon: `-pc_gamg_threshold -1` (structure
+  IS symmetric) + `-pc_gamg_prolongator_filter 0.03` + aggressive
+  coarsening: 20/20 Newton, 206 its, PCSetUp 4.24 s/103 (vs 5.4 bare).
+
+## REVIEW: the full-GPU SWE Manning conversion (with Mark, 2026-08-21)
+
+Protocol everywhere: Turning 30 m (2.93M cells), dt=1 BEULER x20 steps,
+fgmres+pbjacobi, fixed ksp_rtol 1e-3, one GPU node.
+
+Correctness: identical Newton path (20 snes / 717 lin its) across all
+seven configurations; device-format and device-assembly trajectories
+bit-identical (2e-16); norms vs CPU identical to 16 digits every step
+(entry order differs only by partitioner availability); device assembly
+FD-limited (1.5-1.9e-8, digit-identical to host); ctest 14/14; host
+adjoint gates untouched.
+
+| SNESSolve (s)     | CPU n64 | P2 baij | P3 baij | P3 baij n4 |
+|-------------------|---------|---------|---------|------------|
+| total             | 116.7   | 29.5    | 22.0    | 29.1       |
+| JacobianEval      | 80.1    | 8.9     | 1.86    | 0.35       |
+| KSPSolve          | 13.0    | 15.6    | 13.1    | 5.6        |
+| TSFunctionEval    | 20.5    | 3.7     | 3.6     | 21.6       |
+
+- Assembly (the campaign target) is dead: 1.15 (pre-COO) -> 0.77 (P1) ->
+  0.086 (P2) -> 0.018/0.0034 s per assembly (P3, n64/n4). 5.3x end-to-end.
+- NOT yet on GPU, honestly: (1) the RHS -- now 74% of n4 SNESSolve; the
+  next increment (device RHS in the PETSc backend, reusing the P3 tables
+  + shared-math-header pattern on swe_roe_flux_petsc.h) takes n4
+  SNESSolve to ~7.5 s (~15x vs CPU n64). (2) adjoint (host by charter).
+  (3) GAMG coarse solve (host LU until cudss/cuda13).
+
+Decisions from the review:
+- **pbjacobi is the production PC for the working dt range.** At dt=1 the
+  shifted system is strongly diagonally dominant: pbjacobi 717 its /
+  KSP 5.6 s at n4, zero setup; GAMG 206 its but 4.2-5.4 s PCSetUp per run
+  (PtAP every Newton) -- net ~3x slower. GAMG stays shelved with P4 until
+  large-dt implicit research (SNES VI / smoothed wet-dry / ts tolerances)
+  lands.
+- **GPU adjoint is NOT technically out of scope -- only charter-deferred**
+  (forward-solve-first). After the device RHS lands, the host adjoint is
+  an estimated 70-80% of calibration gradient time (GPU forward ~7.5 s vs
+  host backward ~18-20 s per 20 steps: one assembly + one transpose solve
+  per backward step + trajectory I/O). Needed: TSTrajectory with device
+  vecs (the observed hang -- the real blocker), transpose PBJacobi
+  verification (MatMultTranspose on baijkokkos exists in the fork). Once
+  trajectory works, the adjoint's assemblies get the P3 device path for
+  free.
+
+## B1 -- device RHS (session 2, 2026-08-21): laptop gates PASSED
+
+Implementation (this commit): the PETSc-backend SWE RHS (interior flux +
+boundary flux + source) runs in Kokkos kernels that REUSE the P3 Jacobian
+context's geometry views (swe_jacobian_kokkos.kokkos.cxx gains SetupRHS/
+ApplyFlux/ApplySource; no duplicated tables). Key pieces:
+
+- swe_roe_flux_petsc.h converted with the RDY_MATH_FN pattern (071257a4
+  style): ComputeSWERoeEigenspectrum -> void, new per-edge
+  ComputeSWERoeFluxEdge + ComputeSWERiemannVelocity; the host array wrapper
+  keeps its signature, so every host caller (explicit, MUSCL, HR, tracer)
+  is source- and bitwise-unchanged.
+- Determinism: per-edge flux kernels write an edge-indexed buffer; a
+  per-owned-cell gather kernel accumulates in EXACTLY the host loops'
+  order (interior edges by ascending index, then boundary edges), built as
+  a CSR at setup. Device sums are bitwise identical to the host RHS.
+- Boundary fluxes: raw per-edge fluxes are D2H-copied (O(surface)) into
+  the per-boundary vecs each eval and accumulated as before (time-series
+  semantics preserved; non-owned entries -- never read -- stay zero).
+- Courant diagnostics via a MaxLoc reduction over amax*len/min(A) with
+  host-side id resolution (same update rule; per-eval reset unchanged).
+- Sources/material props: host seq vecs staged to device with
+  PetscObjectState change tracking (upload only when forcing updates, not
+  per eval). Dirichlet ghosts reuse the Jacobian's staging buffer.
+- Wiring: CreateAnalyticJacobianCOO attaches SWERHSKokkosData to
+  Operator.petsc when config is eligible (SWE, no sediment, non-HR, Roe,
+  first-order, source explicit|ark_imex); ApplyPetscOperator dispatches to
+  ApplySWEPetscOperatorsKokkos when the state Vec is a Kokkos type,
+  mirroring the flux -> flux_divergence copy -> source sequence. CEED path
+  untouched. `-swe_rhs_kokkos false` keeps the host RHS with device
+  matrices/vecs (the A/B baseline that isolates the RHS delta).
+
+Laptop gates (arch-macosx-gnu-rdycore-kokkos-O, host Kokkos):
+- ctest adjoint|calibrate|jacobian: 14/14; swe tests minus cgns: 97/97
+  (the 6 swe_roe cgns tests fail PRE-EXISTINGLY: this arch has no CGNS --
+  "Unknown PetscViewer type: cgns").
+- Bitwise A/B (same baijkokkos+kokkos-vec linear algebra, host RHS vs
+  device RHS): adjoint_beuler (reflecting BCs), a dirichlet +
+  critical-outflow variant, and adjoint_arkimex -- trajectories
+  BIT-IDENTICAL (cmp) at np 1 and 2; np 4 beuler solve 40/40.
+- NB an earlier aij-vs-baijkokkos comparison showed 2e-6 rel diffs -- that
+  is the LINEAR ALGEBRA delta (different MatMult/dot rounding), present
+  with the host RHS too; the -swe_rhs_kokkos A/B isolates the RHS proper.
+
+PM gate (pending): dt=1 x20 Turning protocol, trajectory twin vs P3 dumps,
+TSFunctionEval GPU %F = 100, no per-eval GpuToCpu of the state, n4
+SNESSolve ~7.5 s expected.
+
+## B1 PM GATE: PASSED (2026-08-21) -- device RHS at Turning 30 m
+
+Protocol: dt=1 x20, baijkokkos + kokkos vecs, fgmres+pbjacobi rtol 1e-3,
+one GPU node. Newton path IDENTICAL across all runs (20 snes conv, 614
+converged-linear-iteration sum). Trajectories: n4 device-RHS vs n4
+host-RHS (same partition, only the RHS source differs) max rel diff
+2.5e-16; n64 device-RHS vs the P3 dump 2.4e-16 -- same ulp-level noise as
+the P3-vs-P2 "bit-identical" comparison (gcc host vs nvcc device FMA
+contraction; on the laptop, where one compiler builds both, the pair is
+exactly bitwise). Norms twin to 16 digits: gate met.
+
+| n4 (s)              | host RHS (P3) | device RHS (B1) |
+|---------------------|---------------|-----------------|
+| SNESSolve           | 28.6          | 6.94            |
+| TSFunctionEval (125)| 21.6          | 0.226  (96x)    |
+| KSPSolve            | 5.13          | 5.00            |
+| SNESJacobianEval    | 0.37          | 0.33            |
+
+- TSFunctionEval GPU %F = 100; CpuToGpu = 2 transfers / 23 MB TOTAL (the
+  one-time material-props + external-sources staging -- the state-change
+  caching works); GpuToCpu = 125 x 37 KB (boundary fluxes only). The
+  host-RHS baseline moved 2.2 GB up + 4.4 GB down per run in the same
+  event. "No per-eval GpuToCpu of the state": met.
+- n4 SNESSolve 6.94 s beats the charter estimate (~7.5 s): 16.8x vs the
+  CPU n64 116.7 s baseline. n64: 20.2 s (KSP-bound at 16 ranks/GPU as
+  before; n4 is the GPU-friendly rank count).
+- Runs/logs: $SCRATCH/gpu-implicit/b1i_{hostrhs_n4,devrhs_n4,devrhs_n64}.log,
+  usol.b1*.bin, b1_interactive.sh.
+
+## B2 progress (2026-08-21, same session)
+
+1. **TSTrajectory + kokkos vec hang: GONE at the current stacks.** The
+   charter repro (rdycore_adjoint adjoint_beuler.yaml -dm_vec_type kokkos,
+   tight tolerances) completes in ~0.4 s on the laptop -- as do
+   -rhs_jac_mat_type baijkokkos and full -dm_mat_type baijkokkos configs,
+   np 1-4. Most plausibly fixed by fdaf8ca (MatShift/MatNorm on device
+   BAIJKokkos: the backward sweep runs TSComputeIJacobianDefault's
+   MatScale+MatShift every step, and pre-fix MatShift destroyed the device
+   matrix). Not re-bisected; the symptom is unreproducible.
+2. **Adjoint FD gates with device forward+backward PASS at np 1 and 2**
+   (full-kokkos: dJ/du0 rel 1.25e-8 / 1.35e-8, Manning aggregate within
+   gate). Fixed a DRIVER FD-check bug exposed at np>1: every rank called
+   VecSetValue(ADD_VALUES) for the sampled-dof perturbation, scaling the
+   FD slope by nproc (fd was exactly 2x at np2 / 4x at np4 while the
+   ADJOINT gradients were identical to np1 all along). Perturbation now
+   applied from rank 0 only. ctest 14/14 after the fix.
+3. **Transpose PBJacobi verification**: end-to-end covered by the FD gates
+   above (KSPSolveTranspose + PCApplyTranspose on baijkokkos in the
+   backward sweep); fork gate ex337 EXTENDED with per-cycle
+   MatMultTranspose and KSPSolveTranspose(preonly+pbjacobi) checks vs the
+   AIJ reference (petsc-claude d1f202c9e6b laptop / e58c2dabe05 PM, 3/3 on
+   the laptop; GPU-node run pending with the next fork QA batch).
+4. The adjoint's per-step Jacobian assemblies take the P3 device path
+   type-driven, as predicted (device assembly PetscInfo confirmed in the
+   full-kokkos adjoint runs).
+
+Remaining for B2: PM-scale adjoint timing/residency (Turning-protocol
+backward sweep with device types vs host types).
+
+## B2 PM GATE: PASSED (2026-08-21) -- GPU adjoint at Turning 30 m
+
+Full gradient runs (rdycore_adjoint beuler_dt1.yaml: truth forward +
+perturbed forward + one TSAdjoint backward sweep), dt=1 x20,
+fgmres+pbjacobi, one GPU node, -adjoint_fd_samples 0 (FD correctness ran
+on the laptop at tight tolerances; see B2 progress above).
+
+Correctness at scale: with the SAME binary and partition (GPU binary,
+n64, parmetis) at ksp_rtol 1e-8 / snes_rtol 1e-10, host-types vs
+device-types (kokkos vec + baijkokkos) gradients are IDENTICAL to all
+printed digits: J = 143.434, |dJ/du0| = 1574->1564.37 both, sum(dJ/dn) =
+-446848 both. (An apparent 0.15%/2.8% host-vs-device discrepancy was the
+CPU binary's DIFFERENT PARTITION -- arch-perlmutter-claude-O has no
+parmetis -- combined with the driver's partition-dependent observation
+set; it persists at tight tolerance for that reason and vanishes under a
+matched partition. Each configuration's gradient is tolerance-stable from
+rtol 1e-3 to 1e-8 at <2e-4 relative.)
+
+Performance (rtol 1e-3 production protocol, logs b2i_*.log):
+
+| event (s)            | host n64 | device n4 | device n64 |
+|----------------------|----------|-----------|------------|
+| total wall           | 271.9    | 107.1     | 184.2      |
+| TSStep (2 forwards)  | 217.8    | 14.4      | 40.3       |
+| TSAdjointStep (20)   | 18.1     | 3.0       | 3.8        |
+| TSTrajectorySet (42) | 8.9      | 8.2       | 9.9        |
+| SNESJacobianEval(246)| 160.6    | 0.78      | --         |
+| MatMultTranspose(151)| 2.15     | 0.29      | --         |
+
+- Gradient loop (forwards + trajectory + backward) 245.9 -> 26.5 s at n4
+  (~9.3x); the backward sweep runs at GPU %F = 99 with the P3 device
+  assembly (246 assemblies in 0.78 s) and device transpose solves.
+- Remaining device-side hotspot: TSTrajectorySet ~8 s/window (a third of
+  the n4 gradient loop) -- the memory-trajectory staging (78 GpuToCpu,
+  1.37 GB, plus its MPI traffic); ~constant across host/device and rank
+  counts. Follow-up lead: device-resident or async trajectory staging.
+- The wall-total gap beyond the loop (~80 s) is one-time setup (mesh
+  distribution etc.), amortized across calibration iterations.
+- Fork gate ex337 (now with MatMultTranspose + KSPSolveTranspose/
+  PCApplyTranspose-pbjacobi cycles): All cycles OK on A100, seq and mpi.
+
+Session-2 charter status: B1 PASSED, B2 PASSED (all charter work items:
+hang gone, transpose verified + fork-gated, device assemblies engaged;
+gates: FD np1/2, calibrate ctest, scale twin). Full laptop ctest: green
+except PRE-EXISTING failures (6x swe_roe cgns: arch lacks CGNS;
+amr_c_np_3_basic: SEGV reproduced at parent commit 670062ee -- AMR is
+out of charter scope).
+
+### B2 follow-up: the TSTrajectorySet lead is CLOSED by -ts_trajectory_type memory
+
+The 8 s/window trajectory cost was the DEFAULT disk ("basic") trajectory:
+rank-0-gathered binary writes of every checkpoint (4.5 GB MPI + 1.37 GB
+D2H per gradient at n4) and reads on the backward sweep. With
+`-ts_trajectory_type memory` the checkpoints are Vec copies -- which for
+kokkos vecs live ON DEVICE -- and the driver already supports it
+(ResetTrajectory's stack handling exists for exactly this):
+
+- TSTrajectorySet 8.21 s -> 0.084 s (98x); TSTrajectoryGet 0.92 s ->
+  0.5 ms; zero MPI, zero D2H in either event.
+- Gradient identical to the disk-trajectory run to every printed digit.
+- Laptop FD gates with memory trajectory, full-kokkos, np 1/2: 1.25e-8 /
+  1.35e-8 (same values as disk).
+- Device n4 gradient loop: 26.5 -> 17.2 s (TSStep 14.1 + TSAdjointStep
+  3.0 + trajectory 0.09) = ~14.3x vs the 245.9 s CPU-n64 loop.
+  Log: $SCRATCH/gpu-implicit/b2m_dev_n4.log.
+
+NOT made the default: the memory trajectory holds every step of the
+window (no disk spill), which is fine for 20-step gate windows but not
+for long Harvey windows on hosts; use the option on the GPU path (or
+revolve-style checkpointing when windows outgrow device memory).
+
+### KSP round: VecMDot was 96% of KSPSolve -- a KokkosBlas::gemv fallback, fixed in the fork
+
+Rank sweep first (gradient, memory trajectory): KSPSolve 37.3 s (n1) ->
+20.3 (n2) -> 10.3 (n4): clean throughput scaling, so per-iteration cost
+was bandwidth-shaped, not sync latency. pipefgmres at n4: 12.2 s (no
+win). Inside KSPSolve at n4, VecMDot was 9.9 of 10.3 s at 0.5 GF/s --
+~1000x off roofline for the FGMRES orthogonalization.
+
+Micro-benchmark (bench_mdot.c, $SCRATCH/gpu-implicit, single A100,
+n = 2.2M, nv = 16): the DEFAULT VecMDot path (-vec_mdot_use_gemv true,
+pooled work vectors -> KokkosBlas::gemv) runs at 36 GB/s; the
+parallel_reduce path (-vec_mdot_use_gemv 0) at 1050 GB/s; per-vector
+fallbacks at ~1000 GB/s. Root cause: PETSc's --download-kokkos-kernels
+builds with vendor TPLs OFF (KokkosKernels_ENABLE_TPL_CUBLAS=OFF), and
+KokkosBlas's NATIVE tall-skinny transpose gemv is ~30x off roofline.
+
+Fork fix (petsc-claude 90d0d174a34 laptop / ddac7cfaecd PM): default
+-vec_mdot_use_gemv to FALSE when the device exec space has no vendor
+BLAS TPL behind gemv (CUDA without cuBLAS TPL, HIP without rocBLAS);
+option still overrides. Host builds unchanged. Alternative long-term
+fix for the next full reconfigure: enable the cuBLAS TPL in the
+kokkos-kernels download.
+
+Effect at Turning n4 (dt=1 x20, fgmres+pbjacobi rtol 1e-3):
+- forward SNESSolve 6.94 -> 2.99 s (VecMDot 9.9 -> 0.40 s over the
+  gradient's 206 solves; KSPSolve 10.3 -> 1.08 s per-forward-pair
+  share). Now 39x vs the CPU n64 forward baseline.
+- gradient loop (2 forwards + trajectory + backward): 17.2 -> 8.1 s
+  (TSStep 5.9-6.3 + TSAdjointStep 2.1 + trajectory 0.11) = ~30x vs the
+  245.9 s CPU-n64 gradient. Gradient values identical throughout.
+- Verified the flipped DEFAULT (no flag): b2v_grad_default.log.
+
+Solver variants tested at n4 (same protocol, gemv fix on):
+- lgmres+pbjacobi: 625 its, SNESSolve 3.89 s -- no win over fgmres.
+- lgmres + gamg (-pc_gamg_agg_nsmooths 0 -mg_levels_pc_type pbjacobi
+  -pc_gamg_threshold -1): 1084 its, SNESSolve 32.4 s (PCSetUp 10.2,
+  PCApply 19.3) -- unsmoothed aggregation with pbjacobi level smoothing
+  is far too weak here; pbjacobi stays the production PC (per the
+  standing decision). Average its/solve is ~6, so nested KSP
+  preconditioning (-pc_type ksp) has no role at dt=1 either.
+
+Current n4 SNESSolve profile after all fixes: KSP 1.1 s + PCSetUp
+(pbjacobi block inversion, 103x) 1.2 s + JacEval 0.33 + RHS 0.23 --
+roughly balanced; further gains are diminishing-returns territory.
+
+## Calibration validation (B1+B2 integration; 2026-08-21 evening)
+
+The full TAO calibration loop (gauge-twin mode) runs on device types --
+the first exercise of the Manning-update path (RDySetDomainManningsN ->
+material-properties state bump -> device re-upload in RHS and Jacobian)
+and of repeated memory-trajectory reset/reuse across TAO iterations.
+
+Laptop (adjoint_beuler.yaml + -adjoint_calibrate_gauges
+-adjoint_gauges_twin, 60 TAO its, np 1 and 2): host and device runs
+converge IDENTICALLY -- J reduction 9.02x and two-zone recovery rel err
+3.071e-01 to all printed digits; J endpoints agree to ~5 digits (the
+benign aij-vs-baijkokkos linear-algebra rounding).
+
+Config foot-gun found and hardened: the gauges CTEST config
+(adjoint_dam_break.yaml) uses numerics.jacobian: fd, and FD COLORING on a
+device-native matrix type SEGVs inside MatGetRowIJ_SeqBAIJ (coloring
+reads host CSR arrays that device matrices only build at assembly -- the
+known P2-era landmine, reached via -dm_mat_type this time).
+RegisterSWERHSJacobian now rejects jacobian: fd with device matrix types
+with an explanatory error. Device calibration uses the implicit config
+(beuler + analytic), which is the production path anyway.
+
+### Turning-scale calibration (gauge twin) + an honest-baseline correction
+
+PM runs (beuler_dt1.yaml + gauges twin: 39-step windows, 13 obs times,
+418,076 twin gauges, 2,926,532 per-cell Manning parameters, BLMVM,
+fgmres+pbjacobi rtol 1e-3, memory trajectory):
+
+- Device n4 (kokkos types): 20 TAO its, J 1.283e6 -> 2.315e4 (55.4x),
+  TaoSolve 106.2 s = 5.3 s per TAO iteration. Total wall 414.7 s
+  (~60 s of that is one-time DMPlexDistribute).
+- Host types n64 (SAME binary and parmetis partition): 5 TAO its,
+  TaoSolve 165.5 s = 33.1 s per iteration. J-trace IDENTICAL to the
+  device run to every printed digit through the common iterations
+  (gauge sets are natural-ordered, hence partition-independent).
+- Single-node apples-to-apples (4 A100s vs 64 cores of the same node):
+  ~6.2x per TAO iteration; recovery converging identically.
+
+CORRECTION to the morning's baselines: the "CPU n64" figures used the
+CPU-arch binary, which has NO PARMETIS -- its native partition inflates
+host times ~4x (e.g. TSAdjointStep 0.90 s/step there vs 0.247 s/step for
+host types on the parmetis partition). The honest single-node
+host-vs-device ratios at Turning are ~6-8x (gradient ~50 s -> 8.1 s per
+20-step window), not the ~30x implied by the no-parmetis baseline. The
+device-side numbers themselves are unaffected.
+
+Device per-iteration profile (TaoSolve 5.3 s/it): forward SNESSolve
+~3.3 s + adjoint sweep ~2.3 s per window-pair share; inside them PCSetUp
+(pbjacobi block inversion, 2473 calls) 41 s total now rivals KSPSolve
+29.7 s -- a possible next squeeze, along with host-H observation
+applications. Diminishing returns.
+
+### 1-simulated-hour gradient (real-window check, device n4)
+
+beuler_dt1_1hr.yaml (Turning, spun-up Harvey IC draining through the
+critical-outflow outlet -- NO rain forcing in this config; storm-forced
+fidelity needs the calibration project's forcing files), 3600 steps at
+dt=1, FD-twin driver mode, -ts_trajectory_type memory
+-ts_trajectory_max_cps_ram 400 (revolve checkpointing), fgmres+pbjacobi
+rtol 1e-3. Log: $SCRATCH/gpu-implicit/b4_1hr_dev_n4.log.
+
+- COMPLETED in 27.3 min wall (includes the driver's extra truth
+  forward): forward 0.114 s/step -- Newton holds ~4 its/step across the
+  full hour -- and the checkpointed backward works: 3199 revolve
+  recompute steps (~0.89 extra forwards, near optimal for 400 cps),
+  TSAdjointStep 0.101 s/step, gradient finite and sane.
+- Per-gradient (1 forward + checkpointed backward) at a 1-hr window:
+  ~19 min at n4. Measured-basis extrapolation per TAO iteration:
+  3 hr ~= 57 min, 6 hr ~= 1.9 hr (n4). A 20-iteration calibration on a
+  6-hr window is ~1.6 GPU-node-days -- the economic case for multi-node
+  scaling, window design, and the dt>=5 research (5x on everything).
+- Follow-up lead: the revolve checkpoints stage through HOST memory
+  (hundreds of GB of PCIe across the sweep -- visible as GpuToCpu in
+  TSStep/TSAdjointStep/TSTrajectoryGet). Device-resident checkpoint
+  storage is the next trajectory squeeze if long-window gradients become
+  the daily workload.
+
+## Rainfall wiring for the adjoint driver (campaign prep, 2026-08-21 night)
+
+The forcing subsystem (-raster_rain_dir + -raster_rain_start_date, hourly
+PETSc-binary rasters, mm/hr -> m/s, raster->mesh map) is only invoked by
+RDyAdvance, which the adjoint driver bypasses -- and the datasets stream
+strictly forward in time while checkpoint recomputes REWIND time. Driver
+fix (adjoint_test.c): preload the window's hourly per-cell rain once at
+setup (monotone RDyApplyForcing calls), then a TSPreStage hook -- which
+fires inside every TSStep, INCLUDING trajectory ReCompute replays --
+swaps the active hour in as a pure function of stage time (hour h covers
+(h*3600,(h+1)*3600], matching RDyAdvance's coupling semantics; region
+id 1 as in RDyApplyForcing; source is state-independent so no adjoint
+terms arise).
+
+Laptop validation (single-region BEULER dam-break variant
+rain_beuler_test.yaml, synthetic 2-hour raster series, 7200 steps at
+dt=1, revolve max_cps_ram 50 => recomputes cross the hour switch):
+- adjoint-vs-FD dJ/du0 gates: 2.4e-7..8.9e-7 (gate 1e-5), host and
+  device types, np 1 and 2 -- the forced trajectory is reproduced
+  exactly through hour switches and replays.
+- device-RHS vs host-RHS with hourly source re-uploads: J, |dJ/du0|,
+  sum(dJ/dn) identical to every printed digit (the source state-cache
+  invalidation handles time-varying rain).
+- dJ/dn on this test is genuinely ~0 (motionless by hour 2): added a
+  degenerate-gradient guard to the driver's Manning FD gate (absolute
+  floor fd_tol*max(J,1) when the relative test is noise-vs-noise).
+- Known limitation (pre-existing): RDyApplyForcing hardcodes region
+  id 1 = whole domain; multi-region configs (e.g. the planar dam tests)
+  error cleanly. Turning's single "domain" region is fine.
+
+Data: full Harvey hourly MRMS (+ mswep/nldas/daymet) rasters at
+/global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/
+mm-per-hr/*/bin (Aug 24-30); repo tree carries a 2-hour sample.
+
+### Turning 1-hr FORCED gradient: the campaign pipeline is complete
+
+b5_1hr_rain_n4.log: beuler_dt1_1hr.yaml + real MRMS hourly rain
+(-raster_rain_dir .../mm-per-hr/mrms/bin -raster_rain_start_date
+2017,8,26,0,0), device n4, memory trajectory with revolve (400 cps).
+Completed in 27.7 min wall -- same as the unforced run (rain adds no
+measurable cost). J(forced) = 3802.79 vs J(unforced) = 5330.22 (the rain
+demonstrably reshapes the trajectory); gradient finite
+(|dJ/du0| = 3.14e8, sum(dJ/dn) = -1.07e10).
+
+End-to-end status for the Wednesday campaign: real forcing + Turning
+30 m + device forward + checkpointed device adjoint all compose, at
+~19 min per gradient per simulated hour of window at n4. Next campaign
+steps: (1) dt-verification (BEULER dt=1 vs ARK dt=0.25 gauge
+hydrographs on a forced window -- the main rdycore driver applies rain
+natively via RDyAdvance, so the ARK reference needs no new wiring);
+(2) window placement on the rising limb per the observation-time
+sensitivity study (confirm at 30 m); (3) the scientists' answers on
+trusted gauges/window (dam-release influence) and WSE accuracy target.
+
+## Session 3 (2026-08-22): optimization pass -- pbjacobi setup, device Jacp/H, staging caches
+
+Scope: the measured leads from the session-2 profiles, in value order.
+Every step gated on ctest adjoint|calibrate|jacobian 14/14 + laptop
+bitwise A/B (device config with vs without each optimization) + PM
+A/B under the standing Turning protocols. RDycore commits 827ec4fb..
+4e854188; fork commit 5b4f3d82d1e (patch applied on PM via git am).
+
+### Lead 1 (fork 5b4f3d82d1e): pbjacobi PCSetUp device-pointer handoff
+
+Root cause of the 41.1 s / 2473 setups: PCSetUp_PBJacobi_Kokkos went
+through the host MatInvertBlockDiagonal() contract -- the BAIJKokkos
+implementation inverted ON DEVICE but copied the finished inverses D2H
+into a->idiag, and the PC pushed the same bytes H2D again: 2 x 52.7
+MB/rank/setup of PCIe plus a fresh 53 MB device allocation per call.
+Fix: Mat_SeqBAIJKokkos caches the inverse in a device view (idiag_d,
+state-keyed, allocation reused); new composed
+"MatInvertBlockDiagonalDevice_C" (mpi delegates to the diag block)
+returns the device pointer; PCSetUp_PBJacobi_Kokkos aliases it with
+zero host traffic. `-pc_pbjacobi_invert_device false` = the old path
+(A/B baseline). Bit-identical by construction (same inversion kernel).
+
+### Leads 3+4+6 (RDycore): device Jacp, device H, staging caches
+
+- **The "revolve checkpoints stage through host" lead was a
+  MISATTRIBUTION**: the b4_1hr log's per-event transfers show
+  TSTrajectorySet/Get move ~ZERO bytes (checkpoint vecs are device-
+  resident kokkos duplicates). The TBs of PCIe inside
+  TSStep/TSAdjointStep/TSTrajectoryGet were the NESTED pbjacobi
+  PCSetUps (45,445 calls, 2.39 TB EACH WAY per rank, 542 s = 32% of
+  the 1-hr wall) + the host Jacp path + unlogged mp staging. Nothing
+  to fix in the trajectory itself.
+- **Device parameter Jacobian dF/dn (ced890f2)**: SWERHSJacobianP ran
+  on host every backward step (full-state D2H, MatSetValue loop into
+  host AIJ, and Jacp^T applies pulling lambda D2H -- 17.6 MB x 3600
+  steps = 63 GB per 1-hr gradient). Device-assembly configs now get a
+  COO-preallocated MATAIJKOKKOS Jacp filled by a device kernel
+  (SWEKokkosJacobianP); assembly and MatMultTranspose(Jacp) stay on
+  device (0 transfers in the o3 profile).
+- **Observation operator H follows the state vec type (ebca3206)**:
+  aijkokkos on device runs; MatCreateVecs hands back kokkos obs-space
+  vecs, so per-observation MatMult/MatMultTranspose stay on device.
+- **Material-props staging unified + state-keyed (827ec4fb)**: the
+  Jacobian assembly deep_copied mp EVERY assembly (unlogged; ~530 GB
+  over the 1-hr gradient). Now one shared state-keyed cache
+  (StageTracked) serves Jacobian, RHS source, and Jacp. Read-only
+  VecGetArray uses of material_properties converted to VecGetArrayRead
+  (write-mode gets bumped the state and would have retired the cache).
+- **src_inst snapshot state-keyed + Dirichlet staging skip (2fe34b5e)**:
+  the per-RHS-eval VecCopy(external_sources -> src_inst) (~920 GB of
+  host memcpy per 1-hr gradient) now runs only when the forcing vec's
+  state changes; the 3*n_bedges Dirichlet upload is skipped when the
+  config has no Dirichlet boundary (has_dirichlet, computed at setup).
+
+### PM A/B (Turning 30 m, n4, standing protocols; logs o1..o6, opt_interactive.sh)
+
+Forward dt=1 x20 (vs `-pc_pbjacobi_invert_device false` -- bitwise
+pair, 20/20 Newton, 614 lin its both):
+
+| n4 forward (s)  | invert off | optimized |
+|-----------------|-----------|-----------|
+| SNESSolve       | 2.59      | 1.76      |
+| PCSetUp (103)   | 0.896     | 0.086     |
+| PCSetUp PCIe    | 5.4 GB x2 | 0         |
+
+Trajectories o1-vs-o2 cmp-BITWISE IDENTICAL. (NB comparisons against
+the STORED usol.b1.n4.bin now differ in late digits: that dump predates
+the fork's -vec_mdot_use_gemv default flip -- different FGMRES
+orthogonalization rounding. In-session A/B pairs are the valid check.)
+
+Gradient (20-step window, memory trajectory; J = 143.152, |dJ/du0| =
+1555.3, sum(dJ/dn) = -445566 -- IDENTICAL to b2v_grad_default to every
+printed digit, and identical between invert on/off):
+
+| n4 gradient (s)   | b2v (recorded) | optimized |
+|-------------------|----------------|-----------|
+| TSStep (2 fwd)    | 6.26           | 3.37      |
+| TSAdjointStep (20)| 2.08           | 0.31      |
+| PCSetUp (226)     | 2.99           | 0.19      |
+| KSPSolve (206)    | 2.39           | 2.01      |
+| gradient loop     | ~8.4           | ~3.8 (2.2x)|
+
+Calibration (gauges twin, 20 TAO its; J-trace identical: 1.283391e6 ->
+2.315231e4, 55.43x):
+
+| n4 calibration (s)  | b3cal (recorded) | optimized |
+|---------------------|------------------|-----------|
+| TaoSolve (20 its)   | 106.2 (5.3/it)   | 34.6 (1.73/it) |
+| PCSetUp (2473)      | 41.1             | 2.06      |
+| TSAdjointStep (440) | 45.8             | 5.81      |
+| TSStep (460)        | 66.2             | 30.7      |
+| KSPSolve (2033)     | 29.7             | 18.3      |
+
+Single-node honest device-vs-host is now ~19x per TAO iteration
+(33.1 s host-types n64 vs 1.73 s device n4).
+
+### Foot-gun found on PM: TAO/LMVM aborts on CUDA device solution vecs
+
+With the device Jacp, MatCreateVecs(rhs_jac_p) returns kokkos vecs;
+duplicating the TAO solution vec from mu put BLMVM's LMVM dense
+internals on device, where MatDenseGetColumnVecWrite hits a Kokkos
+DualView "concurrent modification" abort inside MatLMVMUpdate (o5;
+invisible on the laptop -- host-space Kokkos has no separate mirror).
+Fix 4e854188: TAO-side vecs (solution/bounds/prior/gradient) are
+explicit host-layout twins; the adjoint keeps its device mu. J-trace
+unchanged. FORK FOLLOW-UP LEAD: fix MatLMVM/densekokkos on CUDA.
+
+### Style pass (Mark review): PetscObjectTypeCompare everywhere
+
+Type-name strstr/strcmp sniffing replaced by PetscObjectTypeCompareAny
+against canonical type constants at: the device-assembly gate, the
+device-RHS dispatch, the FD-coloring guard, the blocked-COO opt-in,
+the driver's observation-matrix choice and trajectory-type check
+(de180e3c, 8cba778c). Simplify pass extracted the shared one-pass
+Dirichlet ghost gather (ddc9b618). MatSeqAIJGetCSRAndMemType noted as
+the sharper memtype query where a SEQ AIJ-family matrix is in hand
+(not applicable at these MPI/BAIJ/pre-assembly sites).
+
+### 1-hr revolve gradient re-verified (o6_1hr_opt_n4.log)
+
+b4 protocol exactly (3600 steps, revolve max_cps_ram 400, unforced):
+gradient IDENTICAL to b4 to every printed digit (J = 5330.22,
+|dJ/du0| = 9.32912e10, sum(dJ/dn) = -3.25331e12); wall 1638 -> 808 s
+(2.03x). TSStep (10399 incl. recomputes) 654 s (62.9 ms/step),
+TSAdjointStep 53.4 s (14.8 ms/step, was 101), PCSetUp 542 -> 37.7 s,
+KSPSolve 437 -> 401 s (now the dominant term -- the next lead if one
+is ever needed). Per-gradient at a 1-hr window: ~19 -> ~9.4 min at n4;
+6-hr window ~= 56 min/TAO-it; the campaign's 6-hr 20-iteration
+calibration drops from ~1.6 to ~0.8 GPU-node-days.
+
+### Deferred
+
+- DMPlexDistribute caching (lead 5): the mesh pipeline (options-driven
+  distribute -> refine -> overlap -> natural SF) would need
+  topology+distribution+natural-order save/load; the natural SF is
+  load-bearing for the gauge observation set (the known partition-
+  dependence trap). 60-90 s is one-time per job, amortized over a
+  calibration -- poor risk/benefit days before the campaign.
+- Fork GitLab push (Mark): main now also carries 5b4f3d82d1e.
+
+### KSP solver sweep (2026-08-22, with Mark; Mark's interactive node, forward dt=1 x20 n4)
+
+The solve under the microscope (logs/ksp_look_n4.log in the repo, full
+-ksp_view + -ksp_monitor): fgmres(30)+pbjacobi bs=3, right PC,
+unpreconditioned norm, rtol 1e-3 -- 81 of 103 solves take exactly 6
+iterations at a flat ~3.2x/iteration; VecMDot is ~40% of KSPSolve even
+post-gemv-fix (inherent to GMRES at 6 its). Variants (SNESSolve /
+KSPSolve seconds; all 20/20 Newton unless noted):
+
+| solver                | rtol | lin its | KSP    | SNES  |
+|-----------------------|------|---------|--------|-------|
+| fgmres (baseline)     | 1e-3 | 614     | 1.02   | 1.76  |
+| gmres right           | 1e-3 | 614     | 1.00   | 1.66  |
+| gmres right           | 1e-2 | 457     | 0.72   | 1.43  |
+| gmres right           | 1e-1 | DIVERGED step 1 (Newton 31 its -> NaN) |
+| gmres left            | 1e-3 | 625     | 1.02   | 1.68  |
+| gmres left            | 1e-2 | 476     | 0.75   | 1.44  |
+| bicg                  | 1e-3 | 721     | 2.13   | 2.76  |
+| bcgs                  | 1e-3 | 365     | 1.13   | 1.77  |
+| bcgs                  | 1e-2 | 290     | 0.92   | 1.60  |
+
+- fgmres's flexibility is unused (pbjacobi is stationary): gmres+right
+  is bit-equivalent at 1e-3 (identical 614-it path, traj 2.3e-16) and
+  ~5% faster -- a free swap.
+- rtol 1e-2: 19% faster forward SNESSolve, trajectory 1.2e-9 from
+  baseline, gradient moves 0.1-0.55% (|dJ/du0| 1555.3->1556.8,
+  sum(dJ/dn) -445566->-448015): likely fine for BLMVM but ~25x the
+  1e-3->1e-8 stability band -- run the laptop FD gates at 1e-2 before
+  making it the campaign default. rtol 1e-1 is unusable.
+- Left PC: within noise of right, slightly more its (predicted:
+  P^-1 ~ well-scaled here, only the test norm changes). bicg 2x slower
+  (2 matvecs/it incl. transpose, MORE its); bcgs no win over gmres.
+- RECOMMENDATION: -ksp_type gmres -ksp_pc_side right (rtol 1e-3 now;
+  1e-2 pending gradient FD gates). PM logs: ksp_*_n4.log,
+  grad_gmres_rtol*_n4.log in $SCRATCH/gpu-implicit.
+
+### rtol 1e-2 validation + rain-forced rerun (2026-08-22, later; Mark's node)
+
+- FD gates at ksp rtol 1e-2 (laptop, tight snes): adjoint-vs-FD
+  4.5e-3 / 6.2e-4 at np1/2 -- formally FAILS the 1e-5 gate, as expected
+  (gradient error is inner-solve-tolerance-limited; the gate is a
+  tight-tolerance instrument). The decision-level tests all pass:
+  laptop gauge-twin calibration at 1e-2 indistinguishable from 1e-3
+  (9.02x, J to 5-6 digits, same 30 its); Turning 20-it calibration at
+  gmres+right rtol 1e-2: J 1.283391e6 -> 2.313797e4 (55.47x vs 55.43x
+  at 1e-3), TaoSolve 34.6 -> 31.5 s (KSPSolve 18.3 -> 14.5).
+  o7_cal_gmres_rtol2_n4.log. Campaign recommendation: gmres+right
+  rtol 1e-2, one 1e-3 spot-check for the record.
+- Rain-forced 1-hr gradient RERUN on the optimized stack
+  (o8_1hr_rain_opt_n4.log, b5 protocol): J = 3802.79, |dJ/du0| =
+  3.14266e8, sum(dJ/dn) = -1.07497e10 -- the recorded b5 values
+  exactly; wall 27.7 -> 13.7 min (2.02x). Rain x optimizations
+  validated; the campaign pipeline is confirmed end-to-end on the
+  final stack.
+- Status vs campaign: real-gauge observations still UNUSED (all
+  Turning calibrations are twins) -- that is the campaign itself.
+  Plan for the Wednesday meeting: plans/campaign-wednesday.md
+  (supersedes campaign-tonight.md, whose no-revolve premise is dead).
+
+### FINDING: drag discontinuity at tiny_h blocks NLCD-prior implicit runs (2026-08-22 night)
+
+The Turning class-mode twin (NLCD prior applied as the Manning field,
+mean n = 0.1005, max 0.16) fails DIVERGED_NONLINEAR_SOLVE within the
+first few dt=1 BEULER steps (logs o9*-o13* in $SCRATCH/gpu-implicit).
+Diagnosis (o9c_diag.log, snes+linesearch monitors): Newton descends
+cleanly 903 -> 1.26e-3 in ~13 its, then the residual FREEZES; at the
+stall a lambda = 1e-13 step jumps the residual 8x (1.26e-3 -> 1.01e-2)
+-- the residual is DISCONTINUOUS at the iterate. Cause: the drag term
+g n^2 h^(-7/3) q|q| is gated by h >= tiny_h with tiny_h = 1e-7 and a
+PLAIN q/h velocity (h_anuga only regularizes the flux/primitive
+velocities, NOT the source kernel), so a cell crossing the cutoff with
+retained momentum switches an enormous drag contribution on/off
+discontinuously. NLCD-scale n^2 raised the jump amplitude ~100x above
+where the mild-field runs left it (invisible below solver tolerance).
+Confirmed NOT fixable by: rtol (1e-2/1e-3), snes_rtol 1e-5, bt/basic
+damped 0.7/newtontr, h_anuga 0.001/0.01 alone (moves the failing step
+only), tiny_h 1e-4 (WORSE - more cells at a fatter threshold), dt=0.5
+(fails step 1; the floor scales oddly with dt). The gauge-twin
+calibrations (n0 0.03, two-zone 0.03/0.06) never see it -- amplitude
+below tolerance. Related to but distinct from the other agent's dt>=5
+linear-solve hardness.
+
+DECISION (Mark): implement fix (2) -- regularize the drag itself with
+the ANUGA velocity (drag -> 0 smoothly as h -> 0), pending scientist
+OK Wednesday (the paper's open-questions section already asks exactly
+this). NEXT-SESSION TASK SPEC:
+- Touch points (keep host/device bitwise-twinned, RDY_MATH_FN style):
+  ApplySourceExplicit host loop (src/swe/swe_petsc.c), the device
+  source kernel swejk_rhs_source (swe_jacobian_kokkos.kokkos.cxx), the
+  source Jacobian SWESourceJacobian (swe_roe_flux_jacobian_petsc.h,
+  shared host+device), SWERHSJacobianP host loop + SWEKokkosJacobianP
+  device kernel (dS/dn changes), SWEIJacobianPFriction +
+  SWEIFunctionFriction (ARK-IMEX implicit part), and the CEED source
+  Q-functions if parity there matters (charter: CEED untouched -- gate
+  the change to the PETSc path or coordinate).
+- Semantics: with h_anuga_reg_parameter = 0 the new code must be
+  BITWISE identical to today (the regularized velocity reduces to q/h)
+  -- that is the A/B gate. With h_anuga > 0 re-run the FD gate suite
+  (jacobian + adjoint + calibrate ctests pass unchanged since configs
+  default h_anuga 0; add a laptop FD-gate run WITH h_anuga > 0 at
+  tight tolerances -- the derivative code must differentiate the
+  regularization too).
+- Then Turning class twin with h_anuga ~ 0.001-0.01 (sweep): expect
+  the stall floor to collapse; pick the smallest value that converges
+  cleanly and put it in the campaign configs + Wednesday agenda.
+- Config plumbing already exists (physics.flow.h_anuga_reg_parameter).
+
+### ANUGA-regularized drag LANDED (2026-08-22 night; RDycore 3110ac50 laptop / 0d9e0d0d PM)
+
+Implementation exactly per the spec above. ComputeSWEManningDrag (new,
+swe_roe_flux_petsc.h) is the shared residual drag -- host
+ApplySourceExplicit, device swejk_rhs_source, and the ARK-IMEX
+SWEIFunctionFriction all call it; SWEFrictionJacobian/SWESourceJacobian
+take h_anuga and carry the exact regularization derivatives (host +
+device assembly + ARK-IMEX IJacobian); SWEFrictionDN (new) is the
+shared dS_fric/dn for SWERHSJacobianP (host), SWEKokkosJacobianP
+(device), and SWEIJacobianPFriction. With h_anuga = 0 every touched
+path keeps its historical operation sequence VERBATIM (branch on
+h_anuga > 0). CEED, semi_implicit, and XQ2018 paths untouched.
+
+Laptop gates (both PASSED):
+1. h_anuga = 0 bitwise: ctest adjoint|calibrate|jacobian 14/14;
+   adjoint_beuler AND adjoint_arkimex kokkos-type trajectory dumps
+   cmp-BITWISE IDENTICAL to a pre-change build at np 1/2, FD-gate log
+   lines (dJ/du0, dJ/dn) identical to every digit. (Full ctest: only
+   the 6 pre-existing cgns failures + amr_c_np_3_basic, which SEGVs
+   identically on the pre-change build -- verified, not ours.)
+2. h_anuga > 0 FD gates: new unit twins in test_swe_jacobian (source
+   Jacobian across h >> ha / h ~ ha / h < ha / h ~ tiny_h at n = 0.1;
+   SWEFrictionDN both branches), a new global FD-coloring-vs-analytic
+   twin pair (swe_jacobian_global_anuga_*.yaml: h_anuga = 5 vs h = 10,
+   n = 0.1) at 1.7e-8 (gate 1e-6) np 1/2, and driver FD gates
+   (h_anuga = 4, n = 0.1): dJ/du0 1.2e-8..4.6e-8, dJ/dn 2.7e-7..5.9e-6
+   (gate 1e-5) for {beuler, arkimex} x {host, kokkos types} x np {1,2}.
+   J and dJ/dn confirmed to genuinely move under the regularization
+   (dJ/dn changes 3.4x at h_anuga = 4), so the gates are not vacuous.
+
+### FINDING (PM): the SECOND discontinuity -- critical-outflow uperp switch (2026-08-22 night)
+
+With the drag fix in, the Turning class twin's early steps now converge
+honestly (FNORM_RELATIVE in 5-12 its, where pre-fix they only escaped
+by SNORM with a stalled residual) -- but EVERY h_anuga in {0.001, 0.003,
+0.01} still died at forward step 4, Newton crawling at lambda = 0.1
+(0.9x contraction/it) to a floor of 1.158e-3 and then line-search
+collapse with the residual JUMPING 1.158e-3 -> 1.019e-2 at
+lambda = 1e-13 (o14_*, o15_diag_anuga01.log). That jump target is
+numerically the SAME as the pre-fix diagnosis (1.26e-3 -> 1.01e-2, o9c)
+-- same discontinuity, unaffected by the drag regularization. Root
+cause CONFIRMED by BC swap: with the outlet's critical-outflow BC
+replaced by reflecting (diagnostic only), all 20 forward steps converge
+cleanly at the NLCD prior (o16_reflect_anuga01.log). The
+CONDITION_CRITICAL_OUTFLOW branch zeroes BOTH states when uperp < 0
+(wall) and otherwise imposes the critical ghost -- at the uperp = 0
+crossing the flux jumps by the full wet-onto-dry Roe flux, O(g h^2/2)
+~ 1e-2 in residual norm. The drag-gate discontinuity was real (it
+gated steps 1-3) but the o9 stall was this BC switch. WEDNESDAY AGENDA:
+a continuous critical-outflow variant is a scheme decision for the
+scientists (smooth blend across uperp = 0, or Froude-limited ghost).
+
+Practical mitigation, MEASURED: the BC pin floor is state-dependent --
+rel ~2.7e-5 of the step's initial residual at the NLCD prior (o9d's
+snes_rtol 1e-5 just missed it), rel ~1.17e-4 at a TAO trial field
+(o18c: floor 5.04e-3 / F0 42.9, lambda pinned at ~1e-6 with the
+residual RISING for any larger step). -snes_rtol 1e-3 clears every pin
+seen; 1e-4 clears the prior's pin but dies at TAO it 7's trial point
+(o18/o18b, and snes_max_it 100 does NOT rescue a lambda = 1e-6 pin).
+This is a BC-discontinuity tolerance, not sloppiness: steps away from
+the pin converge at 2-8 Newton its.
+
+### h_anuga sweep + 20-it class calibration (o17/o18*, gmres+right ksp rtol 1e-2)
+
+3-TAO-it class twin at snes_rtol 1e-4 (NLCD truth, uniform 0.03 start,
+15 classes, 418076 obs cells x 20 times):
+- h_anuga 0.001: CLEAN. 140/140 solves converge (28x2, 90x3, 10x4,
+  6x6, 6x8 Newton its), J 1.45342e7 -> 7.47493e6, TaoSolve 6.03 s.
+- h_anuga 0.003: CLEAN, J-trace nearly identical (7.46462e6) --
+  the regularization at this size barely perturbs the physics.
+- h_anuga 0.01: truth forward clean (2-6 its) but the calibration
+  forward from the uniform-0.03 start hits DIVERGED_FUNCTION_NANORINF
+  at Newton it 33 on step 1 -- bigger is NOT safer (weaker drag
+  damping lets an iterate excurse to h < 0 -> pow NaN in the flux).
+- 20-it calibration at h_anuga 0.001: snes_rtol 1e-4 dies at TAO it 7
+  (J already 1.45e7 -> 1.00e5) on a trial-field pin (above); at
+  **snes_rtol 1e-3 the full 20 its COMPLETE: J 1.45342e7 -> 6.42e-7,
+  EXACT class recovery (rel L2 vs prior 0.0000, max class rel err
+  0.0000), TaoSolve 20.7 s** (o18d_cal20_n4.log). The machine-level
+  twin convergence is also an end-to-end gradient-quality check at
+  this solver tolerance.
+- DECISION: NLCD/class-mode recipe = h_anuga_reg_parameter 0.001
+  (smallest clean value) + -snes_rtol 1e-3 (BC pins) + gmres+right
+  ksp rtol 1e-2. Recorded in beuler_dt1_anuga.yaml and
+  beuler_dt1_1hr_anuga.yaml on PM and in campaign-wednesday.md.
+  The snes_rtol 1e-3 crutch retires if/when the critical-outflow
+  switch is smoothed (Wednesday agenda).
+
+### o26: free-outflow BC lands -- the o22 pin is FIXED (2026-08-24)
+
+Implemented `CONDITION_FREE_OUTFLOW` (yaml `type: free-outflow`): a
+transmissive / zero-gradient ghost (qR = qL in primitive space), the
+standard "free outflow" of FV SWE codes (ANUGA transmissive, Clawpack
+zero-order extrapolation) and exactly option (c) from the design sketch
+in next-phase-strategy.md. Checked first, per the plan: RDycore's CEED
+path has NO transmissive option -- its `SWEBoundaryFlux_Outflow` is the
+same critical ghost with the same q >= 0 switch -- so nothing existed to
+match; we added the QFunction there too. The BC is continuous in the
+interior state by construction; the Jacobian ghost map is the identity,
+wired through host AND device analytic Jacobians (commit 7d2b07fe, all
+four solver paths + CEED + docs; default behaviour bitwise unchanged --
+new enum value, new switch cases only).
+
+FD gates (laptop, arch-macosx-gnu-rdycore-kokkos-O), all PASSED:
+- new global FD-coloring twin pair swe_jacobian_global_freebc_*:
+  full-matrix rel err 1.8e-8 (gate 1e-6), np 1/2.
+- new driver gates adjoint_{beuler,arkimex}_freeflow.yaml: dJ/du0 and
+  dJ/dn vs FD 2e-8..8e-7 (gate 1e-5) across {beuler, arkimex} x
+  {host, kokkos vecs} x np {1,2}; arkimex also through the aijkokkos
+  DEVICE Jacobian assembly. J differs from the reflecting baseline
+  (7.02394 vs 7.03713), so the gates are not vacuous.
+- full ctest: only the 7 pre-existing failures (6 cgns, amr_np3).
+- CAVEAT (laptop only): adjoint_beuler + -dm_mat_type aijkokkos
+  crashes (SEGV/TRAP) for the PRE-EXISTING reflecting baseline too --
+  never reaches new code; check on PM at some point. The PM acceptance
+  below ran the device Jacobian (baijkokkos) cleanly.
+
+ACCEPTANCE (PM, jobs 57519697/8, debug q, n4 A100): the o22 base
+control with ONLY `critical-outflow -> free-outflow` in the yaml
+(o26_freeflow.yaml) completes **600/600 steps, zero failures, 598 of
+600 solves at 2 Newton its** (1x3, 1x5) in ~6 min wall. The unmodified
+o22 base rerun with the SAME new binary still dies at solve 499
+(DIVERGED_MAX_IT 50 after 5 solves grinding at 25 its) -- the exact
+o22 signature, so the rebuild changed nothing else and the BC swap
+alone is the fix. The 25-it grinding phase is entirely absent under
+free-outflow. Both jobs then hit a HARMLESS post-forward error: the
+2026-08-20 PETSc rebuild rejects `-tao_max_it 0` (o22's "forward-only"
+idiom) at TaoSetFromOptions -- use `-tao_max_it 1` or drop the
+calibrate flags for future forward-only controls.
+
+CONSEQUENCES:
+- Rain-forced NLCD runs are UNBLOCKED. The snes_rtol 1e-3 crutch can
+  retire on free-outflow runs (the o26 histogram suggests honest
+  convergence; verify on the first long window).
+- Long-window configs must switch the outlet yaml to
+  `type: free-outflow` (beuler_dt1_*_anuga.yaml etc. on PM still say
+  critical-outflow).
+- Documented for the scientists in docs/common/input.md with the
+  caveats (weak reflections for subcritical outflow; inflow not
+  prevented); critical-outflow remains the default -- invite
+  correction per the working model.
+
+### o27 + peak-WSE misfit mode: the 1-hr rain-forced window is CLEAN (2026-08-24)
+
+**o27 (PM job 57520315, n4, 15 min wall):** the o22-class run at 6x the
+window -- 1-hr rain-forced NLCD classes twin, free-outflow outlet,
+beuler dt 1 s, snes_rtol 1e-3 -- completed with **17,198 converged
+solves and ZERO failures**: the 3600-step truth forward, the adjoint
+sweeps, and a TAO iteration's line-search forwards all clean. The
+rain-forced program is unblocked in practice, not just at o26's 600 s.
+Cost calibration: the WHOLE tao_max_it-1 run (~4.8 forward passes +
+adjoint recomputes) took 15 min at n4 -- far below the old ~1 hr per
+TAO-it per simulated hour estimate; budget accordingly.
+
+**Peak-WSE (HWM) misfit mode landed (commit 934d8304).** New
+`-adjoint_hwm_file` observation mode in rdycore_adjoint for both
+per-cell and NLCD-class calibration: J compares each mark cell's PEAK
+sampled WSE against the surveyed mark; the adjoint reuses
+AdjointSweepMulti unchanged by placing each mark's residual in the r_k
+of its own argmax time (exact gradient a.e.; ties measure-zero).
+Below-bed marks are zero-weighted with a printed count; peak-WSE MAE
+(the Inunda-comparable number) and the model-dry mark count print at
+start and at the TAO solution. `-adjoint_hwm_twin` synthesizes mark
+values from the truth forward through the real file path;
+`-adjoint_hwm_fd` gates the parameter gradient against central
+differences at the all-ones + largest-|g| directions (probe step 1e-3
+relative = measured V-curve optimum; smaller steps drown in the forward
+solve's noise floor -- 4e-5 at 1e-5 vs 8.6e-7 at 1e-3). Gates: ctests
+adjoint_hwm_fd_np_{1,2} at 8.9e-7 (gate 1e-5); classes+hwm smoke at
+6.5e-7 with a synthetic 2-class map. Real table:
+data/harvey_hwm/turning30m_hwm_obs.txt (108 QC-passed marks) via
+make_hwm_obs.py; ALSO staged to PM $SCRATCH/gpu-implicit.
+
+**o28 SUBMITTED (PM job 57521605, regular q, 3 hr):** the
+identifiability re-ask -- NLCD-truth twin observed at the 108 real mark
+cells' peaks, 1-hr window, 15 TAO its, on a COPY (o28_hwm_twin.txt;
+the twin overwrites the table's values -- NEVER point -adjoint_hwm_twin
+at the real turning30m_hwm_obs.txt). Compare against o25i (13 gauges /
+20 s: rel L2 0.66, worst class 0.81).
+
+### o28: HWM identifiability -- the observable changes the answer (2026-08-24)
+
+PM job 57521605, n4, 100 min wall, 173,575 converged solves, ZERO
+failures. NLCD-truth twin observed at the 108 QC-passed real mark
+cells' peaks (12 samples over a 1-hr rain-forced window,
+free-outflow outlet), uniform 0.03 start, 15 TAO its, beta 1e-4.
+
+J 7.48e4 -> 926 (81x); peak-WSE MAE 0.103 m -> 0.017 m; model-dry
+marks 32 -> 19 of 108.
+
+Per-class recovery (rel err): the AREA-DOMINANT classes recover well
+-- 22 dev-low 0.7%, 23 dev-med 10.5%, 24 dev-high 8.6%, 81 pasture
+1.9%, 82 crops 8.6% -- together 2.43M of 2.93M cells (83% of the
+domain in classes recovered to <= 10.5%). Failures concentrate in
+small-area classes: 41 deciduous forest pinned at the UPPER bound
+(100% err), 52 shrub pinned at the LOWER bound (96%), 95 emergent
+wetland 115%, 42 evergreen 52%, 21 dev-open 47%. Unweighted rel L2
+0.58; AREA-WEIGHTED rel L2 0.20.
+
+Read against o25i (13 gauges, 20-s window: rel L2 0.66, worst 0.81,
+distant classes NEVER MOVED from the start value): with 108 marks and
+a 1-hr window the small classes now MOVE -- they are sensitive but
+weakly constrained, overshooting to the bounds (semiconvergence along
+weak directions; more Tikhonov or longer windows are the obvious
+levers) -- while the classes that cover the domain are identified.
+The o25i conclusion ("13 gauges cannot constrain 15 classes") does
+NOT carry over to the HWM observable: most of the field, by area, is
+constrained even by 1 hour of early-transient dynamics.
+
+Caveats for the paper: (1) 1-hr window peaks are early transients,
+not flood peaks -- the real 6-12-hr windows should only help; (2) 15
+its is not converged (J still falling); (3) twin marks are synthesized
+from the truth run (inverse crime -- no representation error), so
+this is an identifiability statement, an upper bound on real-data
+performance.
+
+Next: the real-data HWM calibration needs a window covering the
+actual flood peak (marks record the event maximum) -- window placement
+is question Q7 for the scientists, and the long-window cost basis is
+now measured (o27).
+
+### o29/o30/o31: wall-clock truths, a robustness hole fixed, and the FIRST REAL-DATA NUMBER (2026-08-24)
+
+**o31 -- the uncalibrated model vs the real survey.** 72-hr rain-forced
+forward from the only IC (2017-08-26 18:00) through the Buffalo Bayou
+crest, NLCD-prior Manning, free-outflow outlet, beuler dt 1, n4:
+**259,200/259,200 implicit solves converged, ZERO failures, 2h05m
+wall.** Every one of the 108 QC-passed marks goes wet, and the
+uncalibrated model's peak-WSE MAE against the REAL surveyed marks is
+**3.41 m** (J 1.24e7). The 1-hr fingerprint (o29g: MAE 1.65 m, 22/108
+dry) shows peaks still growing into the window -- crest timing
+matters, as expected. Caveats: single hot-start IC, no signed-bias
+decomposition yet (o31d dump rerun pending), rain/mesh/datum error
+unseparated from roughness error. This is the honest "before" number
+to put beside Inunda's calibrated 0.67 m.
+
+**o29 -- measured integrator wall-clocks at 30 m (1-hr forward, n4):**
+beuler dt=1: 221 s. Explicit euler dt=0.25: 130 s (exit 0; finiteness
+fingerprint run o29f pending -- its first attempt tripped our own
+guard: numerics.jacobian: fd is refused with device matrix types, use
+analytic). ARK-IMEX dt=0.25: did NOT finish in 100 min => >= 27x
+slower than beuler dt1 at this scale; the o19-era 1-km arkimex
+numbers do not transfer, needs tuning before quoting. So the honest
+implicit-vs-explicit forward factor at 30 m is ~1.7x wall for 4x
+fewer steps -- the implicit case rests on robustness (drag stiffness
+at trial fields, larger dt headroom), not on this forward ratio.
+
+**o30 -- noisy (0.15 m) HWM twin: found a robustness hole.** Init
+with noise: J 361.8, MAE 0.2336 m (clean twin: 0.1034) -- then at TAO
+it ~3-4 a trial field hit DIVERGED_MAX_IT(50) and TSStep HARD-ABORTED
+the run (exit 91). Fix committed: TSSetErrorIfStepFails disabled;
+objectives grade a diverged trial with J=1e30 + zero gradient (line
+search backs off); all data-producing forwards explicitly verified
+(CheckTruthForward). Rerun pending cert refresh.
+
+**BLOCKED: sshproxy cert expired ~12:30 PT.** Pending PM work, ready
+to fire on refresh: (1) o29f explicit fingerprint (yaml fixed to
+analytic), (2) o30 rerun with failure-tolerant trials, (3) o31d dump
+rerun (-adjoint_hwm_dump o31_marks.txt) for signed bias + per-mark
+crest times (window placement for the 12-hr calibration).
+
+### o29f: the explicit path does NOT survive dt 0.25 at 30 m (2026-08-24)
+
+Eval-only forward over the same 1-hr rain-forced window as o29g, on the
+same real 108-mark table, n4. The two configs differ in **exactly two
+lines** (`diff o27_1hr_freeflow.yaml o29f.yaml`: `temporal` and
+`time_step`); mesh, IC, free-outflow BC, ANUGA regularization, rain and
+the NLCD prior field are identical.
+
+| run | integrator | dt | result |
+| --- | --- | --- | --- |
+| o29g | beuler | 1.0 s | J 3.429e6, peak-WSE MAE 1.6479 m, 22/108 marks dry |
+| o29f | explicit euler | 0.25 s | **J inf, MAE inf, 108/108 marks dry** |
+
+So dt = 0.25 s is NOT the explicit CFL limit at 30 m -- the explicit run
+at that step produces a non-finite state. o32 walked it down: dt 0.125
+and dt 0.05 (advective CFL ~0.007) are ALSO non-finite, J inf, 108/108
+dry, with the observation frequency scaled so every rung samples peaks
+at o29g's 300 s interval.
+
+**This confirms a limit the project already measured and the code already
+documents** (see the NOTE in `AddSourceExplicit` in src/swe/swe_petsc.c,
+plans/RESULTS-manning-draft.md:273, plans/note-to-team-manning-config.md):
+with the dt-FREE drag that the adjoint requires, the binding constraint
+is the friction rate, not the CFL --
+`dt < 1/tb`, `tb = g n^2 h^{-4/3} |v|`. On the spun-up 30 m state (99.9%
+wet, median depth 6 mm) tb reaches 420/s => dt < ~2.4 ms, vs the CFL's
+0.25 s; 90k cells violate dt*tb > 1 at 0.25 s. o29f/o32 add the
+end-to-end confirmation at three step sizes. I ran the ladder before
+grepping for the known result -- the code comment would have predicted
+all three outcomes.
+
+Consequences that DO matter:
+
+1. **The o29 wall-clock comparison is void as written.** "Explicit euler
+   dt 0.25 = 130 s vs beuler dt 1 = 221 s, so implicit costs ~1.7x"
+   timed a run that produces a non-finite state. Against explicit
+   stepping of the SAME differentiable RHS, the implicit path wins by
+   ~400x in step count, not loses by 1.7x.
+2. **The paper's W4 text was wrong** where it called dt = 1 s "4x the
+   explicit CFL limit" and inferred a modest implicit-vs-explicit
+   factor: that conflates the CFL limit with the stability limit of the
+   source method the adjoint actually requires. Both the W4 item and
+   red-team item Q6 now state the measurement and the distinction.
+3. The genuinely modest comparison -- explicit at 0.25 s with the
+   operator-split (`semi_implicit`) friction -- is against a
+   NON-DIFFERENTIABLE discretization (it buries dt in the RHS, which is
+   why the adjoint cannot use it). Quote it only as such. The
+   differentiable equivalent is `ark_imex`, which at 30 m did not
+   finish in 100 min (>= 27x beuler dt 1, o29) and needs tuning.
+
+### Mid-event window IC: solved with no conversion machinery (2026-08-24)
+
+The 12-hr calibration window over the crest cannot start at the only IC
+(Aug 26 18:00). Investigated the handoff's option (a) and it is simpler
+than feared -- no checkpoint->IC-file conversion is needed:
+
+- `-restart <file>` is already a `RDySetup` option, and `ReadCheckpointFile`
+  overwrites `u_global` AFTER the yaml IC is applied; the driver stashes
+  `u_ic` straight from `u_global` right after `RDySetup`. So a checkpoint
+  IS the window's IC.
+- Checkpoints are written in NATURAL order, so the window need not run on
+  the rank count of the forward that produced it (verified np1 -> np2).
+- `DMSetUseNatural(FALSE)` in the adjoint driver does not block checkpoint
+  write/read: the natural-SF entry points key off `dm->sfNatural`, which
+  survives the flag (only errors when the SF is missing AND useNatural is
+  set).
+
+The one real gap was the rain clock: every forward restarts the TS clock
+at 0, so a mid-event window replayed rain from the event's first hour.
+Fixed by `-adjoint_rain_start_hour <h0>`. Also added
+`-adjoint_forward_only` (one forward, then exit) -- without it the
+checkpoint on disk is from whichever extra forward ran last (perturbed
+IC, optimizer trial), not the window's answer.
+
+Gated as ctests on the rain-forced Houston 1 km mesh (`adjoint_restart_*`,
+5 tests, ~2 s): hour 2 of a continuous run vs the same hour restarted
+from the 1-hr checkpoint is **bitwise identical** at matched
+decomposition and 2.4e-10 max relative across np1->np2; dropping the rain
+offset moves it 2.3e-2 relative L2, so the gate discriminates.
+
+### o33: the mid-event window IC path, validated on the PRODUCTION config (2026-08-24)
+
+The `adjoint_restart_*` ctests gate the restart + rain-offset logic on
+CPU, on a 2,746-cell mesh. The calibrated run restarts a window on the
+GPU at 2.93M cells, so o33 repeats the same three-leg experiment there:
+30 m Turning mesh, kokkos vecs + baijkokkos, real MRMS rain, beuler
+dt 1, free-outflow, n4.
+
+| leg | final \|u\|_2 | h range |
+| --- | --- | --- |
+| A: continuous 0-2 h | 7.8231705568e+02 | [4.9016634538e-05, 8.7983908048e+00] |
+| B: hour 2 restarted from A's 1-h checkpoint, `-adjoint_rain_start_hour 1` | **7.8231705568e+02** | **[4.9016634538e-05, 8.7983908048e+00]** |
+| C: control, same restart with NO rain offset | 7.3088366533e+02 | [1.2901825470e-06, 8.7472719399e+00] |
+
+B reproduces A in all three quantities to every printed digit; the
+control C is off by 7% in |u|_2 and 40x in min depth. So on the exact
+production configuration a mid-event window is indistinguishable from
+the corresponding stretch of a continuous run. Checkpoint write also
+works from this driver on the GPU path despite its
+`DMSetUseNatural(PETSC_FALSE)` (the natural SF survives the flag).
+
+The calibrated real-data run is no longer blocked on IC machinery.
+
+### o34 (submitted): initial conditions for every candidate window
+
+Repeats the o31 72-hr eval-only forward with HOURLY checkpoints (72
+files, ~70 MB each) plus the per-mark dump. Decouples window placement
+from IC production: once o31d/o34's crest histogram picks the window,
+no further forward is needed, and several placements can be tried for
+free (paper Q7). Its "hwm eval" line doubles as a regression check that
+the new build reproduces o31's uncalibrated MAE 3.41 m -- both new
+options are default-off, so it should match exactly.
+
+### o36: inner-tolerance ladder -- the loose settings did NOT corrupt the forward (2026-08-25)
+
+Mark's concern: `ksp_rtol 1e-2` could be causing a problem that is hard
+to see, and `snes_rtol 1e-3` likewise. Both were adopted while the
+critical-outflow BC was stalling Newton -- a stall free-outflow removed
+-- so neither is paying for anything any more.
+
+**First, the WATCH ITEM from the 2026-08-22 solver decision is not
+tripping.** In the completed 72-hr forward at rtol 1e-2, 259,197 of
+259,200 steps converge in **2 Newton iterations** (2 steps at 3, 1 at 5;
+cap 50). The o30 calibration runs 2-7, plus exactly one pathological
+trial field that hit DIVERGED_MAX_IT and was absorbed by the
+failure-tolerant machinery. Nothing is visibly stressed.
+
+**Ladder** (1-hr rain-forced window, eval-only vs the real 108 marks, n4):
+
+| rung | ksp / snes | wall | KSP solves | its/solve | total KSP | J | MAE | dry |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A (campaign) | 1e-2 / 1e-3 | 231 s | 7204 | 5.27 | 37,965 | 3.429246e6 | 1.6479 | 22 |
+| B | 1e-3 / 1e-3 | **203 s** | **3986** | 7.49 | **29,855** | 3.429268e6 | 1.6479 | 22 |
+| C | 1e-4 / 1e-5 | 291 s | 7227 | 9.67 | 69,885 | **3.429274e6** | 1.6479 | 22 |
+| D (reference) | 1e-6 / 1e-8 | 348 s | 7581 | 13.96 | 105,832 | **3.429274e6** | 1.6479 | 22 |
+
+Three findings:
+
+1. **C reproduces the converged answer D exactly**, so C is converged to
+   printed precision. The campaign setting A is off by **8.2e-6 relative
+   in J**, with peak-WSE MAE and dry count identical. The forward science
+   answer is insensitive to all of this -- the 3.41 m baseline and the
+   crest-censoring result are not tolerance artifacts, at least over
+   3,600 steps. o37 repeats the 259,200-step run at C to confirm at scale.
+2. **Tightening 1e-2 -> 1e-3 makes the run FASTER** (203 s vs 231 s) on
+   21% less linear work. Better linear solves let Newton finish in ONE
+   iteration at 3,218 of 3,600 steps instead of two, so the number of KSP
+   solves nearly halves (3986 vs 7204) even though each costs more
+   iterations. There is no speed argument for 1e-2.
+3. **The laptop does not predict Turning.** On the 50-cell free-outflow
+   twin, KSP iterations are quantized -- two iterations satisfy both 1e-2
+   and 1e-3 (mean 1.97 vs 2.01), both returning the same gradient
+   (6.4e-4 adjoint-vs-FD, both FAILING the 1e-5 gate); only 1e-4 adds a
+   third iteration and drops the error to 7.2e-6. At Turning the Newton
+   behaviour is the opposite (1e-3 needs FEWER Newton iterations), so the
+   laptop ladder cannot be used to set the production tolerance. o38
+   measures the gradient at production scale.
+
+**Discrepancy to resolve.** `plans/campaign-wednesday.md` and the paper's
+open issue 3 both state that "the same configuration at rtol 1e-3 passes
+the 1e-5 gates". On the laptop free-outflow beuler twin it does not
+(6.4e-4, failing). That claim was measured 2026-08-22, before
+free-outflow existed, so it may be configuration-specific rather than
+wrong -- o38 settles it at production scale. Do not repeat the claim in
+the paper until it does.
+
+**Decision.** Forward/eval work has no gradient in it at all, so its only
+requirement is forward accuracy; calibration is where gradient error
+lives. o37 (72-hr baseline + fresh hourly checkpoints) and any subsequent
+calibration run at **ksp 1e-4 / snes 1e-5**; the checkpoints a calibration
+window restarts from must come from the same tolerance the calibration
+runs at, which is why o37 regenerates them rather than reusing o34's.
+
+### o37 drainage analysis: the 37 censored marks are a structural drainage failure, not late crests (2026-08-25)
+
+P2 of the Fable brief, run against o37's 73 hourly checkpoints (direct
+seeks at the 108 mark cells; script `o37_drainage.py` on PM). The
+question: are the marks that never crest in the 72-h window merely
+late-cresting (argues for a longer window), or can their cells not drain
+at all (argues they are inadmissible for roughness calibration)?
+
+| | censored 37 | genuine-crest 71 (control) |
+| --- | --- | --- |
+| peak location | ALL at hour 72 (window end) | interior |
+| recession from peak | **0.000 -- every single mark** | 52/71 recede > 5% |
+| dh/dt over last 12 h | +0.016..+0.060 m/hr, ALL positive | median -0.008 m/hr (draining) |
+| mean water column | 0.52 m -> **10.7 m and still rising** | peaks ~1.95 m at h54, then declines |
+
+The control group is already receding in the late window while the
+censored cells keep accumulating ~+0.05 m/hr -- that late-window mass is
+arriving laterally (the genuine group's decline shows the rain has
+effectively ended), i.e. the domain's runoff converges on the downstream
+reach and never exits. At the observed fill rates those cells are WEEKS
+from cresting: this is not "the window is too short."
+
+Physical reading: the model cannot drain the Buffalo-Bayou/downstream
+reach -- either the 30 m mesh's conveyance through the incised channel
+is under-resolved or the outlet connectivity is wrong for these cells --
+and it piles a mean 10.7 m of standing water there (individual cells to
+18 m, vs surveyed h_obs down to ~1 m: marks 27/72 are 11-17 m over).
+**No Manning field can repair a reach whose water has no exit**, so the
+37 marks are inadmissible for roughness calibration on physical grounds.
+Beside that, they are the entire difference between the 3.41 m headline
+MAE and 1.51 m on the admissible 71 (bias +1.20 m).
+
+For the scientists (this evidence reframes yesterday's Q1): the
+exclusion is no longer "should we drop inconvenient marks?" but "these
+sit in a reach the model demonstrably cannot drain; calibrating
+roughness against them would absorb a drainage defect into n." The
+drainage defect itself is a finding worth reporting -- and worth a look
+at the outlet placement/conveyance before any longer-window run.
+
+Units note for reproducers: `turning30m_hwm_obs.txt` column 2 is WSE
+(NAVD88 m); the driver converts to water column against the cell bed.
+The per-mark dump's h_obs is the converted value. (A first cut of the
+drainage script compared raw WSE to model h -- the model-side
+classification above never used obs values, so it is unaffected.)
+
+### o40d: the observable-kink hypothesis is REFUTED -- the FD gap lives below the observable (2026-08-25)
+
+The kink-probe instrumentation (commit c51e5063) decomposes the FD gate
+exactly over marks, J = J_S + J_flip, counting per probe direction the
+marks whose argmax time moves or whose wet/dry state flips, and re-running
+the comparison restricted to the non-flipping set (snapshot-reconstructed
+FD vs a zero-weighted adjoint re-evaluation; validated on the smooth twin,
+where it reproduces the full check to the last digit with zero flips).
+
+Basin scale (debug variant: 30-min window, 108 real marks, classes mode,
+converged tolerances ksp 1e-4 / snes 1e-5):
+
+| direction | adjoint g.d | FD | rel err | argmax moved | wet/dry flipped |
+| --- | --- | --- | --- | --- | --- |
+| ones (all 15 classes) | -1.1256e6 | -8.9248e5 | **2.07e-1** | **0** | **0** |
+| e_s (one class) | 3.0650e6 | 3.0721e6 | 2.34e-3 | 0 | 0 |
+
+**Zero observable-level flips, yet the ones direction errs by 21%.** The
+smooth-subset error equals the full error because the "smooth" subset is
+all 108 marks. Three sharp facts:
+
+1. **Determinism to ~9 digits**: two independent evaluations at the base
+   point printed identical J and g.d. Noise is excluded; the ones-direction
+   FD difference (dJ ~ 53 on J ~ 3.5e6) is three orders above the
+   reproducibility floor. The discrepancy is real and well-resolved.
+2. **Error scales with direction support**: domain-wide 2.1e-1 vs
+   single-class 2.3e-3 (o38C's coordinate directions: 2.7e-3..6.5e-2).
+   A wiring bug has no natural reason to care about sparsity; branch
+   switching in the wet/dry DYNAMICS does -- a wider perturbation crosses
+   more tiny_h surfaces along the trajectory.
+3. **|FD| < |adjoint|** on the ones direction -- the signature of a
+   central difference averaging slopes across branch surfaces.
+
+Remaining candidate mechanisms, and the running discriminators:
+- (a) dynamics-level wet/dry branch switching: FD error falls ~ eps^1
+  as the probe shrinks (fewer surfaces inside the interval);
+- (b) genuine curvature (central-difference truncation): falls ~ eps^2;
+- (c) a support-correlated defect: flat in eps, systematic in class area.
+o39 (eps sweep at converged tolerances, RUNNING) separates (a)/(b) from
+(c); o41 (all-15-class coordinate sweep on the 30-min window, gpu4 build
+with the direction index printed) measures error vs class area across
+four orders of magnitude of support.
+
+Noise-floor arithmetic for reading o39: the base J reproduces to ~1e-7
+relative, so the FD noise contribution at probe eps_rel is roughly
+0.35/(2 * eps_rel * 0.03 * |g.d|); for the ones direction that is ~5e-3
+at eps 1e-3 and ~5e-2 at eps 1e-5 -- the V-curve's left branch is noise,
+only the descent from eps 1e-2 -> 1e-3 -> 1e-4 is signal.
+
+Consequence, already in the paper (19c4ed18 wording corrected after this
+run): the basin-scale gradient is currently validated by descent
+behavior, not by the FD gate, and the paper says so explicitly. What
+this does NOT touch: the forward results (o37 baseline, drainage
+finding) involve no adjoint; and o28/o30's calibrations descended --
+consistent with a gradient that is right up to kink-scale detail.
+
+### o39 (partial): FD is CONVERGED in the probe step and still 7.5% from the adjoint (2026-08-25)
+
+Probe-step ladder at converged tolerances (1-hr window, classes mode,
+real marks; o38C supplies the eps 1e-3 point). Ones = all 15 classes
+shifted together; coordinates are the 3 largest-|g| classes, same rows
+across rungs.
+
+| direction | eps 1e-2 | eps 1e-3 | eps 1e-4 |
+| --- | --- | --- | --- |
+| ones | 5.244e+0 (FD sign-flips) | 7.635e-2 | 7.470e-2 |
+| coord A | 3.587e-2 | 2.668e-3 | (pending) |
+| coord B | 7.972e-3 | 1.527e-2 | (pending) |
+| coord C | 8.869e-2 | 6.488e-2 | (pending) |
+
+Readings:
+- eps 1e-2 (3e-4 absolute in n) is outside the linear regime entirely.
+- **The ones-direction FD is stable across a decade** (1.3607e6 at 1e-3,
+  1.3586e6 at 1e-4) while the adjoint says 1.2642e6: FD has converged to
+  a value 7.5% from the adjoint. Noise bands: ~0.5% at eps 1e-3 (solid),
+  ~4.6% at 1e-4 (consistent with flat). So neither pure curvature
+  (would fall eps^2) nor sparse kinks (would fall eps^1) explains it.
+- The coordinate directions move NON-MONOTONICALLY with eps (one falls
+  ~eps, one rises, one is flat) -- characteristic of discrete branch
+  surfaces entering/leaving the probe interval, not of a smooth error.
+
+Surviving hypotheses, now sharply posed:
+(a) DENSE wet/dry branch structure in the dynamics: so many (cell,step)
+    tiny_h crossings inside any reachable interval that FD converges to
+    a smoothed (Clarke-type averaged) slope while the adjoint returns
+    the exact one-branch derivative -- both stable, persistently apart.
+    Property of the objective, not a bug.
+(b) A branch-related defect in df/dn or the adjoint accumulation.
+
+Discriminators in flight:
+- o41 (all-15-class support sweep, 30-min window): under (a) the gap
+  scales with class area; also tests FD superposition
+  (sum_s FD(e_s) vs FD(ones)) and carries Jp/Jm for second differences.
+- o42 (window ladder 60/300/900 s, debug queue): under (a) the
+  contamination ACCUMULATES with trajectory length (a 60-step window
+  crosses ~60x fewer surfaces); under (b) the relative gap is
+  window-independent. This is the cleanest bug-vs-structure separator.
+
+### o42 (complete): the window-length ladder, ones direction (2026-08-25)
+
+| window | rel FD error | note |
+| --- | --- | --- |
+| 60 s | 8.923e-5 | inner-solve floor: the gate effectively PASSES |
+| 300 s | 8.082e-3 | |
+| 900 s | 2.375e-2 | |
+| 1800 s | 2.071e-1 | o40d (30-min config) |
+| 3600 s | 7.470e-2 | o39/o38C (1-hr config) |
+
+Monotone accumulation through 1800 s; the 3600-s point is a different
+J (peaks over a longer horizon), so strict monotonicity across configs
+is not expected. Single-class directions stay 1-3 orders cleaner at
+every window (e_3: 2.7e-5 at 60 s, 1.7e-5 at 300 s; e_4: 3.0e-3 at
+900 s). The verdict stands as committed in 346217b3: the adjoint is
+exact (verified at the inner-solve floor with all machinery engaged);
+the long-window FD gate measures the objective's dense wet/dry
+nonsmoothness, not gradient error. Verification policy: FD-gate on
+short windows; descent plus short-window gates on long ones.
+
+### o39/o40/o41 complete: the gradient closure, confirmed three more ways (2026-08-25)
+
+**o39 full eps ladder (1-hr window, converged tolerances), by direction:**
+
+| direction | eps 1e-2 | 1e-3 | 1e-4 | 1e-5 |
+| --- | --- | --- | --- | --- |
+| ones | 5.24 | 7.64e-2 | 7.47e-2 | 4.38e-2 |
+| coord A (class 24) | 3.59e-2 | 2.67e-3 | 4.82e-4 | **8.28e-6 -- PASSES the 1e-5 gate** |
+| coord B (class 23) | 7.97e-3 | 1.53e-2 | 1.57e-2 | 5.54e-4 |
+| coord C | 8.87e-2 | 6.49e-2 | 6.79e-2 | 2.31e-2 |
+
+Every direction falls toward the gate as the probe shrinks; sparse
+directions get clean first. (The e5 rung is meaningful because the
+determinism is far better than estimated: o41 resolved a class with
+|g| = 249 -- a J-difference of 0.015 on 3.5e6, i.e. ~4e-9 relative --
+to 2.4e-5, so reproducibility is ~1e-10/1e-11 relative.)
+
+**o41 all-15-class support sweep (30-min window):** the FD-adjoint gap
+per class, mapped to class area, is NOT proportional to area -- it
+concentrates in the developed-intensity and wetland classes:
+
+| slot | NLCD | cells | rel gap |
+| --- | --- | --- | --- |
+| e_1 | 21 developed-open | 178k | 1.10e-1 |
+| e_2 | 22 developed-low | 439k | 7.99e-2 |
+| e_7 | 42 evergreen | 43k | 2.86e-2 |
+| e_3 | 23 developed-med | 928k | 2.60e-2 |
+| e_13 | 90 woody wetland | 122k | 6.76e-3 |
+| e_4 | 24 developed-high | 552k | 2.34e-3 |
+| e_11 | 81 pasture | 428k | 2.48e-4 |
+| others | | 12k-86k | 2e-6..2.5e-4 |
+
+What matters is a class's MARGINAL-WETNESS exposure (cells crossing
+the depth cutoff during the window), not its size: urban classes flood
+progressively, pasture is mostly decisively wet or dry.
+
+**Superposition (from the same o41 data):** the signed per-class gaps
+SUM to the domain-wide gap (2.35e5 vs 2.33e5, ~1%). The gap is
+additive over classes -- exactly what independent per-cell branch
+crossings predict, and what no plausible wiring bug would arrange.
+
+**o40 (full 1-hr probe)** reproduces o38C/o39 with the restricted
+machinery engaged: zero observable-level flips, smooth-subset error ==
+full error, verdict unchanged.
+
+With the window-length ladder (o42), the mechanism now has four
+independent confirmations: eps-convergence per direction,
+window-length accumulation, class-support structure with additivity,
+and zero observable-level kinks. CLOSED: the adjoint is correct; the
+long-window FD gate measures dense wet/dry branch structure in the
+objective.
+
+### o44/o45: how much of the error can Manning roughness reach? (2026-08-25)
+
+Uniform scale scan on the production configuration (12-hr cluster-A
+window h29-41, 46 real marks, IC = o37 h29 checkpoint, converged
+tolerances), evaluating J and peak-WSE MAE at alpha * n_NLCD:
+
+| alpha | n range | J | MAE | dry |
+| --- | --- | --- | --- | --- |
+| 0.2 | 0.005-0.032 | **DIVERGED_NONLINEAR_SOLVE** | -- | -- |
+| 0.3 | 0.008-0.048 | 6.7367e2 | **0.6392** | 1/46 |
+| 0.45 | 0.012-0.072 | 7.0380e2 | 0.6614 | 1/46 |
+| 0.6 | 0.016-0.096 | 7.4056e2 | 0.6776 | 1/46 |
+| 1.0 (NLCD) | 0.027-0.160 | 8.0826e2 | 0.7188 | 0/46 |
+
+**The entire uniform-roughness knob is worth 0.08 m against a 0.72 m
+error (11%)** -- and only at alpha 0.3, i.e. roughness at 30% of the
+published NLCD values (n as low as 0.008; smooth concrete is ~0.012),
+which no one would defend physically. Over a defensible range
+(alpha >~ 0.7) it is worth about 3 cm.
+
+Shape: mildly concave, slope steepening toward low alpha (0.103, 0.108,
+0.148 m per unit alpha over the three intervals). The limit is NOT
+drying (1/46 dry throughout) but numerical: at alpha 0.2 the implicit
+solve diverges.
+
+Cross-check: the identifiability twin measured the parameter-induced
+peak-WSE signal at ~0.1 m for a large class perturbation -- the same
+authority scale, from an independent measurement. So ~85-90% of the
+model-vs-survey residual is NOT roughness (rain, DEM, datum,
+representation error at 30 m).
+
+Consequences:
+1. No Manning calibration against these marks can close the gap to
+   Inunda's calibrated 0.67 m (which is on a DIFFERENT mark set --
+   never compare the two directly).
+2. The paper's claim shifts from "calibration closes the gap" to the
+   stronger and more defensible "we can measure, at basin scale, how
+   much of a flood model's error a parameter is capable of explaining"
+   -- here 11% at the edge of physical plausibility, ~4% within it.
+3. The multi-class calibration is still worth running: spatial
+   redistribution can beat uniform scaling, and how much it beats it by
+   is the quantitative question o43 (running) answers. The alpha curve
+   is the one-parameter bar it must clear to justify 15 parameters.
+4. Discrepancy stopping at J ~ N/2 ~ 23 is unreachable (J stalls near
+   ~670 at best); sigma = 0.15 m is survey error only, and the
+   achievable floor is set by structural error an order of magnitude
+   larger. Report the floor as measured.
+
+### o47: the peak observable constrains ONE roughness mode, not fifteen (2026-08-25)
+
+Half-scans at alpha 0.45 on the production configuration, splitting the
+domain by land-cover group (same window, marks, IC as o44/o45):
+
+| field | J | dJ | MAE | dMAE |
+| --- | --- | --- | --- | --- |
+| NLCD baseline | 808.3 | -- | 0.7188 | -- |
+| developed 21-24 only (71.6% of cells) | 786.8 | -21.5 | 0.7306 | **+0.0118** |
+| everything else (28.4%) | 827.5 | +19.2 | 0.7268 | **+0.0080** |
+| both (= global alpha 0.45) | 703.8 | **-104.5** | 0.6614 | **-0.0574** |
+
+**Each half alone makes the fit WORSE; together they help by 45x the
+sum of the parts.** A strong positive interaction, not two opposing
+signs (an intermediate reading of the developed-only point alone, since
+refuted by the second half).
+
+Mechanism consistent with all four points: a mark's peak is set by the
+PATH-INTEGRATED conveyance from upstream to that mark, and the paths
+cross both groups. Speeding part of a path does not drain it, and the
+resulting fast/slow junction ponds water -- so partial changes raise
+peaks. Only a domain-coherent change lowers them.
+
+**Consequence -- the key design finding.** The peak-WSE observable at
+these marks constrains essentially ONE roughness degree of freedom (the
+domain-scale, path-integrated conveyance), worth ~0.08 m against a
+0.72 m error. It does not carry fifteen classes' worth of information.
+This unifies the earlier evidence: o28 identified only the area-dominant
+classes (the ones that move the domain mean), and o30 pinned five
+classes under realistic noise (the other directions have no signal to
+fit, so the optimizer fits noise instead).
+
+Production design follows structurally, not by tuning: calibrate ONE or
+TWO parameters rather than fifteen (-adjoint_classes_active, commit
+456524dc). o43 (15-class, running) is the control that demonstrates
+why -- expect it to descend to roughly the alpha-curve level and then
+begin pinning weakly constrained classes.
+
+CAUTION on the alpha-scan bound: it measures the uniform mode, which
+this result shows IS the dominant identifiable mode -- so ~0.08 m is a
+fair estimate of accessible roughness authority, not merely a lower
+bound on one arbitrary direction.
+
+### o48: the calibration was a scaling problem, and it is fixed (2026-08-26)
+
+o43 did zero TAO iterations. The diagnosis in
+`plans/PROJECT-STATE-2026-08-26.md` S4 is confirmed and now demonstrated
+rather than argued: the failure reproduces in five minutes and the fix
+is measured on the production wiring.
+
+**The control.** `o48_smoke.sh` runs the exact production configuration
+-- 2.93M cells, GPU types, the 46 real cluster-A marks, the h29
+checkpoint, the rain offset -- over a 600-step window instead of 43,200.
+Case A is the o43 setup (Manning n as the variable, beta = 1e2, start at
+the NLCD prior):
+
+    hwm init: J 7.022047e+02, MAE 0.6630 m, 0 of 46 dry
+      0 TAO,  Function value: 702.205,  Residual: 667.459
+    class recovery: 0 TAO its, J_final 7.022047e+02
+
+Zero iterations, J_final = J_init, on a window costing five minutes.
+The o43 failure was never about the long window or the real data.
+
+**The fix.** Case B is the same start point with
+`-adjoint_classes_relative -adjoint_sigma_n 0.015`:
+
+    hwm init: J 7.022047e+02, MAE 0.6630 m, 0 of 46 dry
+    objective scaled by 1/J0 = 1.4241e-03; first trial step |g|/J0 = 0.1036 in alpha
+      0 TAO,  Function value: 1.,         Residual: 0.103623
+      1 TAO,  Function value: 0.970516,   Residual: 0.123666
+    hwm final: J 6.815011e+02, MAE 0.6127 m
+    class recovery: 1 TAO its, J_final 6.815011e+02
+
+Identical J at the start point to every digit -- alpha = 1 reproduces
+the NLCD prior field exactly, so the two cases differ only in the
+optimization problem. The first trial step is 0.10 in alpha (a 10%
+roughness change) where before it was five orders too large.
+
+**Why it works.** BLMVM's first trial is x - g. With n as the variable
+and |g| = 1554 where n ~ 0.05 that lands on the lower bound everywhere,
+and uniform alpha 0.2 is measured to diverge (o44), so every trial
+failed and the line search gave up. Making the variable alpha_k =
+n_k/n_prior_k and the objective J/J(start) puts both at O(1). The bounds
+become alpha in [0.3, 3.0] -- a physical statement that also excludes
+the divergent region, which a bound of n > 0.005 did not.
+
+**Regularization on principle.** `-adjoint_sigma_n <s>` sets
+beta = 1/s^2 from a prior standard deviation on n, and the run reports
+sigma_n. Against the measured J(alpha) curve (o44/o45) with
+sum_k n_prior_k^2 = 0.1399 over the 15 classes:
+
+| sigma_n | beta | uniform-mode minimum | J_mis | reg | MAE |
+| --- | --- | --- | --- | --- | --- |
+| 0.010 | 10000 | alpha 0.88 | 790.0 | 9.7 | ~0.708 |
+| **0.015** | **4444** | **alpha 0.70** | **757.3** | **28.6** | **~0.690** |
+| 0.020 | 2500 | alpha 0.33 (bound) | 678.6 | 79.5 | ~0.643 |
+
+So sigma_n = 0.015 is about the loosest prior that leaves an interior
+minimum in the dominant identifiable direction; at 0.020 the problem
+runs to the bound again, which is what beta = 1e2 was doing at a
+relative roughness change of 13.6. Report sigma_n, never a bare beta.
+
+**Verification** (commit 48485e24, all 21 adjoint/calibration ctests
+pass -- 19 previous plus 2 new):
+- the alpha gradient passes the central-difference gate at 2.3e-6 (new
+  ctest `adjoint_classes_relative_fd_np_1`, eps 1e-4; the default 1e-3
+  probe is truncation-limited at 3e-5 and the error scales as eps^2
+  across the whole sweep 3e-5..3e-2, which is what says truncation
+  rather than a wrong chain rule)
+- the dJ/dn recovered from the alpha gradient equals the absolute
+  mode's gradient at the same point to 1e-8, the dump's 10-digit
+  precision, class by class
+- dump/init round-trips exactly and across modes: a relative run's
+  dump, read back by either mode, reproduces its J_final to all digits
+- `-adjoint_jred_gate` now applies to the classes branch as well, so a
+  run that reports a "final" objective equal to its initial one fails
+  CI instead of passing quietly
+
+**Also added.** `-adjoint_classes_grad_dump <file>` writes
+(code, n, dJ/dn) at the start point before TAO runs. It is the fallback
+if the optimizer still struggles -- a line search along -g can then be
+run as eval-only forwards (~36 min) instead of trial points (~2 hr) --
+and it is a diagnostic in its own right: it says which classes carry
+the misfit gradient, which is what `-adjoint_classes_active` needs.
+
+**Caution, from the smoke's one iteration.** Classes 23 and 24 reached
+the alpha 0.3 bound on the first accepted step (BLMVM's line search
+expanded well past -g), while the objective fell only 3% and the
+gradient norm rose. On a 600-step window the peaks are barely resolved,
+so this is not a production result -- but it is the expected
+over-parameterization behaviour (o28/o30/o47) and the cue to read the
+production run's per-class table before believing any per-class number.
+
+
+### o51: the mesh does scale to 4 nodes -- 2.42x, bit-identical (2026-08-26)
+
+Eval-only forward of the production 43,200-step window at three node
+counts, in one interactive allocation:
+
+| ranks | nodes | forward | speedup | node-hr | efficiency |
+| --- | --- | --- | --- | --- | --- |
+| 4 | 1 | 36m21s | 1.00x | 0.606 | -- |
+| 8 | 2 | 21m55s | 1.66x | 0.731 | 83% |
+| 16 | 4 | 15m01s | **2.42x** | 1.001 | 61% |
+
+**All three reproduce `J 8.082566e+02, peak-WSE MAE 0.7188 m, 0 of 46
+dry` to every printed digit.** That is the result that mattered most:
+no decomposition dependence in the peak-WSE observable across a 4x
+change in rank count, which also re-validates the argmax bookkeeping
+under different partitioning.
+
+This CORRECTS an inference drawn earlier the same day from the b2i
+benchmarks, where 64 ranks ran 2.8x slower than 4 and we concluded the
+mesh does not scale past one node. It does not scale to 64; it scales
+usefully to 16.
+
+Production choice: **n16**, despite 61% parallel efficiency, because
+queue wait rather than node-hours is the binding constraint. A
+~10-evaluation calibration is 8.3 hr at n16 -- one 12-hr slot with
+margin for line-search retries -- against 20 hr at n4, a two-link chain
+whose second link may sit pending for hours. The extra ~13 node-hr is
+negligible against the ~265 remaining. Forward+adjoint should scale
+like the forward, because its cost is dominated by revolve
+recomputation, which is forward work.
+
+### o52: the prior is losing to the misfit, and the line search is not the lever (2026-08-26)
+
+One BLMVM iteration on a 7200-step (2 event-hour) window, relative
+variables, sigma_n = 0.015, More-Thuente line search. J 741.38 ->
+713.45, peak-WSE MAE 0.6837 -> 0.6096, **residual 0.0906 -> 0.1343**.
+
+| NLCD | class | prior n | recovered n | alpha | % cells |
+| --- | --- | --- | --- | --- | --- |
+| 23 | developed med | 0.1200 | 0.0360 | **0.300** | 31.7% |
+| 24 | developed high | 0.1600 | 0.0480 | **0.300** | 18.9% |
+| 90 | woody wetland | 0.0980 | 0.0294 | **0.300** | 4.2% |
+| 22 | developed low | 0.0900 | 0.2358 | **2.620** | 15.0% |
+
+**69.7% of the domain sits at or against a bound after ONE step**, and
+the step direction matches the start-point gradient signs exactly -- so
+the direction is right and the magnitude is not.
+
+Decomposing the step at sigma_n = 0.015 (beta 4444): the prior charged
+**118.5** units and the misfit paid **146.5** (-19.8%), for a net -27.9.
+The Tikhonov term is working; it is simply losing. The weight that
+would make this exact step net-worse is beta 5492, i.e.
+**sigma_n < 0.0135** -- so 0.015 sits just above the threshold, which
+sharpens the earlier "loosest prior with an interior minimum" estimate
+from inference into measurement.
+
+**Mechanism.** 22 rises 2.6x while 23 falls to the floor: two adjacent,
+spatially interleaved developed classes moving in opposition. For a
+path-integrated observable that is a near-null-space direction -- it
+barely changes total conveyance while driving both parameters somewhere
+indefensible (developed-medium urban at n = 0.036, smoother than
+concrete; developed-low at n = 0.236, rougher than forest). This is the
+o30 noise-fitting pathology reproduced on **real data at basin scale**
+rather than on a synthetic twin, which is a stronger statement than the
+paper currently makes.
+
+**Consequence for the production run.** A gentler line search changes
+the path, not the minimizer; armijo would walk toward the same place
+more slowly. The levers are sigma_n and the number of free parameters,
+not `-tao_ls_type`.
+
+CAUTION: 7200 steps is two event-hours. At the production window the
+alpha scan puts the ENTIRE uniform authority at ~135 J units while
+redistribution bought 146 here, so whether the prior holds at 43,200
+steps is genuinely open and is what the production run measures.
+
+
+### o52 addendum: armijo beats More-Thuente, and the reason is the trade (2026-08-26)
+
+Both line searches, one BLMVM iteration, identical start point
+(J 741.38, MAE 0.6837, |g|/J0 0.0906 -- reproduced to every digit):
+
+| | misfit | + prior | = J | residual | pinned at alpha 0.3 | near alpha 3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| mt | 594.9 | **118.5** | 713.45 | 0.1343 (+48%) | 23, 24, 90 = **54.8%** of cells | 22 = 15.0% |
+| armijo | 610.7 | **68.0** | **678.73** | **0.0849 (-6.3%)** | 23, 90 = **35.9%** | none |
+
+More-Thuente expands past -g, and the expansion is a bad trade: it buys
+15.8 units of extra misfit for 50.5 units of prior violation, ending at
+a HIGHER total objective than the shorter step, with the gradient norm
+risen 48% and 69.7% of the domain on or against a bound.
+Backtracking-only reaches a lower objective with a falling gradient and
+half the pinning. Production uses `-tao_ls_type armijo`.
+
+This corrects the reading recorded above ("the line search changes the
+path, not the minimizer"). Asymptotically that stands -- both minimize
+the same objective, and if the unconstrained optimum lies past a bound
+both will eventually pin. But within the ~10-iteration budget a 12-hour
+slot buys, the path is most of what we get, and armijo's is
+qualitatively healthier.
+
+### o53: the production start-point gradient (2026-08-26)
+
+Run at n16 on an otherwise-idle interactive allocation while the batch
+queue was saturated. `hwm init: J 8.082566e+02, MAE 0.7188` -- exactly
+the alpha = 1 reference, confirming again that relative mode's start
+point reproduces the NLCD prior field. First trial step
+`|g|/J0 = 0.1575` in alpha.
+
+Classes ranked by |dJ/dn| * n_prior, the gradient in the variable the
+optimizer actually moves:
+
+| # | NLCD | class | dJ/dn | share | cum | push | rank at 2 h |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 23 | developed med | +755.9 | 28.8% | 28.8% | lower | 1 |
+| 2 | 90 | woody wetland | +675.3 | 21.0% | 49.7% | lower | 2 |
+| 3 | 81 | pasture | **-898.4** | 10.8% | 60.6% | RAISE | 7 |
+| 4 | 22 | developed low | -327.9 | 9.4% | 69.9% | RAISE | 3 |
+| 5 | 21 | developed open | -568.3 | 7.2% | 77.1% | RAISE | 5 |
+| 6 | 24 | developed high | +135.7 | 6.9% | 84.0% | lower | 4 |
+
+The top two are stable across a 6x change in window length and carry
+half the gradient. Below rank 2 the 7200-step proxy is unreliable:
+pasture moves 7th -> 3rd (its raw |dJ/dn| is the largest in the field;
+it ranked low only because its prior n is small) and developed-high
+drops 4th -> 6th. Designing the reduced-parameter run on the proxy
+would have picked the wrong third parameter.
+
+**Active set for o50: 23, 90, 81** (60.6% of the gradient). Adding 22
+buys 9.4% but reintroduces the 22/23 compensating pair -- two
+interleaved developed classes pulling opposite ways, which is nearly
+null-space for a path-integrated observable and is what blew up in o52.
+
+Note the gradient is relatively STRONGER at the production window
+(|g|/J0 0.1575 vs 0.0906 at two hours), so sigma_n = 0.015 is more
+likely to lose here, not less. Expect pinning in the 15-class control;
+the defensible number should come from the reduced-parameter run.
+
+
+### o49/o53/o54: the calibration clears the bar, and the IC beats it (2026-08-26)
+
+**The uniform-alpha curve, completed.** o49 filled the gap at the two
+alphas that matter, and the sigma_n = 0.015 balance had predicted the
+first one before it was run:
+
+| alpha | 0.30 | 0.45 | 0.60 | **0.70** | **0.80** | 1.00 |
+| --- | --- | --- | --- | --- | --- | --- |
+| J | 673.67 | 703.80 | 740.56 | **765.48** | **781.29** | 808.26 |
+| MAE | 0.6392 | 0.6614 | 0.6776 | **0.6894** | **0.6991** | 0.7188 |
+
+Monotone throughout, no interior minimum in the misfit. The predicted
+optimum for sigma_n = 0.015 was alpha 0.697 at MAE **0.6895**; the
+measured point at 0.70 is **0.6894**. A forward prediction from a
+quadratic fit through points on either side, landing within 0.0001 m.
+
+**The first calibrated real-data number (o53, scored by o54).** Two
+BLMVM iterations from the NLCD prior on the production window, relative
+variables, sigma_n 0.015, default line search:
+
+| field | MAE | vs NLCD | defensible |
+| --- | --- | --- | --- |
+| NLCD lookup | 0.7188 | -- | yes |
+| uniform alpha 0.70 (prior-consistent optimum) | 0.6894 | -0.029 | yes |
+| uniform alpha 0.30 (unregularized floor) | 0.6392 | -0.080 | no, n to 0.008 |
+| **calibrated, 15 classes, 2 its** | **0.6242** | **-0.095** | mostly; 1 class pinned |
+
+**The calibration clears the one-parameter bar it was built to clear.**
+Against the honest competitor -- alpha 0.70, the optimum the
+calibration's own prior implies, not the indefensible 0.30 -- it wins by
+0.065 m. Spatial redistribution reaches authority global scaling cannot,
+which the half-domain experiment (o47) would not have predicted.
+
+Two cautions. J and MAE do NOT move together: a uniform field with this
+misfit would score 0.6135, so redistribution buys objective slightly
+less MAE-efficiently than scaling does. And the run is two iterations in
+with class 23 at its lower bound.
+
+FREE VERIFICATION: the calibration reported J_total 6.849004e+02; the
+prior term computes to 46.2, implying misfit 638.7. An independent
+eval-only forward through a different code path returned
+**6.387436e+02**. That validates the sigma_n arithmetic, the Jscale
+physical-J conversion, and the new eval-only-on-a-class-table path at
+once.
+
+**The initial condition has ~4x the authority of roughness (o54).**
+Scaling the whole restart state by a (velocities unchanged, so only
+antecedent storage moves):
+
+| a | 0.80 | 0.90 | 1.00 | 1.10 | 1.20 |
+| --- | --- | --- | --- | --- | --- |
+| J | 665.17 | 728.43 | 808.26 | 907.11 | 1024.51 |
+| MAE | 0.6434 | 0.6796 | 0.7188 | 0.7610 | 0.8174 |
+
+dMAE per unit fractional change is **0.392** (over the well-sampled
+[0.8, 1.1]) against **0.098** for uniform roughness. Like for like at a
+20% perturbation: 0.075 m versus 0.020 m. And the plausibility runs the
+same way -- a 20% error in water stored after a 29-hour spin-up under
+radar rainfall is far easier to defend than Manning at 30% of the
+published table.
+
+Monotone over the whole range with no interior optimum; straight to
+about 1% between 0.8 and 1.1 and CONVEX above (second differences
+0.0030, 0.0030, 0.0142), i.e. adding water hurts at an accelerating
+rate. Roughness by contrast is concave and saturating. That difference
+in curvature is the diagnosis: the model does not hold the wrong
+DISTRIBUTION of water at hour 29, it holds too much.
+
+**This is a diagnosis, not a knob.** Over this window the initial state
+is ~8.8M unknowns against 46 peak observations; calibrating it would fit
+the marks exactly and mean nothing. And the checkpoint is a MODEL state,
+so an IC calibration would absorb accumulated forcing and elevation
+error rather than correct it -- and could launder the downstream
+drainage defect into a "corrected" initial state, the same trap as
+scoring against the 37 marks the model cannot drain.
+
+
+### o56/o58: the observable supports ONE roughness parameter (2026-08-26/27)
+
+**o56 failed, and the failure is the method note.** Assembling the full
+Hessian by differencing the GRADIENT field returned 45% relative
+asymmetry and eigenvalues to -6.8, where an unconstrained direction must
+return exactly 1. Its own self-check rejected it. The cause is the
+paper's own S6.1: over a 7200-step window the objective is dense with
+wet/dry branch surfaces, and while the adjoint is exact ON its branch --
+o56's J values reproduced the adjoint gradient to 0.1-4% -- the gradient
+FIELD jumps between branches, so a difference quotient samples a
+discontinuity. Neither a smaller nor a larger eps escapes it.
+
+**o58 is the right object.** The Gauss-Newton Hessian from observation
+sensitivities, H = S^T W S / sigma^2 with S = d(peak)/d(alpha),
+differences the mark peaks rather than the gradient. It is PSD by
+construction, costs 16 FORWARDS rather than 16 forward+adjoints, and it
+verifies the argmax assumption instead of relying on it: 27 of 690
+mark-column pairs (3.9%) changed their peak time.
+
+Prior-preconditioned spectrum (sigma_n 0.015, sigma_obs 0.15, 46 marks):
+
+    lambda = 3.03, 0.64, 0.33, 0.32, 0.21, 0.10, 0.05, ...
+
+**One eigenvalue above unity. Gap 4.8. Rodgers DOF for signal 2.02.**
+The scans and the spectrum agree, independently -- no optimizer enters
+the Hessian.
+
+**The alpha scan varies nearly the wrong direction.** The leading mode
+is 23(-0.81), 90(+0.41), 22(-0.36), 24(-0.18), dominated by the
+large-area classes. Overlap with the equal-per-CLASS uniform direction
+the scan varies: **0.263**, where random for 15 classes is 0.258.
+Overlap with the same physical change weighted per CELL: **0.768**. The
+informative mode is the area-weighted conveyance mode; the scan probes
+it obliquely. That is why the class calibration beats uniform scaling --
+not because 15 parameters beat 1, but because the scan's 1 was the wrong
+one. A single WELL-CHOSEN parameter should do nearly as well, which o59
+tests.
+
+**Per-class information** (fractional reduction from prior to posterior
+standard deviation): 23 **36%**; 22, 90 17%; 81 15%; 21 12%; 24, 95, 11
+2-5%; **41, 43, 82, 31, 42, 71, 52 all <=1%**.
+
+**More marks do not rescue it.** lambda scales linearly in observation
+count and as 1/sigma^2 in quality:
+
+| marks | supported | data set |
+| --- | --- | --- |
+| 46 | 1 | the 12-hr cluster-A window (this study) |
+| 71 | **2** | all admissible marks, 24-hr window |
+| 108 | **3** | every QC-passed mark, 72-hr window |
+| 324 | 5 | every Harvey mark in-domain, BEFORE QC |
+| **1.2e5** | 15 | -- |
+
+**CORRECTED 2026-09-17 (was 71->1, 108->2, 7e5->15).** Those three came
+from the PILOT spectrum; the production spectrum has lambda_3 = 0.613
+(not 0.329) and lambda_15 = 3.867e-4, which moves two rows and the
+15-parameter extrapolation. The values above are the production ones and
+match the paper's tab:scaling. Source
+`logs/o61/o61_spectrum_sigma_n0.015.txt`; see the memory note
+`manning-paper-stale-spectrum-tables`.
+
+At fixed size, sigma 0.10 m buys two more parameters (three in all) and
+sigma 0.05 m -- better than any HWM survey achieves -- buys five. **The
+limitation is a
+property of the observing system, not of the method.**
+
+### o48 (57627058): the calibration converges, and what it converges to
+
+Warm-started from o53's iteration 2, armijo, 12-hr slot, stopped by the
+wall after 7 more iterations (9 total from the NLCD prior):
+
+    0 TAO  f 1.000000  |g| 0.135663
+    ...
+    7 TAO  f 0.959753  |g| 0.0159113     <- gradient norm fell 8.5x
+
+J 8.083e2 (NLCD) -> 6.849e2 (it 2) -> 6.573e2 (it 9), an 18.7% total
+reduction, with J flattening (the last iteration gained 0.01%) while the
+gradient collapsed. This is convergence behaviour.
+
+**The null space behaved.** The classes the data cannot see drifted BACK
+toward the prior as curvature accumulated: deciduous forest 0.739 ->
+0.983, mixed forest 1.096 -> 1.006, cropland 1.274 -> 1.098. Iteration
+2's excursions there were transients, not the minimizer. That is the
+prior doing its job.
+
+**What remains is signal.** Developed-medium sat at the alpha 0.3 bound
+for all nine iterations and woody wetland was driven to alpha 0.355
+(-4.2 sigma) -- the two best-informed classes, both wanting roughness
+below what the prior and bounds allow. Total displacement 9.2 sigma
+(from 9.6), with 2.9% of it in the one data-constrained direction,
+85.6% in comparable directions and 11.5% where the prior alone decides.
+
+The job was killed by the wall before its final evaluation, so it
+carried no MAE; o59 Part A supplies it below.
+
+
+### o59 Part A (57649525): the converged 15-class field, scored (2026-08-27)
+
+One eval-only forward of `o48_p_57627058.txt` on the production window
+(43,200 steps, 46 marks, 144 obs times):
+
+    hwm eval (class table): J 6.153969e+02, peak-WSE MAE 0.6116 m,
+                            model dry at 0 of 46 marks
+
+**This is the paper's headline calibration number** and it replaces the
+2-iteration 0.6242 everywhere:
+
+| field | MAE | vs NLCD | defensible |
+| --- | --- | --- | --- |
+| NLCD lookup | 0.7188 | -- | yes |
+| uniform alpha 0.70 (prior-consistent optimum) | 0.6894 | -0.029 | yes |
+| uniform alpha 0.30 (unregularized floor) | 0.6392 | -0.080 | no, n to 0.008 |
+| **calibrated, 15 classes, 9 its** | **0.6116** | **-0.107** | mostly; 1 class pinned |
+
+Roughness accounts for **15%** of the 0.72 m discrepancy (was 13% at 2
+iterations). Against the honest one-parameter competitor (alpha 0.70) it
+wins by **0.078 m**, ~3.6x what the best defensible uniform field
+reaches.
+
+**The J-vs-MAE divergence did NOT blow up** -- the risk flagged before
+this run was that iterations 3-9 might buy objective the MAE does not
+credit. They did not: J fell 6.849e2 -> 6.573e2 and MAE fell 0.6242 ->
+0.6116, the same direction. The efficiency gap did widen slightly.
+Sliding the uniform scan's measured MAE-vs-J relation
+(dMAE/dJ = 7.37e-4, from the alpha 0.30/0.45 points) down to the
+calibrated misfit gives 0.596 against the calibrated 0.6116, a gap of
+0.015 m (was 0.011 at 2 its). But that comparison is now a
+counterfactual: J 615.4 is 58 units BELOW 673.7, the lowest objective
+the uniform knob reaches before the implicit solve fails, so the
+uniform field it compares against cannot be run. The calibration
+reaches an objective global scaling cannot attain at all.
+
+FREE VERIFICATION, the same check that validated o53: TAO reported
+J_total 6.573355e+02; the prior term computed from the class table
+against sigma_n = 0.015 is 41.94 (displacement norm 9.16 sigma, so
+9.16^2/2); the eval-only misfit is 6.153969e+02. 615.40 + 41.94 =
+657.34. Matches to every printed digit, which validates the sigma_n
+arithmetic and the eval-only-on-a-class-table path against the
+optimizer's own accounting.
+
+**The converged field, as alpha = n/n_prior** (recomputed from
+`o48_p_57627058.txt` against the make_nlcd_manning.py lookup; confirms
+the log's 0.983 / 1.006 / 1.098 / 0.300 / 0.355 spot values):
+
+| code | class | prior n | calibrated n | alpha | sigma |
+| --- | --- | --- | --- | --- | --- |
+| 11 | open water | 0.038 | 0.04785 | 1.259 | +0.66 |
+| 21 | developed open | 0.040 | 0.07218 | 1.804 | +2.15 |
+| 22 | developed low | 0.090 | 0.14642 | 1.627 | +3.76 |
+| 23 | developed medium | 0.120 | 0.03600 | **0.300** | **-5.60** (bound) |
+| 24 | developed high | 0.160 | 0.12299 | 0.769 | -2.47 |
+| 31 | barren | 0.027 | 0.04033 | 1.494 | +0.89 |
+| 41 | deciduous forest | 0.150 | 0.14742 | 0.983 | -0.17 |
+| 42 | evergreen forest | 0.120 | 0.11537 | 0.961 | -0.31 |
+| 43 | mixed forest | 0.140 | 0.14086 | 1.006 | +0.06 |
+| 52 | shrub/scrub | 0.115 | 0.08585 | 0.746 | -1.94 |
+| 71 | grassland | 0.038 | 0.02408 | 0.634 | -0.93 |
+| 81 | pasture/hay | 0.038 | 0.05884 | 1.548 | +1.39 |
+| 82 | cultivated crops | 0.035 | 0.03843 | 1.098 | +0.23 |
+| 90 | woody wetland | 0.098 | 0.03476 | **0.355** | **-4.22** |
+| 95 | emergent wetland | 0.068 | 0.08886 | 1.307 | +1.39 |
+
+NOTE for the paper's question 5: at 9 iterations pasture and
+developed-open are at 1.55 and 1.80 of table value, NOT "above twice"
+-- that was true of the 2-iteration field. And deciduous forest is back
+at 0.983, so the "moved 2.6 sigma in a direction the data cannot see"
+example no longer describes the headline field. Both fixed in the draft.
+
+
+### o59 Part B (57649525): three spectrum-chosen parameters vs fifteen (2026-08-27)
+
+Calibrating ONLY classes 23, 90, 22 (chosen from the leading
+eigenvector), the other twelve frozen at the prior. Perlmutter went
+down mid-run at ~11:01 PDT, but TAO had already flattened and wrote its
+dump (`o59_p_57649525.txt`, mirrored with all o59 logs to `logs/o59/`
+in this repo):
+
+    0 TAO  f 1.000000  |g| 0.143643
+    1 TAO  f 0.897180  |g| 0.0754734
+    2 TAO  f 0.844136  |g| 0.00691323
+    3 TAO  f 0.843947  |g| 0.0145433
+    4 TAO  f 0.843935  |g| 0.00779137     J = 6.821163e+02
+
+The last two iterations gained 0.02% and 0.001% -- flat. ~64 min/TAO
+iteration at n16, consistent with the 15-class rate.
+
+**GATE PASSED.** All twelve frozen classes sit bit-exactly at the prior
+in the dump (rel_err 0.000000 on every one), so
+`-adjoint_classes_active` works and the run counts.
+
+**Falsification verdict: the spectrum called it, with a measured
+remainder.** Three parameters, essentially converged in 4 iterations,
+removed 126.1 of the 150.9 units the converged 15-parameter run removed
+-- **83.6% of the reduction from 20% of the parameters**, and J 682.1
+beats the 15-class run's own iteration-2 value (684.9). The 24.8-unit
+gap decomposes exactly: the 15-class run pays 8.8 MORE prior (41.94 vs
+33.16) to buy 33.5 more misfit (615.40 vs 648.95). So the twelve
+non-leading classes are not pure decoration -- they carry ~5% of J in
+aggregate -- but the leading eigenspace holds the great majority of
+what the marks can teach, which is what Section 7.4 claims (8.4 before the 2026-08-27 restructure).
+
+**The sharpest confirmation is WHERE the three parameters landed:**
+
+| class | 3-param | 15-param converged |
+| --- | --- | --- |
+| 22 developed-low | alpha 1.626 | 1.627 |
+| 23 developed-medium | 0.300 (bound) | 0.300 (bound) |
+| 90 woody wetland | 0.301 (~bound) | 0.355 |
+
+22 and 23 reproduce their 15-class values to three digits from a
+different starting point and a different active set -- these two are
+genuinely determined by the data. Woody wetland dives further (0.301 vs
+0.355) when the other twelve are frozen: with no other classes to share
+the work it compensates alone, which is the equifinality the spectrum
+predicts for a direction the data sees only in combination.
+
+MISSING and cheap to get when PM returns: an eval-only MAE for this
+field (one forward). Methods-check number, not a headline.
+
+
+
+### Mesh forensics: the domain has ONE 400 m outlet (2026-08-27)
+
+Prompted by the question "could the drainage defect be the outflow BC?"
+Measured on the login node from the production mesh
+(`Turning_30m_with_z.updated.with_sidesets.exo`, netCDF inspection --
+no run needed):
+
+- The 75 km x 37 km domain (x 3,159,075-3,234,464, y
+  3,615,882-3,652,776) has exactly ONE side set: **ss1 with 13 edges**,
+  spanning x 3,233,652-3,234,079, y 3,633,846-3,634,017 -- a ~400 m
+  opening at the eastern boundary, mid-height in y.
+- The production yaml (`o43_window.yaml`) binds free-outflow to that
+  side set alone. **Every other perimeter edge is an untagged
+  reflecting wall.**
+
+**CORRECTION, same session.** The first draft of this entry called
+outlet placement "a strong candidate" for the drainage defect. A
+second measurement refutes that, and the mesh is vindicated:
+
+- **The domain is a delineated watershed, not a rectangular cutout.**
+  Only **35 of 6,198 boundary nodes (0.6%)** lie on the bounding box;
+  the perimeter is an irregular polygon. Reflecting walls on the
+  untagged perimeter are therefore physically right -- it is a
+  catchment divide, not an artificial cut.
+- **The side set sits exactly at the catchment's low point.** Outlet
+  nodes span z = -0.10 to 5.50 m and the twelve lowest boundary nodes
+  in the entire 6,198-node perimeter (z = -0.10) ARE the outlet nodes.
+  Boundary median z is 29.85 m. The one gap in a high rim is at the
+  drainage point.
+
+So a single 400 m side set is exactly what a correctly delineated
+watershed mesh should have. **There is no side-set question to ask the
+domain team**, and asking one would have implied an error that is not
+there.
+
+What survives is narrower and is a *physics* question about the
+event, not a configuration question: whether a catchment-divide domain
+is the right idealization for a storm that exceeded the divide. The
+censored reach ponds ~10.7 m mean depth (cells to 18 m) on bed
+elevations of 0-6 m near the outlet, so its modelled water surface
+sits above parts of its own perimeter; a reflecting wall holds in
+water that would have spilled. This is a known limitation of
+watershed-delineated domains under extreme events, NOT a defect in
+this mesh.
+
+Mark geography, for whoever picks this up (local, from
+`turning30m_hwm_cells.csv`, distances to the outlet centroid): the 122
+above-bed marks span 1.1-66.1 km from the outlet, median 35.8 km. The
+near-outlet marks sit at bed z = 0.3-6.1 m on Buffalo Bayou; the
+farthest sit at z = 39-48 m on Willow Fork. So mark distance to the
+outlet and bed elevation are strongly collinear, which means the
+band-wise bias gradient (+0.30 / +2.85 / +7.06 m) CANNOT by itself
+distinguish a backwater/outlet story from a "low-lying downstream
+cells pond" story. Any future attribution needs the boundary flux, not
+the bias gradient.
+
+Distinguishing test if anyone wants it, when PM compute returns: sum
+the free-outflow boundary flux over the late window from the o37
+checkpoints and compare with the lateral inflow rate (~+0.05 m/hr over
+the censored cells). A saturated outlet sits at capacity while the
+reach rises. **Not needed for the paper** -- the paper's claim is only
+that the reach does not drain and that no roughness value repairs it,
+which is measured and stands regardless of mechanism.
+
+
+### The audit closes: o57 existed all along, and the dry counts too (2026-08-28)
+
+When Perlmutter came back, the content greps that had died three times
+mid-connection finally ran, and both remaining audit flags resolved as
+**sourced after all**:
+
+- **The IC extension points were run on 2026-08-26 as o57** -- a tag
+  the audit's `ls o54*` listing could not see, which is why "no o54
+  log exists" hardened into "never ran". The values match the paper
+  to every digit (logs mirrored to `logs/o57/`):
+
+      o57_ic0.6.log  ic scale: state x 0.6 (max h 17.7573 -> 10.6544 m)
+                     J 5.969400e+02, MAE 0.5818 m, 0/46 dry
+      o57_ic0.7.log  ic scale: state x 0.7 (max h 17.7573 -> 12.4301 m)
+                     J 6.188921e+02, MAE 0.6117 m, 0/46 dry
+
+  Figure 2 and Section 8 were right all along; what was missing was
+  the pointer, which this entry now is.
+- **The dry-mark counts in tab:alpha are in the o49 logs**: the
+  `hwm eval` lines report `dry at 1 of 46` at alpha = 0.70
+  (J 7.654816e2, MAE 0.6894) and `0 of 46` at alpha = 0.80
+  (J 7.812901e2, MAE 0.6991) -- exactly the table's 1/46 and 0/46.
+
+**o60 (job `57670045`, still PD PartitionDown) is therefore
+redundant.** If it runs it becomes a free cross-check of o57 under
+the gpu8 binary; cancelling it costs nothing either. Either way it is
+no longer *before circulating* -- nothing in the paper waits on it.
+
+LESSON, for the next audit: a negative claim scoped by a name pattern
+(`ls o54*`) is a claim about the pattern, not the filesystem. The
+content grep was the right check and it eventually said so.
+
+
+### o60 (57670045): the redundant run pays for itself as a determinism check
+
+o60 was submitted before the audit closed and was redundant by the time
+it ran. It is worth keeping anyway, because it reproduced o57 **to
+every printed digit**, two days and a separate allocation apart:
+
+| a | J | MAE | dry | o57 (2026-08-26) | o60 (2026-08-28) |
+| --- | --- | --- | --- | --- | --- |
+| 0.7 | 6.188921e+02 | 0.6117 | 0/46 | yes | identical |
+| 0.6 | 5.969400e+02 | 0.5818 | 0/46 | yes | identical |
+
+`diff` of the two log files, with only timing/MPI-noise lines
+filtered, is empty. The `ic scale` lines agree too (max h 17.7573 ->
+12.4301 at a=0.7, -> 10.6544 at a=0.6). ~15 min per forward at n16,
+confirming the planning number.
+
+**What this does and does not establish.** It confirms the restart +
+`-adjoint_ic_scale` + eval-only path is deterministic across
+allocations and node sets. It is NOT confirmed to be a cross-build
+check: o60 pinned `build-claude-gpu8`, but o57 was an ad hoc run with
+no script and no build string in its log, and it ran at 15:46 on
+2026-08-26 -- after gpu8 was built at 14:36 -- so it could have used
+either gpu7 or gpu8. The binaries do differ (1,682,232 vs 1,686,328
+bytes).
+
+ACTIONABLE GAP, and the direct cause of the o57 confusion: **our logs
+do not record which binary produced them.** Every campaign script
+should echo the resolved `$ADJ` path, its mtime and size, and ideally
+the git describe of the build, before the first srun. Two hours of
+audit went into a question one echo line would have answered. (Not
+retrofitted into o61 while it is queued -- do not edit a script a
+pending job may launch from.)
+
+
+### o61 Part A: the 3-parameter field scored (2026-08-28)
+
+The MAE o59 Part B never got, from one eval-only forward on the
+production window:
+
+    hwm eval (class table): J 6.489523e+02, peak-WSE MAE 0.6274 m,
+                            model dry at 0 of 46 marks
+
+| field | MAE | vs NLCD | share of the 15-param gain |
+| --- | --- | --- | --- |
+| NLCD lookup | 0.7188 | -- | -- |
+| uniform alpha 0.70 | 0.6894 | -0.0294 | 27% |
+| **3 params (23, 90, 22)** | **0.6274** | **-0.0914** | **85.3%** |
+| 15 params, converged | 0.6116 | -0.1072 | 100% |
+
+**The falsification test passes in a second, independent metric.**
+Three spectrum-chosen parameters recovered 83.6% of the objective
+reduction; scored on MAE -- which they were NOT fit to -- they recover
+85.3%. The two agree to under two points.
+
+That agreement is itself a result, because for the 15-class field they
+did NOT agree: Section 7.3 records that redistribution buys objective
+less MAE-efficiently than scaling, with the calibrated field scoring
+0.6116 where the uniform relation extrapolates to 0.596. A fit
+confined to the directions the data constrains converts objective into
+MAE at the honest rate; a fit free to move all fifteen does not. That
+is a cleaner statement of what the spectrum buys than the objective
+comparison alone.
+
+Also: 3 parameters beat the best defensible uniform field (alpha 0.70)
+by 0.062 m, against 0.078 m for all fifteen -- so ~80% of what
+class-by-class calibration wins over global scaling comes from three
+classes.
+
+Timing confirms the planning number: ~14.9 min per 43,200-step
+eval-only forward at n16 (base 17:00:15 -> 17:15:08, col11 ->
+17:29:59).
+
+
+### o61 Part B: the production-window spectrum -- SAME COUNT (2026-08-28/29)
+
+15 of 16 forwards landed before the 4-hour interactive wall (col95
+cut off; job 57700665 queued to finish it). Analysis on base + 14
+columns, sigma_obs 0.15, eps 0.05:
+
+| | 7,200-step pilot | 43,200-step production |
+| --- | --- | --- |
+| lambda_0 | 3.03 | **2.779** |
+| lambda_1 | 0.64 | 0.669 |
+| eigenvalues > 1 | **1** | **1** |
+| Rodgers dof for signal | 2.02 | 2.10 |
+| spectral gap | 4.8 | 4.15 |
+| overlap, uniform per class | 0.263 | 0.230 |
+| overlap, uniform per cell | 0.768 | 0.700 |
+| leading vector | 23(-.81) 90(+.41) 22(-.36) | 23(-.64) 90(+.59) 22(-.36) 81(-.23) |
+
+**The paper's central claim survives on the correct window.** One
+supported parameter, same three classes leading, same
+obliquely-probed-by-the-alpha-scan story.
+
+**A prediction of ours FAILED and should be reported.** The o61 header
+predicted lambda would RISE with window length, because each peak
+integrates more trajectory. It fell, 3.03 -> 2.78. The reason is that
+the two windows do not measure the same observable: over 7,200 steps
+(2 event-hours) many marks have not crested, so the pilot's "peak" is
+a truncated rising limb, which is MORE sensitive to roughness than a
+true crest. Table 11's mark-count scaling is unaffected -- it varies
+mark counts at fixed sensitivity -- but the claim that a longer window
+buys more lambda is now measured to be false, and Section 7.4 should
+say so rather than repeat the speculation.
+
+**THE ARGMAX CHECK IS THE HEADLINE CAVEAT.** 151 of 644 mark-column
+pairs (23.4%) moved their peak TIME, against 27 of 690 (3.9%) on the
+pilot. Investigated rather than waved through:
+
+    shift 300 steps (1 obs sample): 107 pairs (71%)
+    shift 600-1200 steps:            34 pairs
+    shift 2100-6900 steps:           10 pairs  <- genuine relocations
+    median |change in peak value|: 2.3e-3 m   (max 2.7e-2 m)
+    typical peak magnitude:        1.5 m
+
+So 71% are single-sample jitter and the median peak VALUE moves 2.3 mm
+on a 1.5 m peak -- 0.15%. That is the expected behaviour of a max near
+a flat crest, where a one-sample shift costs O(dt^2 h'') and is second
+order.
+
+**Why this is not the o56 failure.** o56 differenced the GRADIENT
+field, which genuinely JUMPS across a branch, so half the differenced
+signal was noise. Here max_t h(t) is CONTINUOUS in alpha even when its
+argmax moves -- at the crossover the two competing maxima are equal --
+so the secant is a valid finite difference of a continuous,
+piecewise-smooth function. The 10 pairs with multi-hour shifts are
+real peak relocations (bimodal hydrographs) and are 1.6% of the
+sample. Confidence: good, with the caveat stated.
+
+**RESOLVED 2026-08-29: col95 landed, count confirmed at ONE of 15.**
+The interlacing prediction held exactly -- lambda_0 unchanged at
+2.779, lambda_1 rose only 0.669 -> 0.6823, and class 95 surfaced where
+expected as a weak direction (lambda_4 = 0.2255 with 95 at +0.38,
+lambda_5 = 0.09968 with 95 at +0.77). Full 15-class production
+spectrum, analysis mirrored to `logs/o61/`:
+
+    lambda = 2.779, 0.6823, 0.6127, 0.324, 0.2255, 0.09968, ...
+    eigenvalues > 1 : 1 of 15
+    Rodgers dof for signal: 2.20     spectral gap: 4.07
+    v_0 = 23(-0.64), 90(+0.59), 22(-0.36), 81(-0.23)
+    overlap with uniform-per-class 0.218, per-cell 0.699
+    argmax: 156 of 690 pairs (22.6%) moved
+    class 23 holds 41% of v_0's energy, top three 89%
+
+Note v_0's fourth component changed identity between windows: pasture
+(81) on the production window where the pilot had developed-high (24).
+The top three are stable.
+
+### o62 -- the calibration under the prior the paper describes (sigma_alpha, uniform relative)
+
+Background: every production run used `-adjoint_sigma_n 0.015`, an
+ABSOLUTE width the driver applies as |n - n_prior|^2 -- +/-12.5% on
+developed-medium but +/-9% on developed-high and +/-56% on barren -- while
+the paper's prose described a uniform fractional width. The coauthors
+(2026-09-09) put the honest width at +/-30% "and higher". o62 runs the
+fractional prior: 15 classes at 0.30 (task 1), 3 classes {23,90,22} at 0.30
+(task 3) and at 0.50 (task 4; replaced the +/-15% task). 2 nodes, 6-h
+slots, 300-min calibration budget then an eval-only score on the 46 marks.
+gpu9 binary (gpu8 was orphaned by the 09-03 PETSc rebuild; see the memory
+note). Job 58069233_1 / _3, 58125983_4.
+
+**Task 1 RESULT (2026-09-10, 5:22 wall, COMPLETED):** 15 classes,
+sigma_alpha = 0.30, 3 TAO iterations. Scored: **MAE 0.6154 m, J_mis
+615.44** -- against the absolute-prior 15-class field's 0.6116 m /
+615.40 after nine iterations, and the prior's 0.7188. The first step put
+SEVEN classes on a bound (21, 22, 81 at alpha = 3; 23, 24, 52, 90 at
+0.3). Final table: developed-medium 0.036 and shrub 0.0345 on the floor,
+developed-low 0.179 (2x), developed-high 0.127, pasture 0.062, woody
+wetland 0.063. Reading: the wider prior reaches the same misfit floor
+faster and by the same indefensible route -- this is the fifteen-class
+CONTROL the paper's thesis needs. Files:
+`o62_p_c15_sa0.30_it{1..4}.txt`, `o62_score_c15_sa0.30.log`.
+Calibration J (with prior term) 631.98 after 3 its; prior term 16.5.
+
+**Tasks 3 and 4 RESULT (2026-09-11/12):** three classes {23, 90, 22}
+from the NLCD lookup, 2 nodes, scored on the 46 marks (all artifacts in
+`logs/o62/`):
+
+| prior | MAE | dMAE | of c15 | J_mis | J_tot | its | final alpha (22 / 23 / 90) |
+|---|---|---|---|---|---|---|---|
+| sigma_n 0.015 (o59) | 0.6274 | -0.091 | 85% | 648.9 | 682.1 | 4 | 1.63 / 0.30 / 0.301 |
+| sigma_alpha 0.30 (task 3, 58069233_3, 5:22 wall) | **0.6290** | -0.090 | 84% | 633.94 | 649.31 | 3 (wall) | 2.34 / 0.30 / 0.30 |
+| sigma_alpha 0.50 (task 4, 58125983_4, 3:23) | 0.6295 | -0.089 | 83% | 627.01 | 636.97 | **1 (converged)** | 3.00 / 0.30 / 0.30 |
+
+(c15 = the absolute-prior fifteen-class field's 0.107 m; J_mis 615.4.)
+Objective-reduction share vs the fifteen-class sigma_alpha 0.30 field
+(J_tot 631.98): 90% at 0.30, 94% at 0.50. Iterates: at +/-30% the FIRST
+step puts all three on a bound (22 -> 0.27 = 3x, 23 -> 0.036, 90 ->
+0.0294 = 0.3x), then 22 relaxes 3.0 -> 2.52 -> 2.34 over two more
+iterations (J_tot 654.7 -> 650.1 -> 649.3); at +/-50% the first step
+lands on the same corner and TAO reports Residual 0 (projected gradient
+zero on the box) -- converged in one iteration. Check: the +/-30% step-1
+point (J_tot 654.68 - prior 27.67 at all-bounds with beta 11.1) has
+J_mis 627.0, identical to the +/-50% final -- same point.
+
+**Reading.** (1) Width does not matter above 30%: the Gaussian prior
+contributes 15 (0.30) / 10 (0.50) J-units against a misfit near 630;
+the box [0.3, 3] does the constraining. (2) Developed-medium and woody
+wetland reach the 0.3x floor under every prior in the three-class
+problem (n = 0.036, 0.0294): that value is the data's, and it is
+indefensible for developed/wetland ground -- the three-class field is
+NOT physically defensible either; the paper's "a calibration confined to
+those stays physical" (Sec 4, prior paragraph) was measured false and
+rewritten. (3) Developed-low is the prior's: 1.63x -> 2.34x -> 3x as the
+width opens, MAE moves 0.002 m -- the flat direction. (4) The
+three-class field is DETERMINED (same answer for 23/90 from three
+priors, 1-3 iterations vs 9), and what it determines is a request for
+roughness the lookup cannot supply -> thesis item 5 (the error is
+elsewhere). o63 (gauge-calibrated, mark-validated) is now the decisive
+test: do the gauges send the same classes to the floor?
+
+**o63 first submission FAILED (58126942, 2026-09-12 07:58, 8 s):**
+`srun: Job step's --cpus-per-task value exceeds that of job (32 > 1)`.
+It was sbatch'ed from inside the gpu10 build job (58126286, shared QOS,
+`-c 1`-shaped step); sbatch reads a parent allocation's SLURM_* as
+options and they outrank the script's #SBATCH lines. Resubmitted from a
+login shell as **58241452** with `--ntasks-per-node=4 --cpus-per-task=32`
+pinned in the header (belt and braces; the real fix is never to sbatch
+from inside a job). Scheduler estimate 09-24 -- the killed job's three
+days of priority age are lost; premium QOS is the lever if needed.
+
+### o64 -- the mark-calibrated fields scored on the above-bed gauges (2026-09-12)
+
+The converse of o63, run before it: the gauge objective (134 above-bed
+observations of 13 gauges x 48 times, sigma 0.15 m, window h29-41) and
+its class gradient at three fields, one forward+adjoint each on 2 nodes
+(~50 min; job array 58242097_[0-2], backfilled within 3 h of submission).
+Script `plans/campaigns/o64_gauge_score.sh`; artifacts in `logs/o64/`.
+RMSE = 0.15 sqrt(2J/134).
+
+| field | J_gauge | RMSE at the gauges | vs prior |
+|---|---|---|---|
+| NLCD prior | 31313.3 | **3.24 m** | -- |
+| 3 classes, sigma_alpha 0.30 (o62 task 3; marks MAE 0.6290) | 30333.4 | 3.19 m | -3.1% |
+| 15 classes, sigma_alpha 0.30 (o62 task 1; marks MAE 0.6154) | 28353.5 | 3.09 m | -9.5% |
+
+
+**Reading.** (1) The gauge misfit is 3.2 m RMSE at the prior, against
+0.72 m MAE at the marks, and the mark-calibrated fields move it by 3-10%.
+The kept observations are those with observed WSE above the cell bed,
+but nothing requires the MODEL to hold that depth there: a 30 m cell on
+the bank of an incised bayou carries sheet flow while the gauge reads
+the channel, so the residual is metres of representation error that
+roughness cannot remove. The gauge observable at this resolution is
+dominated by the same defect that disqualified seven of twelve gauges
+outright. (2) The gauge gradient at the prior is LARGER relative to J
+than the marks' (|g|/J0 = 0.44 in alpha vs 0.16), so o63 will move --
+roughness can deepen the water on the bank. (3) **The gauges and the
+marks disagree on the two best-informed classes**: at the prior,
+dJ_gauge/dn is -53129 on developed-medium (23) and -6903 on woody
+wetland (90) -- the gauges want MORE roughness there -- where the marks
+sent both to the 0.3x floor (dJ_marks/dn +756, +675). They agree on
+developed-low (22; both want more) and on 8 of the 12 frozen classes.
+The largest gauge gradient of all is on developed-high (24, +72214,
+wants less), which is not in the active set. Prediction for o63: the
+gauge-calibrated field raises 23 and 22, and scores WORSE than the prior
+on the marks (outcome 3 of the table given to Mark on 09-12) -- friction
+compensating for different errors at the two observables. (4) There is
+no per-gauge residual dump in the driver; which gauges carry the 3 m is
+a one-line addition worth making before any gauge result is interpreted
+(build a gpu11; never touch gpu10 while 58241452 is queued).
+
+### o63 -- gauge-calibrated, mark-validated: the two observables disagree (2026-09-14)
+
+Donghui's design, accepted 09-09. Calibrate the three classes {23, 90, 22}
+on the 134 above-bed gauge observations at sigma_alpha 0.30; validate by
+scoring the resulting field on the 46 cluster-A marks. Job **58241452**,
+2 nodes, 5:22 wall (exit 124 on the calibration budget after 1 TAO
+iteration; TAO Residual 7.97e-4, so the projected gradient was near zero
+-- two classes sat on the upper bound). Artifacts in `logs/o63/`.
+
+| | 22 dev-low | 23 dev-med | 90 woody-wet | gauge J | marks MAE |
+|---|---|---|---|---|---|
+| NLCD prior | 0.090 | 0.120 | 0.098 | 31313 | 0.7188 |
+| calibrated on GAUGES (o63) | 0.27 (3.0x) | 0.36 (3.0x) | 0.171 (1.74x) | **24007 (-23%)** | **0.7609 (+5.9%)** |
+| calibrated on MARKS (o62 task 3) | 0.210 (2.34x) | 0.036 (0.30x) | 0.029 (0.30x) | 30333 (-3.1%) | 0.6290 (-12.5%) |
+
+**THE RESULT: the gauge-calibrated field is WORSE on the marks than no
+calibration at all** (0.7609 vs 0.7188 m, J 894.9 vs 808.3, +10.7%). The
+two observables send the same two classes to OPPOSITE bounds: the gauges
+put developed-medium at 3x its lookup, the marks at 0.3x -- a factor of
+ten apart, both at the edge of the same prior. Gauge RMSE 3.24 -> 2.84 m.
+
+**This was predicted in writing before the run** (o64, commit 727a82fd,
+09-12): from the gauge gradient's signs at the prior (dJ/dn < 0 on 23
+and 90, where the marks' gradient is > 0) the prediction was "the
+gauge-calibrated field raises 23 and 22, and scores WORSE than the prior
+on the marks (outcome 3)". Direction, classes and sign all held; only
+90's magnitude was under-called (it moved 1.74x, not to the bound).
+
+**Reading.** Friction is not being calibrated, it is absorbing whatever
+error each observable sees. The marks sit on floodplain cells where the
+model's peak is too HIGH, so they want less friction; the gauges sit on
+bank cells where the model's stage is too LOW by metres of
+representation error, so they want more. No single roughness field can
+satisfy both, and the one that satisfies either is outside the
+land-cover table. That is the strongest evidence in the paper for
+thesis item 5 (the error is in the water balance and the mesh, not in
+the friction), and it retires the in-sample caveat in the opposite way
+to the one we hoped: the three-parameter fit does not generalize to a
+second observable, so it must be reported as a fit, never as skill.
+
+**For the paper:** this replaces the three `[PENDING o63]` slots and
+makes Sec 6 a negative validation result rather than a headline
+calibration. The gauge observable's 2.8-3.2 m RMSE must be stated
+alongside it, or a reader will take "calibrated on gauges" at face
+value. Still missing: a per-gauge residual dump (no such option in the
+driver) to say WHICH gauges carry the 3 m -- the two reservoirs (water
+balance) or the two main-stem gauges (channel geometry). One-line
+driver addition, ~3 node-hours to rerun the three fields; worth doing
+before the coauthors read this.
+
+**Audit (2026-09-14, `plans/o63-gauge-weight-audit.md`):** the gauge
+objective used the survey grade sigma 0.15 m and 134 autocorrelated
+records as independent. Decomposed: J_tot 24006.6 = J_mis 23959.1 +
+prior 47.5 (1:505). The SIGN disagreement on 23 and the first-order
+worsening of the marks along the gauge step (+171 predicted, +86.7
+measured) are exactly sigma-independent; the excursion to the bound is
+not a data verdict -- it is where one projected BLMVM step landed (TAO
+tolerances 1e-12, never converged, killed at 300 min), and neither
+sigma alone (needs ~5 m under iid) nor N_eff alone brings the field
+inside the prior; both together do. "Converged" and "factor of ten"
+must not appear in the paper. The 134 = Katy 48 + Houston 48 + Langham
+20 + Fulshear 14 + Bear Ck 4 (five gauges, reconstructed exactly). The
+principled instrument is the gauge Gauss-Newton spectrum: 16 forwards,
+~12 node-hours wall on 2 nodes, every weighting a post-processing step.
+
+### o65 -- the Gauss-Newton spectrum of the GAUGE observable (job 58370104, submitted 2026-09-15 10:41 PDT)
+
+Agreed by Donghui and Emil (decision list, 09-14/15): the Sec 6.4
+construction pointed at the gauges. Sixteen forwards on the production
+window (NLCD prior + each class raised 5%, as o58/o61), each writing the
+modelled WSE at 13 gauges x 48 times via the new `-adjoint_obs_eval_only
+-adjoint_obs_model_dump` path (driver commit of 09-15; gpu11 binary,
+`cmake-claude-gpu11.sh`). Script `plans/campaigns/o65_gauge_spectrum.sh`
+(16-task array, 2 nodes, 40-min slots, m4267_g); analysis
+`plans/campaigns/o65_gauge_spectrum.py`, which rebuilds the above-bed
+mask from the obs table and the `.zb` file, forms H = S^T W S / sigma^2
+whitened by sigma_alpha, and reports the count, a sigma scan, an AR(1)
+and a per-gauge-demeaned variant, the GN prediction of the o63 solution
+under each weighting, and against the o58 mark columns the angle between
+leading eigenvectors and the mutual subspace overlaps (Emil's question).
+
+Self-checks to read first: task 0's printed J must be 3.131332e+04
+(o64's J0); the script's gradient from S and the base residual must
+reproduce o64's dJ/dalpha (22 -4016, 23 -6376, 90 -676); its mark
+gradient must reproduce o62's (22 -29.5, 23 +90.7, 90 +66.2). The base
+dump minus the obs table is the per-gauge residual the 09-14 to-do asked
+for. Expected cost 16 x 2 nodes x ~22 min = 12 node-hours wall.
+
+**o65 partial (2026-09-15 12:05 PDT, 10 of 16 columns in, self-check
+PASSED: task 0 J 3.131332e+04 = o64's J0 to seven digits).** Two
+results that do not depend on the remaining columns:
+
+(1) **The per-gauge residual, at last** (base dump minus obs table,
+kept records, model minus observed):
+
+| gauge | kept | mean residual | share of J |
+|---|---|---|---|
+| Buffalo Bayou at Houston (cell 2858868, bed 6.93) | 48 | **+4.90 m** | ~82% |
+| Buffalo Bayou nr Katy (803709, bed 33.27) | 48 | +1.94 m | ~13% |
+| Buffalo Bayou nr Fulshear (877521) | 14 | +1.97 m | ~4% |
+| Bear Ck nr Barker (1825690, reservoir) | 4 | +1.20 m | <1% |
+| Langham Ck nr Addicks (1858212, reservoir) | 20 | -0.61 m | <1% |
+
+The model is too HIGH at four of five gauges, including both main-stem
+gauges. This CONTRADICTS the o64 reading (2)-(3) and the o63 reading
+("the model's stage is too LOW by metres of representation error ...
+roughness can deepen the water on the bank") and the paper's Sec 6.1
+mechanism paragraph; it CONFIRMS the paper's Sec 6.1 first paragraph
+(modelled WSE above observed). dJ_gauge/dn_23 < 0 therefore means: more
+friction on developed-medium land LOWERS the main-stem stage (slower
+runoff), not "deepens the bank cell". The gauge misfit is one gauge,
+Buffalo Bayou at Houston, 4.9 m too high -- the downstream reach, i.e.
+the drainage/lake defect of the o37 analysis reaching the main stem.
+The gauge calibration was fitting the lake with friction.
+
+(2) **The class-24 (developed-high) column is not in the linear
+regime at +5%.** Its J moves 31313 -> 38258 (+6944) where the adjoint
+gradient predicts +578 (12x); its dWSE at the Houston gauge is +0.63 m
+mean, +1.05 m max, against ~0.02 m for every other class; the largest
+change anywhere is +1.39 m at the (masked) Whiteoak Main St gauge. The
+other nine columns reproduce the adjoint gradient within a factor ~2
+(22: -1728 from S vs -4016 adjoint; 23: -3617 vs -6376; 21, 31, 41, 42,
+43 within 20-60%), i.e. the one-sided 5% secant under-reads the two
+leading classes by ~2x -- the same saturation the o63 step showed (35%
+of linear). With 24 included the raw spectrum has lambda_0 = 4e4 on
+pure class 24 -- an artifact of the secant, not a measurement. NEEDED:
+class 24 at +/-1% and a -5% column for 22, 23, 24, 90 (central
+differences) -- 6 forwards, ~4.4 node-hours. Until then the gauge
+spectrum is read WITHOUT 24, and the mark spectrum's own 24 column
+(22 of 46 marks moved their peak time in o61) deserves the same check.
+
+**o65 COMPLETE (2026-09-15 12:20 PDT; 16/16, ~22 min each, 2 nodes;
+artifacts `logs/o65/`, analyses `logs/o65/o65_spectrum_*.txt`).**
+
+*Self-checks.* Base J = 3.131332e+04 (o64, exact). The MARK sensitivity
+matrix from the o58 columns reproduces the o62 adjoint gradient on every
+class to within 4% (22 -28.4/-29.5, 23 +89.7/+90.7, 90 +65.1/+66.2,
+81 -31.3/-34.1 in alpha): the paper's Sec 6.4 construction is validated
+against the adjoint for the first time. The GAUGE matrix does NOT: the
++5% secant is 0.43x the adjoint on 22, 0.56x on 23, 2.1x on 90, 3.4x on
+81 and 12x on 24, while the small classes (41, 82, 95, 31, 42, 43) are
+within 40%. The gauge observable is nonlinear over a 5% class step in
+exactly the classes that matter (the Houston stage responds to upstream
+roughness through a ponded reach); the gauge spectrum below is therefore
+soft by a factor 2-4 in lambda (+/-1-2 in the count) until o66's
+central differences land. The mark spectrum is not affected.
+
+*Mark spectrum at the paper's prior (sigma_alpha 0.30, class 24 dropped,
+14 classes):* lambda = 12.0, 2.98, 1.13, 0.31, ... -> **3 supported**,
+dofs 3.01, leading 23(-0.79) 90(+0.52) 22(-0.30). Consistent with the
+abstract's "about three combinations at +/-30%".
+
+*Gauge spectrum (class 24 dropped; see (2) above), iid:*
+
+| weighting | lambda (top 5) | supported | leading direction |
+|---|---|---|---|
+| sigma 0.15, iid (o63's) | 141, 25.3, 5.1, 1.28, 1.08 | 5 of 14 | 81(-0.67) 23(-0.56) 90(-0.45) |
+| sigma 0.30 | 35, 6.3, 1.3, ... | 3 | same |
+| sigma 0.50 | 12.7, ... | 2 | same |
+| sigma 1.0 | 3.2, 0.56, ... | 1 | same |
+| sigma 2.0 / 3.0 / 5.0 | 0.79 / 0.35 / 0.13 | **0** | -- |
+| sigma 0.15, AR(1) rho 0.9 | 13.9, 7.9, 4.0, 2.9, 1.3, 1.0 | 6 | 23(-0.67) 81(-0.60) 90(-0.41) |
+| sigma 0.15, per-gauge demeaned | 26, 10, 1.96, 0.95 | 3 | 81(-0.77) 90(-0.55) 23(-0.26) |
+| with class 24 (raw) | 3.99e4 on pure 24, then 139, 12.4, ... | 5 of 15 | artifact |
+
+At the representation-dominated sigma of 1-3 m the gauges determine 0-1
+roughness combination (iid; with the AR(1) whitening lambda_0 is 10x
+smaller still). The GN prediction of the o63 solution under o63's own
+weighting is alpha = 16, 3.1, 5.9 for 22/23/90 (unconstrained; the box
+made it 3, 3, 1.74) -- the o63 excursion is what that weighting demands.
+
+*Emil's question (complementary / redundant / opposed), iid no-24:*
+angle between leading eigenvectors 75.6 deg; **98% of the marks'
+3-dim informative subspace lies inside the gauges' 5-dim one** (59% the
+other way). Not complementary: the gauges see everything the marks see,
+plus pasture/hay (81). Along BOTH leading directions the two gradients
+are OPPOSED (gauge v0: +4112 vs marks -59; mark u0: +2777 vs -24).
+
+*Where the opposition comes from -- the decisive variant.* With each
+gauge's mean residual projected out (per-gauge demeaning: hydrograph
+SHAPE only, the offset treated as a nuisance parameter), the sign
+agreement flips: along the gauge leading direction dJ_gauge = -35 and
+dJ_marks = -39, SAME sign, and the GN step for 22/23/90 is alpha =
+0.33, 0.34, 1.03 -- developed classes DOWN, exactly where the marks put
+them. The entire gauge-vs-mark disagreement is carried by the per-gauge
+OFFSET, i.e. by the 4.9 m bias at Buffalo Bayou at Houston (82% of J),
+which is the ponded downstream reach. The time-varying part of the
+gauge record agrees with the marks about roughness.
+
+**Reading for the paper.** (a) The o63 gauge calibration fitted the
+Houston lake with friction: the bias is the drainage defect, the
+roughness request is its shadow. (b) Sec 6.1's mechanism paragraph is
+wrong (model too HIGH at the gauges, 4.9 m at Houston) and its
+"opposite edges" framing overstates: the observables agree once the
+offset is removed. (c) The defensible cross-observable statement is
+now measured: the marks' informative directions lie inside the gauges';
+the gauges at their own error and correlation determine 0-1 roughness
+combination; the sign disagreement is the downstream bias, not the
+roughness physics. (d) Class 24's +5% column is a >1 m stage response
+at Houston: whatever it is, it is not a sensitivity, and the mark
+spectrum's 24 column (22/46 argmax moves in o61) needs the same check.
+
+**Pending: o66** (`plans/campaigns/o66_gauge_spectrum_central.sh`, 6
+forwards, ~4.4 node-hours, **job 58382148 submitted 2026-09-15 12:34
+PDT**): 24 at +/-1%, and -5% for 22/23/24/90 so the
+gauge S can be built from central differences and re-checked against
+the adjoint. Mark approved 09-15.
+
+### o66 (job 58382148, 2026-09-15) -- and the RETRACTION of the o65 spectrum numbers
+
+Six forwards: class 24 at +/-1%, and -5% columns for 22, 23, 24, 90
+(`logs/o65/o65_gauge_col*_e*.txt`, all exit 0, ~22 min each).
+
+**1. The gauge sensitivity matrix is not usable at 5%, and central
+differences do not rescue it.** The two one-sided columns of the SAME
+class differ by more than their own magnitude:
+`||S(+5%) - S(-5%)|| / ||S_central||` = 1.42 (22), 1.27 (23), 2.22 (90),
+1.56 (24). The gradient implied by each column, `S^T W r / sigma^2`,
+against the o64 adjoint (dJ/dalpha at the prior):
+
+| class | S from +5% | S from -5% | S central | adjoint |
+|---|---|---|---|---|
+| 22 | -1728 | +1123 | -303 | **-4016** |
+| 23 | -3617 | -2057 | -2837 | **-6376** |
+| 90 | -1448 | +18 | -715 | **-676** |
+| 24 | +127809 | +14222 | +71015 | **+11554** |
+
+Only class 90 agrees. The same numbers come out of the J secants
+(-309, -2832, -711, +76463), so the finite differences are internally
+consistent; it is the linearization that fails, not the arithmetic.
+
+**2. The adjoint is right; the objective is not smooth at 5%.** Class 24
+on the DECREASING side behaves smoothly and its slope extrapolates to
+11426 against the adjoint's 11554 (1.1%). On the increasing side it is
+4.9x the adjoint at 1% and 12.0x at 5%. That is a one-sided kink at the
+prior, not curvature. Physically, raising developed-high roughness moves
+the Whiteoak Main St gauge by 1.39 m and Houston by up to 1.05 m at +5%.
+
+**3. RETRACTED from o65** (everything that used the gauge S): the gauge
+eigenvalue counts (5 / 3 / 1 / 0 as sigma opens), the 75.6 deg angle
+between leading eigenvectors, "98% of the marks' informative subspace
+lies inside the gauges'", and the demeaned GN step. None of those are
+measurements. **A valid gauge Gauss-Newton spectrum has not been
+computed and may not exist at this step size.**
+
+**4. The demeaning claim, re-tested directly on the objective** (no S,
+no linearization: J evaluated at the base and at +/-5% per class):
+
+| class | demeaned J wants | marks want | |
+|---|---|---|---|
+| 22 dev-low | less | more | disagree |
+| 23 dev-med | less | less | AGREE |
+| 90 woody-wet | more | less | disagree |
+
+So the 09-15 statement "with per-gauge demeaning the signs agree and the
+gauges also send the developed classes down" is **wrong as written**: the
+agreement is on developed-medium only, and the differences are 1-5
+J-units on a base of 168, on a surface already shown to be nonlinear.
+
+**5. What replaces it, and it is stronger because it needs no
+sensitivity matrix at all** -- the offset/shape split of the gauge
+misfit at the NLCD prior, straight from the base dump:
+
+| gauge | n | mean residual | shape rms | share of J |
+|---|---|---|---|---|
+| Buffalo Bayou at Houston | 48 | **+4.901 m** | 0.382 m | **82.3%** |
+| Buffalo Bayou nr Katy | 48 | +1.944 m | 0.067 m | 12.9% |
+| Buffalo Bayou nr Fulshear | 14 | +1.965 m | 0.055 m | 3.8% |
+| Langham Ck nr Addicks | 20 | -0.613 m | 0.123 m | 0.6% |
+| Bear Ck nr Barker | 4 | +1.197 m | 0.012 m | 0.4% |
+
+**J 31313 = 31145 constant per-gauge offset (99.5%) + 168 hydrograph
+shape (0.54%).** RMSE 3.243 m overall, **0.238 m in shape alone.** The
+model tracks the shape of every hydrograph to a quarter of a metre and
+has the level wrong by metres. A constant 1.9-4.9 m bias held for twelve
+hours is not a friction signature. The gauge observable at 30 m is a
+datum/storage measurement with a 0.5% roughness-relevant component, and
+the o63 calibration spent its three parameters on the 99.5%.
+
+**6. The MARK sensitivity matrix IS validated** -- the same test on the
+o58 columns reproduces the o62 adjoint gradient to within 4% on every
+class (22 -28.4 vs -29.5, 23 +89.7 vs +90.7, 90 +65.1 vs +66.2). Sec 6.4's
+construction now has an independent check it never had. The peak
+observable is well-behaved where the time-series observable is not,
+which is itself worth a sentence: a peak has no phase, and a 5% roughness
+change shifts hydrograph timing.
+
+**For the paper.** Report (5). Drop every gauge-spectrum number. The
+cross-observable section becomes: the gauges disagree with the marks in
+sign (adjoint, solid), and the reason is that 99.5% of what they measure
+is an offset roughness cannot produce.
+
+### Step A -- a transmissive perimeter would leak INWARD, decisively (2026-10-03)
+
+Donghui's question (09-06, relayed 09-16) was whether to open all the
+boundary edges. This is the guard-rail, and it needed no allocation: a
+login-node pass over the existing o37 hourly checkpoints
+(`plans/campaigns/stepA_perimeter_flux.py`, logs mirrored to
+`logs/stepA/`). RDycore's free-outflow ghost map is the identity (o26),
+so for a boundary edge the Roe flux equals the interior physical flux
+exactly, and the would-be transmissive volume flux is just
+`q = (hu, hv) . n_out * L`, positive outward. No approximation enters.
+
+**Answer: opening the perimeter as written is NOT safe.** The net flux
+over the 6,185 perimeter (id 0) edges is INWARD at every hour checked:
+
+| hour | perimeter net | outlet net | concurrent rain | perimeter / rain |
+|------|--------------:|-----------:|----------------:|-----------------:|
+| 40   | -6,607 m3/s   | +25 m3/s   | 1,456 m3/s      | 4.5x |
+| 60   | -7,240 m3/s   | +364 m3/s  | 1,167 m3/s      | 6.2x |
+| 72   | -8,288 m3/s   | +661 m3/s  | 77 m3/s         | 107x |
+
+At hour 72 an opened perimeter would admit 29.8e6 m3 in one hour against
+a stored volume of 1,252e6 m3 -- 2.4% of the domain's water per hour,
+12.5x what the outlet discharges. An elevation-thresholded overflow is
+the right condition, not bare free-outflow.
+
+**The imbalance is not a facet artifact.** The 30 m perimeter is a
+zig-zag, and a flow parallel to a zig-zag crosses alternating facets in
+and out in near-equal measure, so a per-edge sign split overstates both
+sides. Walking the boundary into its single 217.3 km loop and
+aggregating into runs before splitting kills that cancellation and the
+imbalance SURVIVES, growing with scale: |in|/out = 122% per edge, 134%
+at 300 m, 145% at 1 km, 164% at 3 km (hour 72). The inflow is spatially
+coherent.
+
+**It is concentrated, and in the censored reach.** Net flux by distance
+from the outlet (hour 72): -14,879 m3/s over the 29.2 km of divide
+within 10 km of the outlet, and net OUTWARD (+6,591 m3/s) over the
+187.6 km beyond it. One 3 km run at (3226445, 3637206), 8.1 km from the
+outlet, carries -9,215 m3/s by itself -- more than the whole-perimeter
+net. By the Voronoi split on the 108 marks, 85% of the inward flux
+belongs to the 37 censored marks' reach. So the leak is where the model
+already ponds, which is the worst place for it: Step B's counterfactual
+would have been measuring an opened perimeter AND a new inflow source at
+once, in exactly the reach the test is about.
+
+**The existing outlet already does this.** The named outlet carries the
+identical free-outflow condition, and its net flux is INWARD for the
+first 38 hours of the baseline, reaching -8,522 m3/s at hour 3, turning
+outward only at hour 39. The no-inflow-guard pathology is not
+hypothetical; it is in the production configuration, on 503 m of
+boundary.
+
+**Validation.** The perimeter is closed in the baseline, so
+d(storage)/dt + outlet = rain. Over all 73 checkpoints the implied
+rainfall is positive at every hour, hyetograph-shaped (peak 45.8 mm/hr
+at hour 28, decaying to 0.2 mm/hr at hour 72) and integrates to ~725 mm
+over 72 h, which is right for Harvey over this domain. That exercises
+the normals, the cell areas (1,428.7 km2 over 2,926,532 triangles,
+median 488 m2 -- NOT 900 m2) and the flux formula together.
+
+**Caveat.** These are instantaneous fluxes from the closed-perimeter
+state: opening the boundary changes the solution, and the water piled
+against the divide would partly equalize. The sign, the concentration
+and the order of magnitude are the answer; the transient is not
+predicted.
+
+**What this does NOT do:** it does not touch the paper. Sec 6.1 still
+says the closed perimeter represents neither crossing, which stands.

@@ -1,0 +1,14 @@
+# ctest run 2026-09-17 on the laptop, build-claude (binaries dated 2026-08-27); source for tab:verification rows 1-6
+5: distinct-state exact-Jacobian rel error: 7.589e-09 (gate: 1e-6)
+5: transcritical exact-Jacobian rel error: 2.427e-10 (gate: 1e-5)
+5: [  PASSED  ] 8 test(s).
+1/2 Test #5: test_swe_jacobian_np_1 ...........   Passed    0.12 sec
+7: global FD-vs-analytic full-matrix rel error (uniform flow): 1.561e-08 (gate: 1e-6)
+7: global FD-vs-analytic full-matrix rel error (dam break): 1.463e-08 (gate: 1e-6)
+7: global FD-vs-analytic full-matrix rel error (dirichlet+outflow): 1.917e-08 (gate: 1e-6)
+7: global FD-vs-analytic full-matrix rel error (anuga-regularized drag): 1.676e-08 (gate: 1e-6)
+7: global FD-vs-analytic full-matrix rel error (dirichlet+free-outflow): 1.826e-08 (gate: 1e-6)
+7: [  PASSED  ] 5 test(s).
+2/2 Test #7: test_swe_jacobian_global_np_1 ....   Passed    0.14 sec
+The following tests passed:
+100% tests passed out of 2

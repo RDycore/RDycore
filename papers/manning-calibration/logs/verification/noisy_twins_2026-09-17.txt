@@ -1,0 +1,44 @@
+# noisy verification-twin runs, laptop, build-claude (binaries 2026-08-27), 2026-09-17
+# source for the two noisy rows of tab:snr and the beta sweep
+
+## per-region, noise-free (adjoint_dam_break.yaml -adjoint_calibrate)
+region 0: n_true 0.030000  n_recovered 0.030000  rel err 4.134e-07
+region 1: n_true 0.060000  n_recovered 0.060000  rel err 7.641e-09
+two-zone recovery max rel err: 4.134e-07 (gate 2e-2)
+
+## per-region, -adjoint_obs_noise 1e-4
+region 0: n_true 0.030000  n_recovered 0.010000  rel err 6.667e-01
+region 1: n_true 0.060000  n_recovered 0.010000  rel err 8.333e-01
+two-zone recovery max rel err: 8.333e-01 (gate 2e-2)
+[0]PETSC ERROR: --------------------- Error Message --------------------------------------------------------------
+[0]PETSC ERROR: calibration failed to recover the two-zone Manning field: 0.833333
+[0]PETSC ERROR: ----------------End of Error Message -------send entire error message to petsc-maint@mcs.anl.gov----------
+
+## per-region, -adjoint_obs_noise 1e-3
+region 0: n_true 0.030000  n_recovered 0.010000  rel err 6.667e-01
+region 1: n_true 0.060000  n_recovered 0.010000  rel err 8.333e-01
+two-zone recovery max rel err: 8.333e-01 (gate 2e-2)
+[0]PETSC ERROR: --------------------- Error Message --------------------------------------------------------------
+[0]PETSC ERROR: calibration failed to recover the two-zone Manning field: 0.833333
+[0]PETSC ERROR: ----------------End of Error Message -------send entire error message to petsc-maint@mcs.anl.gov----------
+
+## per-cell, noise-free (adjoint_dam_break_analytic.yaml -adjoint_calibrate_percell -adjoint_obs_stride 1)
+per-cell recovery: 200 TAO its, 44 observable cells, 8 obs times, rel L2 err 1.986e-01 (beta 1.0e-04)
+
+## per-cell, -adjoint_obs_noise 1e-4 (default beta)
+per-cell recovery: 39 TAO its, 44 observable cells, 8 obs times, rel L2 err 1.761e+00 (beta 1.0e-04)
+
+## per-cell, -adjoint_obs_noise 1e-3 (default beta)
+per-cell recovery: 12 TAO its, 44 observable cells, 8 obs times, rel L2 err 2.378e+00 (beta 1.0e-04)
+
+## per-cell, -adjoint_obs_noise 1e-4 -adjoint_beta 1e-3
+per-cell recovery: 105 TAO its, 44 observable cells, 8 obs times, rel L2 err 1.730e+00 (beta 1.0e-03)
+
+## per-cell, -adjoint_obs_noise 1e-4 -adjoint_beta 1e-2
+per-cell recovery: 48 TAO its, 44 observable cells, 8 obs times, rel L2 err 5.414e-01 (beta 1.0e-02)
+
+## per-cell, -adjoint_obs_noise 1e-4 -adjoint_beta 1e-1
+per-cell recovery: 58 TAO its, 44 observable cells, 8 obs times, rel L2 err 2.274e+00 (beta 1.0e-01)
+
+## per-cell, -adjoint_obs_noise 1e-4 -adjoint_beta 1
+per-cell recovery: 200 TAO its, 44 observable cells, 8 obs times, rel L2 err 4.449e-01 (beta 1.0e+00)

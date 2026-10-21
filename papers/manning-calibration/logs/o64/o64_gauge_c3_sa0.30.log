@@ -1,0 +1,204 @@
+[1] This process is not using the same device it did during gtl_init.
+ Current device_id 1 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[2] This process is not using the same device it did during gtl_init.
+ Current device_id 2 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[5] This process is not using the same device it did during gtl_init.
+ Current device_id 1 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[3] This process is not using the same device it did during gtl_init.
+ Current device_id 3 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[6] This process is not using the same device it did during gtl_init.
+ Current device_id 2 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+[7] This process is not using the same device it did during gtl_init.
+ Current device_id 3 original device_id 0.
+ Use of IPC is disabled from this point. IPC PUT protocol may be used instead 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-26:18-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-26:19-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-26:20-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-26:21-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-26:22-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-26:23-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:00-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:01-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:02-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:03-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:04-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:05-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:06-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:07-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:08-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:09-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:10-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:11-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:12-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:13-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:14-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:15-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:16-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:17-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:18-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:19-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:20-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:21-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:22-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-27:23-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:00-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:01-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:02-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:03-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:04-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:05-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:06-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:07-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:08-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:09-00.int32.bin 
+Opening /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin/2017-08-28:10-00.int32.bin 
+rain schedule: 12 hourly datasets preloaded for the 43200 s window (event hours 29-40)
+gauge observations: 134 kept, 331 masked with observed WSE within 0. m of the cell bed (-adjoint_obs_above_bed), of 13 gauges x 48 times
+class calibration: 3 of 15 classes active, 12 frozen at prior
+class calibration: warm start from o62_p_c3_sa0.30.txt (15 classes)
+class calibration: prior sigma_alpha = 0.3000 (beta = 1.1111e+01), relative variables alpha = n/n_prior
+class calibration: alpha bounds [0.300, 3.000]
+class calibration: 15 classes, 13 gauges, 48 obs times (every 900 steps), 134 observations, start n = 0.03, beta = 1.1e+01
+class calibration: start-point gradient written to o64_g_gauge_c3_sa0.30.txt
+class calibration: objective scaled by 1/J0 = 3.2967e-05; first trial step |g|/J0 = 0.4200 in alpha
+[0]PETSC ERROR: --------------------- Error Message --------------------------------------------------------------
+[0]PETSC ERROR: Argument out of range
+[0]PETSC ERROR: Maximum number of iterations must be positive
+[0]PETSC ERROR: WARNING! There are unused option(s) set! Could be the program crashed before usage or a spelling mistake, etc!
+[0]PETSC ERROR:   Option left: name:-tao_monitor (no value) source: command line
+[0]PETSC ERROR: See https://petsc.org/release/faq/ for trouble shooting.
+[0]PETSC ERROR: PETSc Development Git Revision: 433dd0b586c1afd3f7b8a0a1a07542967caf64ff Git Date: 2026-09-08 15:45:54 -0700
+[0]PETSC ERROR: /global/homes/m/madams/Codes/rdycore-manning/build-claude-gpu10/driver/rdycore_adjoint with 8 MPI process(es) and PETSC_ARCH arch-perlmutter-opt-gcc-kokkos-cuda on nid008677 by madams Sat Sep 12 12:16:36 2026
+[0]PETSC ERROR: Configure options: --CFLAGS="   -g" --CXXFLAGS=" -g " --with-cc=cc --with-cxx=CC --with-fc=ftn --with-fortran-bindings=0 --COPTFLAGS="   -O" --CXXOPTFLAGS=" -O" --FOPTFLAGS="   -O" --with-debugging=0 --with-x=0 --with-cuda=1 --with-cuda-arch=80 --with-mpiexec=srun --with-batch=0 --download-muparser=1 --download-exodusii=1 --download-netcdf=1 --download-netcdf-configure-arguments=--disable-nczarr --download-pnetcdf=1 --download-revolve=1 --download-libceed=1 --download-parmetis=1 --download-metis=1 --download-triangle=1 --download-p4est=1 --with-zlib=1 --download-cudss=https://developer.download.nvidia.com/compute/cudss/redist/libcudss/linux-x86_64/libcudss-linux-x86_64-0.8.0.10_cuda13-archive.tar.xz --download-kokkos --download-kokkos-kernels --with-kokkos-kernels-tpl=0 --with-make-np=8 --with-hdf5-dir=/opt/cray/pe/hdf5-parallel/1.12.2.9/gnu/12.3 PETSC_ARCH=arch-perlmutter-opt-gcc-kokkos-cuda
+[0]PETSC ERROR: #1 TaoSetMaximumIterations() at /global/u2/m/madams/Codes/petsc-claude/src/tao/interface/taosolver.c:1272
+[0]PETSC ERROR: #2 TaoSetFromOptions() at /global/u2/m/madams/Codes/petsc-claude/src/tao/interface/taosolver.c:521
+[0]PETSC ERROR: #3 main() at /global/homes/m/madams/Codes/rdycore-manning/driver/adjoint_test.c:2299
+[0]PETSC ERROR: PETSc Option Table entries:
+[0]PETSC ERROR: -adjoint_calibrate_classes (source: command line)
+[0]PETSC ERROR: -adjoint_class_file turning30m_class.bin (source: command line)
+[0]PETSC ERROR: -adjoint_classes_active 23,90,22 (source: command line)
+[0]PETSC ERROR: -adjoint_classes_grad_dump o64_g_gauge_c3_sa0.30.txt (source: command line)
+[0]PETSC ERROR: -adjoint_classes_init o62_p_c3_sa0.30.txt (source: command line)
+[0]PETSC ERROR: -adjoint_classes_relative (source: command line)
+[0]PETSC ERROR: -adjoint_fd_samples 0 (source: command line)
+[0]PETSC ERROR: -adjoint_obs_above_bed (source: command line)
+[0]PETSC ERROR: -adjoint_obs_error 0.15 (source: command line)
+[0]PETSC ERROR: -adjoint_obs_file obs_turning_h29_41.txt (source: command line)
+[0]PETSC ERROR: -adjoint_prior_file turning30m_manning.bin (source: command line)
+[0]PETSC ERROR: -adjoint_rain_start_hour 29 (source: command line)
+[0]PETSC ERROR: -adjoint_sigma_alpha 0.30 (source: command line)
+[0]PETSC ERROR: -dist_dm_distribute_save_sf true (source: code)
+[0]PETSC ERROR: -dm_mat_type baijkokkos (source: command line)
+[0]PETSC ERROR: -dm_plex_filename Turning_30m_with_z.updated.with_sidesets.exo (source: code)
+[0]PETSC ERROR: -dm_vec_type kokkos (source: command line)
+[0]PETSC ERROR: -ksp_max_it 300 (source: command line)
+[0]PETSC ERROR: -ksp_pc_side right (source: command line)
+[0]PETSC ERROR: -ksp_rtol 1e-4 (source: command line)
+[0]PETSC ERROR: -ksp_type gmres (source: command line)
+[0]PETSC ERROR: -pc_type pbjacobi (source: command line)
+[0]PETSC ERROR: -raster_rain_dir /global/cfs/cdirs/m4267/shared/data/harvey/spatially-distributed-rainfall/mm-per-hr/mrms/bin (source: command line)
+[0]PETSC ERROR: -raster_rain_start_date 2017,8,26,18,0 (source: command line)
+[0]PETSC ERROR: -restart checkpoints_o37/o37.rdycore.r.104400.bin (source: command line)
+[0]PETSC ERROR: -snes_max_it 50 (source: command line)
+[0]PETSC ERROR: -snes_rtol 1e-5 (source: command line)
+[0]PETSC ERROR: -tao_max_it 0 (source: command line)
+[0]PETSC ERROR: -tao_monitor (source: command line)
+[0]PETSC ERROR: -ts_adapt_type none (source: command line)
+[0]PETSC ERROR: -ts_trajectory_max_cps_ram 400 (source: command line)
+[0]PETSC ERROR: -ts_trajectory_type memory (source: command line)
+[0]PETSC ERROR: -vecload_block_size 3 (source: file)
+[0]PETSC ERROR: ----------------End of Error Message -------send entire error message to petsc-maint@mcs.anl.gov----------
+MPICH ERROR [Rank 0] [job id 58243169.0] [Sat Sep 12 13:06:05 2026] [nid008677] - Abort(63) (rank 0 in comm 16): application called MPI_Abort(MPI_COMM_SELF, 63) - process 0
+
+srun: error: nid008677: task 0: Exited with exit code 63
+srun: Terminating StepId=58243169.0
+[2026-09-12T20:06:09.028] error: *** STEP 58243169.0 ON nid008677 CANCELLED AT 2026-09-12T20:06:09 DUE TO TASK FAILURE ***
+[4]PETSC ERROR: ------------------------------------------------------------------------
+[4]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[4]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[4]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[4]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[4]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[4]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 4] [job id 58243169.0] [Sat Sep 12 13:06:09 2026] [nid008680] - Abort(59) (rank 4 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 4
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 4
+srun: error: nid008680: task 4: Exited with exit code 15
+[1]PETSC ERROR: ------------------------------------------------------------------------
+[1]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[1]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[1]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[1]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[1]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[1]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 1] [job id 58243169.0] [Sat Sep 12 13:06:10 2026] [nid008677] - Abort(59) (rank 1 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 1
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 1
+[5]PETSC ERROR: ------------------------------------------------------------------------
+[5]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[5]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[5]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[5]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[5]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[5]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 5] [job id 58243169.0] [Sat Sep 12 13:06:10 2026] [nid008680] - Abort(59) (rank 5 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 5
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 5
+srun: error: nid008677: task 1: Exited with exit code 15
+srun: error: nid008680: task 5: Exited with exit code 15
+[2]PETSC ERROR: ------------------------------------------------------------------------
+[2]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[2]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[2]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[2]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[2]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[2]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 2] [job id 58243169.0] [Sat Sep 12 13:06:11 2026] [nid008677] - Abort(59) (rank 2 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 2
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 2
+[6]PETSC ERROR: ------------------------------------------------------------------------
+[6]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[6]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[6]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[6]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[6]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[6]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 6] [job id 58243169.0] [Sat Sep 12 13:06:11 2026] [nid008680] - Abort(59) (rank 6 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 6
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 6
+srun: error: nid008677: task 2: Exited with exit code 15
+srun: error: nid008680: task 6: Exited with exit code 15
+[3]PETSC ERROR: ------------------------------------------------------------------------
+[3]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[3]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[3]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[3]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[3]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[3]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 3] [job id 58243169.0] [Sat Sep 12 13:06:12 2026] [nid008677] - Abort(59) (rank 3 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 3
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 3
+[7]PETSC ERROR: ------------------------------------------------------------------------
+[7]PETSC ERROR: Caught signal number 15 Terminate: Some process (or the batch system) has told this process to end
+[7]PETSC ERROR: Try option -start_in_debugger or -on_error_attach_debugger
+[7]PETSC ERROR: or see https://petsc.org/release/faq/#valgrind and https://petsc.org/release/faq/
+[7]PETSC ERROR: or try https://docs.nvidia.com/compute-sanitizer/ComputeSanitizer/index.html on NVIDIA CUDA systems to find memory corruption errors
+[7]PETSC ERROR: configure using --with-debugging=yes, recompile, link, and run 
+[7]PETSC ERROR: to get more information on the crash.
+MPICH ERROR [Rank 7] [job id 58243169.0] [Sat Sep 12 13:06:12 2026] [nid008680] - Abort(59) (rank 7 in comm 0): application called MPI_Abort(MPI_COMM_WORLD, 59) - process 7
+
+aborting job:
+application called MPI_Abort(MPI_COMM_WORLD, 59) - process 7
+srun: error: nid008680: task 7: Exited with exit code 15
+srun: error: nid008677: task 3: Exited with exit code 15

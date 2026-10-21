@@ -1,0 +1,74 @@
+13 gauges x 48 times = 624 (gauge,time) pairs; 134 kept (NaN + above-bed mask)
+base: J 3.131332e+04, RMSE 3.2428 m  <- must equal the driver's "gauge eval" line (o64 prior: 3.131332e+04, 3.243 m)
+per-gauge residual of the base field (kept records only):
+  gauge  0 cell   803709: 48 kept, mean  +1.944 m, rms  1.945 m, obs depth 2.32-2.79 m
+  gauge  1 cell   877521: 14 kept, mean  +1.965 m, rms  1.966 m, obs depth 0.00-0.09 m
+  gauge  3 cell  1825690:  4 kept, mean  +1.197 m, rms  1.197 m, obs depth 0.14-0.21 m
+  gauge  5 cell  1858212: 20 kept, mean  -0.613 m, rms  0.626 m, obs depth 2.50-3.02 m
+  gauge  6 cell  2858868: 48 kept, mean  +4.901 m, rms  4.916 m, obs depth 3.78-5.84 m
+15 classes; |S| per class over kept rows (m per unit alpha): 11:0.06, 21:0.63, 22:1.63, 23:3.82, 24:99.84, 31:0.27, 41:0.23, 42:0.43, 43:0.51, 52:0.21, 71:0.13, 81:4.09, 82:0.27, 90:2.87, 95:0.61
+
+GAUGE prior-preconditioned Gauss-Newton spectrum (sigma_obs 0.15 m, sigma_alpha 0.3, iid):
+  i     lambda data vs prior      shrink  leading classes
+  0  3.989e+04 data-determined     0.01x  24(-1.00), 23(+0.02), 22(+0.01), 21(+0.00)
+  1      138.7 data-determined     0.08x  81(+0.68), 23(+0.53), 90(+0.47), 95(-0.10)
+  2      12.41 data-determined     0.27x  23(-0.83), 90(+0.40), 81(+0.35), 22(-0.17)
+  3      3.078 data > prior        0.50x  22(+0.79), 21(+0.44), 42(+0.29), 90(+0.26)
+  4      1.282 data > prior        0.66x  90(+0.71), 81(-0.52), 21(-0.32), 95(+0.21)
+  5     0.8453 comparable          0.74x  21(-0.53), 22(+0.52), 42(-0.38), 81(+0.30)
+  6      0.283 comparable          0.88x  42(-0.79), 21(+0.42), 52(-0.34), 82(-0.17)
+  7     0.1862 comparable          0.92x  95(+0.59), 43(+0.59), 21(+0.24), 31(+0.23)
+  8     0.1092 comparable          0.95x  41(+0.89), 52(+0.26), 42(-0.24), 21(-0.18)
+  9    0.09906 prior-determined    0.95x  52(-0.80), 21(-0.35), 82(+0.29), 41(+0.22)
+ 10     0.0561 prior-determined    0.97x  95(+0.56), 71(-0.48), 43(-0.46), 82(-0.36)
+ 11     0.0462 prior-determined    0.98x  82(-0.71), 71(+0.59), 52(-0.27), 21(-0.18)
+ 12    0.01608 prior-determined    0.99x  71(+0.56), 43(-0.55), 82(+0.45), 31(+0.32)
+ 13     0.0103 prior-determined    0.99x  11(+0.65), 31(-0.65), 95(+0.32), 82(+0.14)
+ 14   0.004969 prior-determined    1.00x  11(+0.75), 31(+0.56), 95(-0.30), 82(-0.10)
+  eigenvalues > 1 : 5 of 15   <- roughness combinations this observable determines
+  degrees of freedom for signal (Rodgers): 5.39
+  spectral gap lambda_0/lambda_1 = 287.63
+
+sigma scan (count of lambda > 1; eigenvectors fixed):
+  sigma 0.15 m:  5 supported, lambda_0 3.99e+04, dofs 5.39
+  sigma 0.30 m:  3 supported, lambda_0 9.97e+03, dofs 3.77
+  sigma 0.50 m:  3 supported, lambda_0 3.59e+03, dofs 2.92
+  sigma 1.00 m:  2 supported, lambda_0 898, dofs 2.10
+  sigma 2.00 m:  1 supported, lambda_0 224, dofs 1.53
+  sigma 3.00 m:  1 supported, lambda_0 99.7, dofs 1.29
+  sigma 5.00 m:  1 supported, lambda_0 35.9, dofs 1.10
+
+gauge gradient at the prior from S and the base residual, dJ/dalpha per class (check vs o64: 22 -4016, 23 -6376, 90 -676 at sigma 0.15 iid):
+  11:-44, 21:-516, 22:-1728, 23:-3617, 24:+127809, 31:+165, 41:+45, 42:-378, 43:+209, 52:+101, 71:-6, 81:-2093, 82:-120, 90:-1448, 95:+338
+  GN step for classes 22/23/90 with the prior, this weighting: alpha = 16.41, 3.06, 5.86   (o63 reached 3.00, 3.00, 1.74 on the box)
+
+MARK prior-preconditioned Gauss-Newton spectrum (sigma_obs 0.15 m, sigma_alpha 0.3), same S construction:
+  i     lambda data vs prior      shrink  leading classes
+  0      12.73 data-determined     0.27x  23(-0.77), 90(+0.50), 22(-0.29), 24(-0.25)
+  1      2.985 data > prior        0.50x  90(+0.77), 23(+0.59), 22(-0.19), 95(+0.10)
+  2      1.128 data > prior        0.69x  22(-0.91), 90(-0.32), 81(+0.17), 21(-0.14)
+  3     0.8529 comparable          0.73x  24(+0.88), 81(-0.32), 52(-0.17), 22(-0.17)
+  4     0.2548 comparable          0.89x  95(-0.65), 21(-0.53), 42(+0.34), 81(-0.31)
+  5     0.2386 comparable          0.90x  81(+0.84), 95(-0.36), 24(+0.29), 90(+0.14)
+  6     0.1577 comparable          0.93x  52(-0.64), 42(+0.45), 43(+0.44), 95(+0.35)
+  7     0.0876 prior-determined    0.96x  21(-0.79), 95(+0.43), 42(-0.24), 43(-0.18)
+  8    0.05021 prior-determined    0.98x  52(-0.67), 42(-0.54), 95(-0.31), 24(-0.25)
+  9    0.02444 prior-determined    0.99x  41(+0.79), 42(-0.43), 43(+0.36), 11(-0.18)
+ 10    0.01454 prior-determined    0.99x  11(-0.78), 41(-0.37), 71(-0.29), 43(+0.26)
+ 11    0.01121 prior-determined    0.99x  71(+0.79), 31(-0.51), 11(-0.21), 82(-0.17)
+ 12   0.006023 prior-determined    1.00x  43(+0.66), 11(+0.42), 41(-0.38), 42(-0.33)
+ 13   0.004086 prior-determined    1.00x  31(+0.83), 71(+0.46), 11(-0.27), 43(+0.11)
+ 14  0.0005972 prior-determined    1.00x  82(-0.93), 43(+0.22), 71(-0.17), 41(-0.17)
+  eigenvalues > 1 : 3 of 15   <- roughness combinations this observable determines
+  degrees of freedom for signal (Rodgers): 3.39
+  spectral gap lambda_0/lambda_1 = 4.26
+
+COMPARISON of the two observables (Emil: complementary, redundant, or opposed?)
+  angle between leading eigenvectors: 76.6 deg (|cos| = 0.231)
+  informative subspaces: gauges 5-dim, marks 3-dim (lambda > 1, at least the leading vector)
+  fraction of the mark subspace inside the gauge subspace: 0.920
+  fraction of the gauge subspace inside the mark subspace: 0.552
+  along the gauge leading direction v_0: dJ_gauge/dv = -127863, dJ_marks/dv = -21  -> same sign
+  along the mark  leading direction u_0: dJ_gauge/du = -28984, dJ_marks/du = -29  -> same sign
+  mark gradient per class from S (check vs o62: 22 -29.5, 23 +90.7, 90 +66.2 in alpha): 11:-7.3, 21:-21.2, 22:-28.4, 23:+89.7, 24:+21.7, 31:-5.9, 41:-4.7, 42:+1.9, 43:+1.2, 52:+19.3, 71:+5.7, 81:-31.3, 82:-4.6, 90:+65.1, 95:+0.4
+  joint spectrum (both observables together): 3.99e+04, 141, 22.8, 4.08, 4 ...
