@@ -13,10 +13,13 @@ first-order scheme's pointwise error does not converge.
   plot   write a figure: top view of the depth with the mesh drawn over it,
          and the channel's cells projected onto a depth-vs-x cross section
          with the exact solution
+  panels write a figure with one top view per output step given, for cases
+         with no exact solution -- the mesh following the flow over time
 
 Usage:
   amr_dam_break.py error <case-0250.xmf> [--hl 2 --hr 1 --x0 25]
   amr_dam_break.py plot  <case-0250.xmf> [-o figure.png] [--hl 2 --hr 1 --x0 25]
+  amr_dam_break.py panels <case-0000.xmf> <case-0500.xmf> ... [-o figure.png]
 
 Reads the XDMF file only to find the HDF5 files it points at, so it follows
 the mesh from one refinement level to the next without being told.
@@ -143,10 +146,37 @@ def plot(xmf_path, h_l, h_r, x0, out):
     print(f"wrote {out}")
 
 
+def panels(xmf_paths, out):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+
+    steps = [read_step(p) for p in xmf_paths]
+    lo = min(float(np.min(s[3])) for s in steps)
+    hi = max(float(np.max(s[3])) for s in steps)
+
+    fig, axes = plt.subplots(len(steps), 1, figsize=(7, 2.1 * len(steps)), constrained_layout=True)
+    axes = np.atleast_1d(axes)
+    for ax, (time, _, areas, depth, vertices, triangles) in zip(axes, steps):
+        polys = PolyCollection(vertices[triangles], array=depth, cmap="viridis", edgecolors="white", linewidths=0.25)
+        polys.set_clim(lo, hi)
+        ax.add_collection(polys)
+        ax.autoscale_view()
+        ax.set_aspect("equal")
+        ax.set_title(f"t = {time:g} s, {len(areas)} cells", fontsize=10)
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+    fig.colorbar(axes[0].collections[0], ax=list(axes), label="h (m)", fraction=0.02)
+    fig.savefig(out, dpi=150)
+    print(f"wrote {out}")
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("action", choices=("error", "plot"))
-    p.add_argument("xmf")
+    p.add_argument("action", choices=("error", "plot", "panels"))
+    p.add_argument("xmf", nargs="+")
     p.add_argument("--hl", type=float, default=2.0, help="initial depth left of the dam (m)")
     p.add_argument("--hr", type=float, default=1.0, help="initial depth right of the dam (m)")
     p.add_argument("--x0", type=float, default=25.0, help="dam position (m)")
@@ -154,10 +184,12 @@ if __name__ == "__main__":
     p.add_argument("--tol", type=float, help="error: fail if the L1 error exceeds this")
     args = p.parse_args()
 
-    if args.action == "error":
-        time, ncells, err = l1_error(args.xmf, args.hl, args.hr, args.x0)
+    if args.action == "panels":
+        panels(args.xmf, args.out)
+    elif args.action == "error":
+        time, ncells, err = l1_error(args.xmf[0], args.hl, args.hr, args.x0)
         print(f"t = {time:g} s, {ncells} cells, L1 depth error vs Stoker = {err:.6f} m")
         if args.tol is not None and err > args.tol:
             raise SystemExit(f"L1 error {err:.6f} exceeds tolerance {args.tol}")
     else:
-        plot(args.xmf, args.hl, args.hr, args.x0, args.out)
+        plot(args.xmf[0], args.hl, args.hr, args.x0, args.out)
