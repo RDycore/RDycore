@@ -33,6 +33,9 @@ function(extract_mpi_include_directories directories)
     return()
   endif()
 
-  # Neither variable found
-  message(FATAL_ERROR "Could not find MPI include directories from PETSc (neither MPICXX_INCLUDES nor MPICC_SHOW available).")
+  # Neither variable is set when the compiler supplies MPI itself, as the Cray
+  # wrappers on Perlmutter and Frontier do. There is nothing to add then, and
+  # nothing is lost but an editor hint, so this is not an error.
+  message(STATUS "PETSc reports no MPI include directories (the compiler supplies MPI); continuing without them")
+  set(${directories} "" PARENT_SCOPE)
 endfunction()
