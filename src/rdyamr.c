@@ -183,9 +183,7 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
   PetscCall(DMLabelDestroy(&adaptLabel));
 
-  if (!dmAdapt) {
-    PetscCheck(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
-  }
+  PetscCheck(dmAdapt, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
 
   PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
   PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view"));
