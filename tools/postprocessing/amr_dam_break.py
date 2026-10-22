@@ -15,11 +15,14 @@ first-order scheme's pointwise error does not converge.
          with the exact solution
   panels write a figure with one top view per output step given, for cases
          with no exact solution -- the mesh following the flow over time
+  movie  animate the top view over every output step given, as a GIF (or MP4
+         where the file name says so and ffmpeg is installed)
 
 Usage:
   amr_dam_break.py error <case-0250.xmf> [--hl 2 --hr 1 --x0 25]
   amr_dam_break.py plot  <case-0250.xmf> [-o figure.png] [--hl 2 --hr 1 --x0 25]
   amr_dam_break.py panels <case-0000.xmf> <case-0500.xmf> ... [-o figure.png]
+  amr_dam_break.py movie  <case-*.xmf> [-o movie.gif] [--fps 8]
 
 Reads the XDMF file only to find the HDF5 files it points at, so it follows
 the mesh from one refinement level to the next without being told.
@@ -173,18 +176,60 @@ def panels(xmf_paths, out):
     print(f"wrote {out}")
 
 
+def movie(xmf_paths, out, fps):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+
+    steps = sorted(xmf_paths)
+    first = read_step(steps[0])
+    lo = min(float(np.min(read_step(p)[3])) for p in (steps[0], steps[-1]))
+    hi = max(float(np.max(read_step(p)[3])) for p in (steps[0], steps[-1]))
+
+    fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    ax.set_xlim(first[4][:, 0].min(), first[4][:, 0].max())
+    ax.set_ylim(first[4][:, 1].min(), first[4][:, 1].max())
+    bar = fig.colorbar(plt.cm.ScalarMappable(norm=plt.Normalize(lo, hi), cmap="viridis"), ax=ax, label="h (m)", fraction=0.03)
+
+    def draw(path):
+        time, _, areas, depth, vertices, triangles = read_step(path)
+        for c in list(ax.collections):
+            c.remove()
+        polys = PolyCollection(vertices[triangles], array=depth, cmap="viridis", edgecolors="white", linewidths=0.25)
+        polys.set_clim(lo, hi)
+        ax.add_collection(polys)
+        ax.set_title(f"t = {time:g} s, {len(areas)} cells", fontsize=11)
+        return (polys,)
+
+    anim = animation.FuncAnimation(fig, draw, frames=steps, interval=1000 / fps, blit=False)
+    if out.endswith(".mp4"):
+        anim.save(out, writer=animation.FFMpegWriter(fps=fps))
+    else:
+        anim.save(out, writer=animation.PillowWriter(fps=fps))
+    print(f"wrote {out} ({len(steps)} frames)")
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("action", choices=("error", "plot", "panels"))
+    p.add_argument("action", choices=("error", "plot", "panels", "movie"))
     p.add_argument("xmf", nargs="+")
     p.add_argument("--hl", type=float, default=2.0, help="initial depth left of the dam (m)")
     p.add_argument("--hr", type=float, default=1.0, help="initial depth right of the dam (m)")
     p.add_argument("--x0", type=float, default=25.0, help="dam position (m)")
     p.add_argument("-o", "--out", default="amr_dam_break.png")
+    p.add_argument("--fps", type=float, default=8.0, help="movie: frames per second")
     p.add_argument("--tol", type=float, help="error: fail if the L1 error exceeds this")
     args = p.parse_args()
 
-    if args.action == "panels":
+    if args.action == "movie":
+        movie(args.xmf, args.out, args.fps)
+    elif args.action == "panels":
         panels(args.xmf, args.out)
     elif args.action == "error":
         time, ncells, err = l1_error(args.xmf[0], args.hl, args.hr, args.x0)

@@ -19,7 +19,8 @@ rdycore_amr <case>.yaml \
 `rdycore_amr -help` lists the rest. The meshes are written by
 [`share/meshes/make_swe_tri_mesh.py`](../../../../share/meshes/make_swe_tri_mesh.py),
 which needs no gmsh, and the figures below by
-[`tools/postprocessing/amr_dam_break.py`](../../../../tools/postprocessing/amr_dam_break.py).
+[`tools/postprocessing/amr_dam_break.py`](../../../../tools/postprocessing/amr_dam_break.py)
+(`error`, `plot`, `panels` and `movie`).
 
 ## What drives the refinement
 
@@ -47,11 +48,14 @@ threshold falls under it after one adapt and the mesh stops following it.
 middle pierced by a central breach, 10 m of water upstream and 5 m downstream,
 352 triangles to start.
 
-<img src="amr-dam-break-panels.png" width="60%" height="60%">
+<img src="amr-dam-break.gif" width="70%" height="70%">
 
 The mesh is refined along the dam before the first step, follows the jet
 through the breach and the front spreading downstream, and coarsens behind
 them: the cell count rises and falls (448, 642, 522, 680) rather than growing.
+The same four instants, side by side:
+
+<img src="amr-dam-break-panels.png" width="60%" height="60%">
 
 ## 1D dam break on a 2D mesh
 
