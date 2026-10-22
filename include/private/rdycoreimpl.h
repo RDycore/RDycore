@@ -96,6 +96,12 @@ typedef struct {
 
   // is refinement on or off
   PetscBool is_refinement_on;
+
+  // smallest owned cell area of the unrefined mesh, recorded by RDyEnableAMR.
+  // Solution-driven marking caps refinement against it: a cell smaller than
+  // base_min_cell_area / 2^max_levels is never marked (refine_sbr bisects, so
+  // one level is a factor of two in area)
+  PetscReal base_min_cell_area;
 } RDyAMR;
 
 // This type serves as a "virtual table" containing function pointers that
