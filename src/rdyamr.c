@@ -61,217 +61,6 @@ PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Computes a per-owned-cell refinement indicator from the solution: the
-///        largest jump in water-surface elevation (h + z) across the cell's
-///        internal faces. Free surface rather than depth, so that water at rest
-///        over a varying bed indicates nothing; a dam, a bore and a wet/dry
-///        front all show up as a jump, including at step 0 before anything moves.
-/// @param [in] rdy       the dycore
-/// @param [out] indicator a Vec over owned cells, created here
-static PetscErrorCode ComputeSurfaceJumpIndicator(RDy rdy, Vec *indicator) {
-  PetscFunctionBegin;
-
-  RDyMesh  *mesh  = &rdy->mesh;
-  RDyCells *cells = &mesh->cells;
-  RDyEdges *edges = &mesh->edges;
-
-  PetscCall(VecCreateMPI(rdy->comm, mesh->num_owned_cells, PETSC_DETERMINE, indicator));
-  PetscCall(VecZeroEntries(*indicator));
-
-  // the local vector carries ghost cells, so a face on the partition boundary
-  // sees the same jump from either side
-  PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, rdy->u_local));
-  const PetscScalar *u;
-  PetscCall(VecGetArrayRead(rdy->u_local, &u));
-  PetscScalar *ind;
-  PetscCall(VecGetArray(*indicator, &ind));
-
-  PetscInt ndof = 3;  // h, hu, hv
-  for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
-    PetscInt edge_id = edges->internal_edge_ids[e];
-    PetscInt l = edges->cell_ids[2 * edge_id], r = edges->cell_ids[2 * edge_id + 1];
-    if (l < 0 || r < 0) continue;
-
-    PetscReal eta_l = u[ndof * l] + cells->centroids[l].X[2];
-    PetscReal eta_r = u[ndof * r] + cells->centroids[r].X[2];
-    PetscReal jump  = PetscAbsReal(eta_l - eta_r);
-
-    for (PetscInt i = 0; i < 2; ++i) {
-      PetscInt c = (i == 0) ? l : r;
-      if (!cells->is_owned[c]) continue;
-      PetscInt owned = cells->local_to_owned[c];
-      if (jump > PetscRealPart(ind[owned])) ind[owned] = jump;
-    }
-  }
-
-  // weight by cell area, so the indicator estimates the cell's CONTRIBUTION to
-  // the error rather than the steepness at its faces. For a first-order scheme
-  // the depth error of a cell is O(|jump|), so its share of an area-weighted
-  // norm is O(|jump| * area). Refining on the unweighted jump chases the shock
-  // alone and leaves the error, which a wide smooth region can dominate,
-  // largely untouched (measured: it barely beat the unrefined mesh).
-  PetscBool weight_by_area = PETSC_TRUE;
-  PetscCall(PetscOptionsGetBool(NULL, "rdy_amr_", "-weight_by_area", &weight_by_area, NULL));
-  if (weight_by_area) {
-    for (PetscInt c = 0; c < mesh->num_cells; ++c) {
-      if (!cells->is_owned[c]) continue;
-      ind[cells->local_to_owned[c]] *= cells->areas[c];
-    }
-  }
-
-  PetscCall(VecRestoreArray(*indicator, &ind));
-  PetscCall(VecRestoreArrayRead(rdy->u_local, &u));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// @brief Spreads the indicator outward by `layers` cell layers, so that cells
-///        the feature will reach before the next adapt are refined with it.
-///        Without this the mesh lags: a front crossing several coarse cells per
-///        coupling interval is resolved only after it has already passed.
-///
-///        The spread runs through the solution DM's halo exchange (component 0
-///        of a 3-dof work vector carries the indicator), so it crosses
-///        partition boundaries and gives the same result on any rank count.
-static PetscErrorCode DilateIndicator(RDy rdy, Vec indicator, PetscInt layers) {
-  PetscFunctionBegin;
-  if (layers <= 0) PetscFunctionReturn(PETSC_SUCCESS);
-
-  RDyMesh  *mesh  = &rdy->mesh;
-  RDyCells *cells = &mesh->cells;
-  RDyEdges *edges = &mesh->edges;
-
-  Vec work_global, work_local;
-  PetscCall(DMGetGlobalVector(rdy->dm, &work_global));
-  PetscCall(DMGetLocalVector(rdy->dm, &work_local));
-
-  for (PetscInt pass = 0; pass < layers; ++pass) {
-    const PetscScalar *ind;
-    PetscScalar       *w;
-    PetscCall(VecZeroEntries(work_global));
-    PetscCall(VecGetArrayRead(indicator, &ind));
-    PetscCall(VecGetArray(work_global, &w));
-    for (PetscInt o = 0; o < mesh->num_owned_cells; ++o) w[3 * o] = ind[o];
-    PetscCall(VecRestoreArray(work_global, &w));
-    PetscCall(VecRestoreArrayRead(indicator, &ind));
-
-    PetscCall(DMGlobalToLocal(rdy->dm, work_global, INSERT_VALUES, work_local));
-
-    const PetscScalar *wl;
-    PetscScalar       *out;
-    PetscCall(VecGetArrayRead(work_local, &wl));
-    PetscCall(VecGetArray(indicator, &out));
-    for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
-      PetscInt edge_id = edges->internal_edge_ids[e];
-      PetscInt l = edges->cell_ids[2 * edge_id], r = edges->cell_ids[2 * edge_id + 1];
-      if (l < 0 || r < 0) continue;
-      if (cells->is_owned[l]) {
-        PetscInt o = cells->local_to_owned[l];
-        if (PetscRealPart(wl[3 * r]) > PetscRealPart(out[o])) out[o] = wl[3 * r];
-      }
-      if (cells->is_owned[r]) {
-        PetscInt o = cells->local_to_owned[r];
-        if (PetscRealPart(wl[3 * l]) > PetscRealPart(out[o])) out[o] = wl[3 * l];
-      }
-    }
-    PetscCall(VecRestoreArray(indicator, &out));
-    PetscCall(VecRestoreArrayRead(work_local, &wl));
-  }
-
-  PetscCall(DMRestoreLocalVector(rdy->dm, &work_local));
-  PetscCall(DMRestoreGlobalVector(rdy->dm, &work_global));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-/// @brief Marks cells for refinement from the solution itself. The indicator is
-///        the water-surface jump of ComputeSurfaceJumpIndicator; which cells it
-///        selects is decided by a PETSc VecTagger under the "rdy_amr_" prefix,
-///        so the criterion is a runtime choice:
-///
-///          -rdy_amr_vec_tagger_type relative -rdy_amr_vec_tagger_box 0.5,1  (default)
-///          -rdy_amr_vec_tagger_type cdf      -rdy_amr_vec_tagger_box 0.95,1 (worst 5%)
-///          -rdy_amr_vec_tagger_type absolute -rdy_amr_vec_tagger_box 0.1,1e30
-///
-///        The default is deliberately scale-free. An absolute jump threshold
-///        disables itself: halving a cell halves the jump across its faces, so
-///        a front that was over the threshold drops under it after one adapt
-///        and the mesh stops following it. Relative and CDF boxes measure each
-///        cell against the current field instead.
-///
-///        Refinement is capped at -rdy_amr_max_levels (default 3) levels below
-///        the mesh AMR started from, since at a genuine discontinuity the
-///        indicator never runs out of signal.
-///
-/// @param [in] rdy      the dycore
-/// @param [out] nmarked number of cells marked across all ranks (may be NULL)
-/// @return PETSC_SUCCESS on success
-PetscErrorCode RDyMarkCellsForAMRBySurfaceJump(RDy rdy, PetscInt *nmarked) {
-  PetscFunctionBegin;
-
-  Vec indicator;
-  PetscCall(ComputeSurfaceJumpIndicator(rdy, &indicator));
-
-  // a front crosses several cells between adapts, so refine a band ahead of it
-  PetscInt buffer_layers = 2;
-  PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-buffer_layers", &buffer_layers, NULL));
-  PetscCall(DilateIndicator(rdy, indicator, buffer_layers));
-
-  // cells already at the finest allowed level cannot be marked, so zero their
-  // indicator before the tagger sees it (a relative or CDF box would otherwise
-  // keep selecting them)
-  PetscInt max_levels = 3;
-  PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-max_levels", &max_levels, NULL));
-  PetscReal min_area = rdy->amr.base_min_cell_area / PetscPowReal(2.0, (PetscReal)max_levels);
-  {
-    PetscScalar *ind;
-    PetscCall(VecGetArray(indicator, &ind));
-    for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
-      if (!rdy->mesh.cells.is_owned[c]) continue;
-      if (rdy->mesh.cells.areas[c] < min_area) ind[rdy->mesh.cells.local_to_owned[c]] = 0.0;
-    }
-    PetscCall(VecRestoreArray(indicator, &ind));
-  }
-
-  VecTagger tagger;
-  PetscCall(VecTaggerCreate(rdy->comm, &tagger));
-  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)tagger, "rdy_amr_"));
-  PetscCall(VecTaggerSetType(tagger, VECTAGGERRELATIVE));
-  VecTaggerBox box = {.min = 0.5, .max = 1.0};
-  PetscCall(VecTaggerRelativeSetBox(tagger, &box));
-  PetscCall(VecTaggerSetFromOptions(tagger));
-  PetscCall(VecTaggerSetUp(tagger));
-
-  IS        tagged;
-  PetscBool listed;
-  PetscCall(VecTaggerComputeIS(tagger, indicator, &tagged, &listed));
-  PetscCheck(listed, rdy->comm, PETSC_ERR_SUP, "The -rdy_amr_tagger_type in use cannot list the cells it tags");
-
-  PetscBool *refine_cell;
-  PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &refine_cell));
-
-  // the tagger lists RANK-LOCAL indices into the indicator, not global ones
-  // (PETSc's own TS ex11 consumes them the same way)
-  PetscInt        n;
-  const PetscInt *idx;
-  PetscCall(ISGetLocalSize(tagged, &n));
-  PetscCall(ISGetIndices(tagged, &idx));
-  for (PetscInt i = 0; i < n; ++i) {
-    PetscCheck(idx[i] >= 0 && idx[i] < rdy->mesh.num_owned_cells, PETSC_COMM_SELF, PETSC_ERR_PLIB,
-               "tagged index %" PetscInt_FMT " outside this rank's %" PetscInt_FMT " owned cells", idx[i], rdy->mesh.num_owned_cells);
-    refine_cell[idx[i]] = PETSC_TRUE;
-  }
-  PetscCall(ISRestoreIndices(tagged, &idx));
-
-  PetscCall(RDyMarkOwnedCellsForAMR(rdy, rdy->mesh.num_owned_cells, refine_cell));
-
-  if (nmarked) PetscCallMPI(MPI_Allreduce(&n, nmarked, 1, MPIU_INT, MPI_SUM, rdy->comm));
-
-  PetscCall(PetscFree(refine_cell));
-  PetscCall(ISDestroy(&tagged));
-  PetscCall(VecTaggerDestroy(&tagger));
-  PetscCall(VecDestroy(&indicator));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// @brief Creates a label to refine cells based on the data previously provided by call
 ///        to RDyMarkOwnedCellsForAMR
 /// @param rdy        RDy struct
@@ -388,8 +177,34 @@ static PetscErrorCode RefineDMByLabel(DM dm, DMLabel adaptLabel, const PetscInt 
 
   PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
-  PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
-  PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
+  // The transform is built here rather than reached through DMAdaptLabel. That
+  // route dispatches on -dm_adaptor, which during an adapt driven by a
+  // DMAdaptor names RDycore's own rebuild adaptor -- and the rebuild refines
+  // level by level through this function, so it would call itself. Building it
+  // also states what RDycore's AMR needs rather than hoping the options carry:
+  // simplex bisection, and labels that follow strata, without which the
+  // refined mesh's boundary edges come back as the wrong mesh points.
+  DMPlexTransform tr;
+  PetscCall(DMPlexTransformCreate(PetscObjectComm((PetscObject)dm), &tr));
+  PetscCall(PetscObjectSetName((PetscObject)tr, "Adapt Label Transform"));
+  PetscCall(DMPlexTransformSetType(tr, DMPLEXREFINESBR));
+  PetscCall(DMPlexTransformSetMatchStrata(tr, PETSC_TRUE));
+  PetscCall(DMPlexTransformSetDM(tr, dm));
+  PetscCall(DMPlexTransformSetFromOptions(tr));  // -dm_plex_transform_* still override
+  PetscCall(DMPlexTransformSetActive(tr, adaptLabel));
+  PetscCall(DMPlexTransformSetUp(tr));
+  PetscCall(DMPlexTransformApply(tr, dm, &dmAdapt));
+  PetscCall(DMCopyDisc(dm, dmAdapt));
+  {
+    DM cdm, rcdm;
+    PetscCall(DMGetCoordinateDM(dm, &cdm));
+    PetscCall(DMGetCoordinateDM(dmAdapt, &rcdm));
+    PetscCall(DMCopyDisc(cdm, rcdm));
+  }
+  PetscCall(DMPlexTransformCreateDiscLabels(tr, dmAdapt));
+  PetscCall(DMCopyDisc(dm, dmAdapt));
+  PetscCall(DMPlexSetTransform(dmAdapt, tr));  // ConstructRefineTree reads it back
+  PetscCall(DMPlexTransformDestroy(&tr));
   PetscCall(DMLabelDestroy(&adaptLabel));
 
   PetscCheck(dmAdapt, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
@@ -397,7 +212,18 @@ static PetscErrorCode RefineDMByLabel(DM dm, DMLabel adaptLabel, const PetscInt 
   PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
   PetscCall(DMViewFromOptions(dmAdapt, NULL, "-adapt_dm_view"));
 
-  // make interpolation matrix
+  PetscCall(RDyAMRBuildInterpolationMatrices(dm, dmAdapt, bs, CoarseToFineMatNDof, FineToCoarseMatNDof, CoarseToFineMat1Dof, FineToCoarseMat1Dof));
+  *dm_fine = dmAdapt;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Builds the four interpolation matrices between a mesh and the mesh
+///        refined from it, from the transform the refinement saved.
+PetscErrorCode RDyAMRBuildInterpolationMatrices(DM dm, DM dmAdapt, const PetscInt bs, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof,
+                                                Mat *CoarseToFineMat1Dof, Mat *FineToCoarseMat1Dof) {
+  PetscFunctionBeginUser;
+  PetscInt d_nz = 4, ccStart, ccEnd, fcStart, fcEnd;
+
   PetscCall(DMPlexGetHeightStratum(dm, 0, &ccStart, &ccEnd));
   PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
 
@@ -412,9 +238,6 @@ static PetscErrorCode RefineDMByLabel(DM dm, DMLabel adaptLabel, const PetscInt 
   PetscCall(MatSetBlockSize(*FineToCoarseMat1Dof, 1));
 
   PetscCall(ConstructRefineTree(dm, dmAdapt, *CoarseToFineMatNDof, *FineToCoarseMatNDof, *CoarseToFineMat1Dof, *FineToCoarseMat1Dof));
-
-  *dm_fine = dmAdapt;
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -469,7 +292,7 @@ static PetscErrorCode UpdateBaseLevels(RDy rdy, PetscInt max_levels) {
 ///        Refining from the base rather than from the current mesh is what
 ///        makes coarsening possible: a region the indicator has stopped
 ///        marking is simply built with fewer levels this time.
-static PetscErrorCode RebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt max_levels, DM *dm_new, Mat *BaseToNewNDof, Mat *NewToBaseNDof,
+PetscErrorCode RDyAMRRebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt max_levels, DM *dm_new, Mat *BaseToNewNDof, Mat *NewToBaseNDof,
                                           Mat *BaseToNew1Dof, Mat *NewToBase1Dof) {
   PetscFunctionBeginUser;
 
@@ -850,6 +673,20 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Turns on AMR driven by RDycore's built-in refinement criterion: at
+///        every adapt a PETSc DMAdaptor computes the water-surface-jump error
+///        indicator, thresholds it with its refine and coarsen VecTaggers, and
+///        adapts the mesh. Call instead of RDyEnableAMR when the caller does
+///        not mark cells itself.
+/// @param [in] rdy the dycore
+/// @return PETSC_SUCCESS on success
+PetscErrorCode RDyEnableAMRBySurfaceJump(RDy rdy) {
+  PetscFunctionBeginUser;
+  PetscCall(RDyEnableAMR(rdy));
+  rdy->amr.use_adaptor = PETSC_TRUE;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyPerformAMR(RDy rdy) {
   Mat      CoarseToFineMatNDof, FineToCoarseMatNDof;
   Mat      CoarseToFineMat1Dof, FineToCoarseMat1Dof;
@@ -864,8 +701,16 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // marking come back coarse. The solution then moves between two meshes that
   // are different triangulations of the same domain, which needs a
   // conservative transfer; refinement alone can inject.
-  PetscBool rebuilt = rdy->amr.allow_coarsening;
+  PetscBool rebuilt = rdy->amr.allow_coarsening && !rdy->amr.use_adaptor;
   Mat       SolutionTransfer = NULL, CellAssign = NULL, old_base_to_current_1dof = NULL;
+  Vec       adapted_solution = NULL;  // the adaptor's transfer, when it did one
+
+  // the adaptor path has to know, before it adapts, what the mesh it is about
+  // to replace maps to in the base mesh
+  Mat base_to_old_1dof = rdy->amr.BaseToCurrentMat1Dof;
+  if (base_to_old_1dof) PetscCall(PetscObjectReference((PetscObject)base_to_old_1dof));
+  PetscInt old_num_cells = rdy->mesh.num_cells;
+  rdy->amr.mesh_was_rebuilt = PETSC_FALSE;
 
   if (rebuilt) {
     PetscInt max_levels = 3;
@@ -876,7 +721,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
     PetscCall(PetscFree(rdy->amr.refine_cell));
 
-    PetscCall(RebuildMeshFromBase(rdy, ndof_coarse, max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof,
+    PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof,
                                   &FineToCoarseMat1Dof));
 
     // region membership and ownership ride along on an assignment to any old
@@ -888,11 +733,54 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
                                         rdy->amr.num_base_cells, ndof_coarse, &CellAssign));
     old_base_to_current_1dof = rdy->amr.BaseToCurrentMat1Dof;
     if (old_base_to_current_1dof) PetscCall(PetscObjectReference((PetscObject)old_base_to_current_1dof));
+  } else if (rdy->amr.use_adaptor) {
+    DMAdaptor adaptor;
+    PetscCall(RDyAMRCreateAdaptor(rdy, &adaptor));
+
+    // DMAdaptorAdapt consumes a reference to the mesh and the solution it is
+    // given and returns new ones; RDycore keeps its own
+    Vec x_adapted;
+    PetscCall(PetscObjectReference((PetscObject)rdy->dm));
+    PetscCall(PetscObjectReference((PetscObject)rdy->u_global));
+    PetscCall(DMPlexSetSaveTransform(rdy->dm, PETSC_TRUE));
+    PetscCall(DMAdaptorAdapt(adaptor, rdy->u_global, DM_ADAPTATION_INITIAL, &dm_fine, &x_adapted));
+    PetscCall(DMAdaptorDestroy(&adaptor));
+
+    if (dm_fine == rdy->dm) {  // nothing was tagged: leave the mesh alone
+      PetscCall(DMDestroy(&dm_fine));
+      PetscCall(VecDestroy(&x_adapted));
+      PetscFunctionReturn(PETSC_SUCCESS);
+    }
+    // whichever mesh adaptor ran left its interpolation matrices behind
+    CoarseToFineMatNDof = rdy->amr.adapt_coarse_to_fine_ndof;
+    FineToCoarseMatNDof = rdy->amr.adapt_fine_to_coarse_ndof;
+    CoarseToFineMat1Dof = rdy->amr.adapt_coarse_to_fine_1dof;
+    FineToCoarseMat1Dof = rdy->amr.adapt_fine_to_coarse_1dof;
+
+    if (rdy->amr.mesh_was_rebuilt) {
+      // the rebuild adaptor coarsened somewhere, so its matrices run from the
+      // base mesh and the solution has to cross conservatively, further down
+      rebuilt = PETSC_TRUE;
+      PetscCall(VecDestroy(&x_adapted));
+      PetscInt ncStart, ncEnd;
+      PetscCall(DMPlexGetHeightStratum(dm_fine, 0, &ncStart, &ncEnd));
+      PetscCall(RDyAMRCreateSiblingAssign(old_num_cells, ncEnd - ncStart, base_to_old_1dof, CoarseToFineMat1Dof, rdy->amr.num_base_cells,
+                                          ndof_coarse, &CellAssign));
+      old_base_to_current_1dof = base_to_old_1dof;
+      base_to_old_1dof         = NULL;  // handed on
+    } else {
+      // a refinement of the mesh in hand: the transfer hook has already
+      // injected the solution onto it
+      adapted_solution = x_adapted;
+      SolutionTransfer = CoarseToFineMatNDof;
+      CellAssign       = CoarseToFineMatNDof;
+    }
   } else {
     PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
     SolutionTransfer = CoarseToFineMatNDof;
     CellAssign       = CoarseToFineMatNDof;
   }
+  PetscCall(MatDestroy(&base_to_old_1dof));  // unused unless the mesh was rebuilt
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
@@ -1083,8 +971,14 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // initialize the solution on the new mesh from the old one: injection when
   // the mesh was refined from the current one, area-weighted averaging when it
   // was rebuilt and some of it coarsened
-  PetscCall(MatMult(SolutionTransfer, U_coarse_local, rdy->u_local));
-  PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
+  if (adapted_solution) {
+    PetscCall(VecCopy(adapted_solution, rdy->u_global));
+    PetscCall(VecDestroy(&adapted_solution));
+    PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, rdy->u_local));
+  } else {
+    PetscCall(MatMult(SolutionTransfer, U_coarse_local, rdy->u_local));
+    PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
+  }
   if (rebuilt) {
     PetscCall(MatDestroy(&SolutionTransfer));
     PetscCall(MatDestroy(&CellAssign));

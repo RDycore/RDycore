@@ -222,7 +222,17 @@ int main(int argc, char *argv[]) {
     PetscCall(RDySetup(rdy));
 
     // enable refinement
-    PetscCall(RDyEnableAMR(rdy));
+    PetscBool by_jump_early = PETSC_FALSE;
+    {
+      char criterion[32] = "box";
+      PetscCall(PetscOptionsGetString(NULL, NULL, "-refine_criterion", criterion, sizeof(criterion), NULL));
+      PetscCall(PetscStrcmp(criterion, "jump", &by_jump_early));
+    }
+    if (by_jump_early) {
+      PetscCall(RDyEnableAMRBySurfaceJump(rdy));  // the DMAdaptor marks the cells
+    } else {
+      PetscCall(RDyEnableAMR(rdy));
+    }
 
     RefinementDataset refinement_dataset;
     PetscCall(ParseRefinementDataOptions(&refinement_dataset));
@@ -261,11 +271,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (refine_at_start && by_jump) {
-      PetscInt nmarked, ncells;
-      PetscCall(RDyMarkCellsForAMRBySurfaceJump(rdy, &nmarked));
-      PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
-      if (!myrank) printf("AMR: marked %" PetscInt_FMT " of %" PetscInt_FMT " cells by water-surface jump (initial condition)\n", nmarked, ncells);
       PetscCall(RDyPerformAMR(rdy));
+      PetscInt ncells;
+      PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
+      if (!myrank) printf("AMR: %" PetscInt_FMT " cells after adapting to the initial condition\n", ncells);
     }
 
     PetscCall(RDyAdvance(rdy));
@@ -289,10 +298,7 @@ int main(int argc, char *argv[]) {
         PetscCall(VecDestroy(&global_base));
         PetscCall(VecDestroy(&global_current));
       } else if (by_jump) {
-        PetscInt nmarked, ncells;
-        PetscCall(RDyMarkCellsForAMRBySurfaceJump(rdy, &nmarked));
-        PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
-        if (!myrank) printf("AMR: marked %" PetscInt_FMT " of %" PetscInt_FMT " cells by water-surface jump\n", nmarked, ncells);
+        // nothing to do: the DMAdaptor computes the indicator inside the adapt
       } else {
         PetscCall(MarkOwnedCellsForRefinement(rdy));
       }
@@ -301,6 +307,12 @@ int main(int argc, char *argv[]) {
       if (check_volume) PetscCall(ComputeWaterVolume(rdy, &volume_before));
 
       PetscCall(RDyPerformAMR(rdy));
+
+      if (by_jump) {
+        PetscInt ncells;
+        PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
+        if (!myrank) printf("AMR: %" PetscInt_FMT " cells after adapt\n", ncells);
+      }
 
       if (check_volume) {
         PetscCall(ComputeWaterVolume(rdy, &volume_after));

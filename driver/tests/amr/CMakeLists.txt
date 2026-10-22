@@ -37,8 +37,9 @@ file(COPY
      ${MESH_DIR}/planar_dam_20x10_tri.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-set(amr_jump_args -dm_adaptor cellrefiner -dm_plex_transform_type refine_sbr -dm_plex_transform_label_match_strata
-                  -refine_criterion jump -refine_at_start -refine_check_volume)
+# the transform RDycore's AMR needs is set in the code, so the cases ask only
+# for the criterion
+set(amr_jump_args -refine_criterion jump -refine_at_start -refine_check_volume)
 
 # 1D dam break on a 2D mesh: the case checked against the Stoker solution
 foreach(np 1 3)

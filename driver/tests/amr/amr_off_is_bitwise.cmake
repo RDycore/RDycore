@@ -27,9 +27,8 @@ endif()
 
 execute_process(
   COMMAND ${RDYCORE_AMR} amr_off.yaml
-          -dm_adaptor cellrefiner -dm_plex_transform_type refine_sbr -dm_plex_transform_label_match_strata
           -refine_criterion jump
-          -rdy_amr_vec_tagger_type absolute -rdy_amr_vec_tagger_box 1e30,1e31
+          -rdy_amr_refine_vec_tagger_type absolute -rdy_amr_refine_vec_tagger_box 1e30,1e31
   WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_QUIET)
 if (NOT rc EQUAL 0)
   message(FATAL_ERROR "the AMR driver failed (${rc})")

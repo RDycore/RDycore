@@ -97,6 +97,21 @@ typedef struct {
   // is refinement on or off
   PetscBool is_refinement_on;
 
+  // when set, the adapt is driven by a PETSc DMAdaptor (src/rdyamr_adaptor.c):
+  // it computes the error indicator, thresholds it with its two VecTaggers and
+  // calls DMAdaptLabel, rather than RDycore marking cells itself
+  PetscBool use_adaptor;
+
+  // interpolation matrices for the adapt in progress, built by the DMAdaptor's
+  // transfer hook and consumed by RDyPerformAMR, which carries the regions
+  // across the adapt with them
+  Mat adapt_coarse_to_fine_ndof, adapt_fine_to_coarse_ndof;
+  Mat adapt_coarse_to_fine_1dof, adapt_fine_to_coarse_1dof;
+
+  // set by the rebuild mesh adaptor: the new mesh is not a refinement of the
+  // old one, so the solution crosses by the conservative transfer
+  PetscBool mesh_was_rebuilt;
+
   // when set, each adapt rebuilds the mesh from dm_base instead of refining
   // the current one, so regions the indicator no longer marks come back coarse
   PetscBool allow_coarsening;
