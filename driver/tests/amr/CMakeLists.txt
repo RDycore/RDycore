@@ -51,6 +51,16 @@ foreach(np 1 3)
   add_test(amr_dam_break_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} dam_break_amr.yaml -options_left ${amr_jump_args})
 endforeach()
 
+# The same two cases with coarsening: each adapt rebuilds the mesh from the base
+# mesh, so the cell count falls again behind a feature that has moved on, and
+# the solution moves between meshes by the conservative transfer
+foreach(np 1 3)
+  add_test(amr_channel_wave_coarsen_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} channel_wave_amr.yaml -options_left
+           ${amr_jump_args} -refine_allow_coarsening)
+endforeach()
+add_test(amr_dam_break_coarsen_c_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${amr_c_driver} dam_break_amr.yaml -options_left
+         ${amr_jump_args} -refine_allow_coarsening)
+
 # Gate: the adapt machinery with nothing marked leaves the answer untouched
 add_test(NAME amr_off_is_bitwise
          COMMAND ${CMAKE_COMMAND}

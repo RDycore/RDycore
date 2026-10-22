@@ -4,7 +4,25 @@
 
 static const char *help_str =
     "rdycore_amr - a standalone RDycore driver for AMR problems\n"
-    "usage: rdycore_amr [options] <filename.yaml>\n";
+    "usage: rdycore_amr [options] <filename.yaml>\n"
+    "\n"
+    "  -refine_criterion <box|jump>  what to refine on: a fixed box (default), or\n"
+    "                                the water-surface jump of the solution\n"
+    "  -refine_at_start              adapt to the initial condition before stepping\n"
+    "  -refine_allow_coarsening      rebuild the mesh from the base mesh at every\n"
+    "                                adapt, so cells the criterion no longer marks\n"
+    "                                come back coarse\n"
+    "  -refine_check_volume          report sum(h * area) across every adapt\n"
+    "  -refine_data_dir <dir>        refine from marker files instead (with\n"
+    "                                -refine_data_start_date Y,M,D,h,m)\n"
+    "\n"
+    "  the jump criterion is tuned with -rdy_amr_vec_tagger_type <relative|cdf|absolute>\n"
+    "  and -rdy_amr_vec_tagger_box <lo,hi>, -rdy_amr_buffer_layers <n> and\n"
+    "  -rdy_amr_max_levels <n>\n"
+    "\n"
+    "  the mesh must be simplicial and the adapt needs\n"
+    "  -dm_adaptor cellrefiner -dm_plex_transform_type refine_sbr\n"
+    "  -dm_plex_transform_label_match_strata\n";
 
 static void usage(const char *exe_name) {
   fprintf(stderr, "%s: usage:\n", exe_name);
