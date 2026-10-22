@@ -111,6 +111,34 @@ static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Reports the water volume the mesh holds, sum(h * area) over owned
+///        cells. Refinement and the interpolation that follows it should not
+///        change this: comparing the value across an adapt is the conservation
+///        check for the AMR path.
+/// @param [in] rdy    the dycore
+/// @param [out] total the global water volume (m^3), valid on every rank
+static PetscErrorCode ComputeWaterVolume(RDy rdy, PetscReal *total) {
+  PetscFunctionBegin;
+
+  PetscInt ncells_local;
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
+
+  PetscReal *h, *area;
+  PetscCalloc1(ncells_local, &h);
+  PetscCalloc1(ncells_local, &area);
+  PetscCall(RDyGetOwnedCellHeights(rdy, ncells_local, h));
+  PetscCall(RDyGetOwnedCellAreas(rdy, ncells_local, area));
+
+  PetscReal local = 0.0;
+  for (PetscInt icell = 0; icell < ncells_local; icell++) local += h[icell] * area[icell];
+  PetscCallMPI(MPI_Allreduce(&local, total, 1, MPIU_REAL, MPI_SUM, PETSC_COMM_WORLD));
+
+  PetscFree(h);
+  PetscFree(area);
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscFunctionBegin;
 
@@ -181,6 +209,22 @@ int main(int argc, char *argv[]) {
     RefinementDataset refinement_dataset;
     PetscCall(ParseRefinementDataOptions(&refinement_dataset));
 
+    // -refine_criterion speed marks cells by the local flow speed instead of
+    // the static box of MarkOwnedCellsForRefinement, so the mesh follows the
+    // solution. -refine_check_volume reports sum(h * area) across each adapt.
+    char      criterion[32] = "box";
+    PetscBool check_volume = PETSC_FALSE, refine_at_start = PETSC_FALSE;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-refine_criterion", criterion, sizeof(criterion), NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_volume", &check_volume, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_at_start", &refine_at_start, NULL));
+    PetscBool by_jump;
+    PetscCall(PetscStrcmp(criterion, "jump", &by_jump));
+    if (!by_jump) {
+      PetscBool by_box;
+      PetscCall(PetscStrcmp(criterion, "box", &by_box));
+      PetscCheck(by_box, comm, PETSC_ERR_USER, "-refine_criterion must be 'box' or 'jump', got '%s'", criterion);
+    }
+
     RDyTimeUnit time_unit;
     PetscReal   time, prev_time;
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
@@ -195,6 +239,14 @@ int main(int argc, char *argv[]) {
 
       PetscCall(MarkOwnedCellsForRefinementBasedOnDataset(rdy, global));
       PetscCall(VecDestroy(&global));
+      PetscCall(RDyPerformAMR(rdy));
+    }
+
+    if (refine_at_start && by_jump) {
+      PetscInt nmarked, ncells;
+      PetscCall(RDyMarkCellsForAMRBySurfaceJump(rdy, &nmarked));
+      PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
+      if (!myrank) printf("AMR: marked %" PetscInt_FMT " of %" PetscInt_FMT " cells by water-surface jump (initial condition)\n", nmarked, ncells);
       PetscCall(RDyPerformAMR(rdy));
     }
 
@@ -218,11 +270,26 @@ int main(int argc, char *argv[]) {
 
         PetscCall(VecDestroy(&global_base));
         PetscCall(VecDestroy(&global_current));
+      } else if (by_jump) {
+        PetscInt nmarked, ncells;
+        PetscCall(RDyMarkCellsForAMRBySurfaceJump(rdy, &nmarked));
+        PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
+        if (!myrank) printf("AMR: marked %" PetscInt_FMT " of %" PetscInt_FMT " cells by water-surface jump\n", nmarked, ncells);
       } else {
         PetscCall(MarkOwnedCellsForRefinement(rdy));
       }
 
+      PetscReal volume_before = 0.0, volume_after = 0.0;
+      if (check_volume) PetscCall(ComputeWaterVolume(rdy, &volume_before));
+
       PetscCall(RDyPerformAMR(rdy));
+
+      if (check_volume) {
+        PetscCall(ComputeWaterVolume(rdy, &volume_after));
+        PetscReal rel = (volume_before != 0.0) ? PetscAbsReal(volume_after - volume_before) / volume_before : 0.0;
+        if (!myrank) printf("AMR: water volume %.15g -> %.15g m^3, relative change %.3e\n", (double)volume_before, (double)volume_after, (double)rel);
+      }
+
       PetscCall(RDyAdvance(rdy));
     }
 
