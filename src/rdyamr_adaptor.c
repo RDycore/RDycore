@@ -156,11 +156,24 @@ static PetscErrorCode ComputeSurfaceJumpIndicator(RDy rdy, Vec errVec) {
 
   // cells already at the finest allowed level cannot be refined further, so
   // zero their indicator before the taggers see it: a relative or CDF box
-  // would otherwise keep selecting them
-  PetscReal min_area = rdy->amr.base_min_cell_area / PetscPowReal(2.0, (PetscReal)rdy->amr.max_levels);
+  // would otherwise keep selecting them.
+  //
+  // The level is read off the area against the cell's OWN base cell, because a
+  // bisection halves a cell exactly: a cell max_levels below its base cell has
+  // 2^-max_levels of its area, whatever the base cell's size. Comparing against
+  // one area for the whole mesh instead only caps the smallest base cell at
+  // max_levels; on a graded mesh every larger base cell refines deeper, and
+  // the largest without any limit at all on the refine-only path. The test is
+  // >=, not >: a cell that has reached max_levels must not be marked again.
   for (PetscInt c = 0; c < mesh->num_cells; ++c) {
     if (!cells->is_owned[c]) continue;
-    if (cells->areas[c] < min_area) ind[cells->local_to_owned[c]] = 0.0;
+    PetscInt base;
+    PetscCall(RDyAMRBaseCellOfLocalCell(rdy, c, &base));
+    if (base < 0) continue;
+    // the ratio is a power of two, so rounding the logarithm absorbs the
+    // roundoff that accumulated computing the areas from the coordinates
+    PetscInt level = (PetscInt)PetscFloorReal(PetscLog2Real(rdy->amr.base_cell_area[base] / cells->areas[c]) + 0.5);
+    if (level >= rdy->amr.max_levels) ind[cells->local_to_owned[c]] = 0.0;
   }
 
   // spread the owned values onto the ghosts and write them out by local cell

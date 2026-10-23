@@ -19,6 +19,10 @@ static const char *help_str =
     "                                -refine_check_volume_tol (default 1e-11)\n"
     "                                relative\n"
     "  -refine_check_volume_tol <t>  that tolerance\n"
+    "  -refine_check_max_level       report how deep the mesh has been refined\n"
+    "                                after every adapt, and fail more than one\n"
+    "                                level past -rdy_amr_max_levels (which caps\n"
+    "                                marking; the conformity closure can add one)\n"
     "  -refine_data_dir <dir>        refine from marker files instead (with\n"
     "                                -refine_data_start_date Y,M,D,h,m)\n"
     "\n"
@@ -168,6 +172,57 @@ static PetscErrorCode ComputeWaterVolume(RDy rdy, PetscReal *total) {
 
   PetscCall(PetscFree(h));
   PetscCall(PetscFree(area));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Reports, and fails on, the deepest any owned cell has been refined
+///        below the base cell it descends from. A bisection halves a cell
+///        exactly, so a cell `level` below its base cell has 2^-level of its
+///        area, whatever the base cell's size -- which is the point: a limit
+///        expressed as one area for the whole mesh binds only on the finest
+///        base cell, and on a graded mesh every coarser one refines past it.
+///
+///        The limit allowed here is max_levels + 1, not max_levels.
+///        -rdy_amr_max_levels caps the level a cell may be MARKED at;
+///        refine_sbr then splits a marked triangle into two children, or into
+///        three of areas 1/2, 1/4, 1/4 where conformity needs a second edge
+///        split, so a cell marked at max_levels - 1 can come back at
+///        max_levels + 1. Measured, not proved: a longer conformity chain
+///        through cells that are already at the limit is not ruled out by
+///        anything we have read, and a failure here would be worth knowing
+///        about rather than tolerating.
+static PetscErrorCode CheckRefinementLimit(RDy rdy, PetscInt max_levels) {
+  PetscFunctionBegin;
+
+  PetscInt ncells_local;
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
+
+  PetscReal *area, *base_area;
+  PetscCall(PetscCalloc1(ncells_local, &area));
+  PetscCall(PetscCalloc1(ncells_local, &base_area));
+  PetscCall(RDyGetOwnedCellAreas(rdy, ncells_local, area));
+  PetscCall(RDyGetOwnedCellBaseAreas(rdy, ncells_local, base_area));
+
+  PetscInt local = 0, deepest;
+  for (PetscInt icell = 0; icell < ncells_local; icell++) {
+    // the ratio is a power of two, so rounding the logarithm absorbs roundoff
+    local = PetscMax(local, (PetscInt)PetscFloorReal(PetscLog2Real(base_area[icell] / area[icell]) + 0.5));
+  }
+  PetscCallMPI(MPI_Allreduce(&local, &deepest, 1, MPIU_INT, MPI_MAX, PETSC_COMM_WORLD));
+
+  PetscCall(PetscFree(area));
+  PetscCall(PetscFree(base_area));
+
+  PetscMPIInt myrank;
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+  if (!myrank) {
+    printf("AMR: deepest cell is %" PetscInt_FMT " levels below its base cell (marking limit %" PetscInt_FMT ")\n", deepest, max_levels);
+  }
+  PetscCheck(deepest <= max_levels + 1, PETSC_COMM_WORLD, PETSC_ERR_NOT_CONVERGED,
+             "the adapt refined past -rdy_amr_max_levels: a cell is %" PetscInt_FMT
+             " levels below its base cell, and the conformity closure accounts for at most %" PetscInt_FMT,
+             deepest, max_levels + 1);
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -343,6 +398,13 @@ int main(int argc, char *argv[]) {
       if (still_water_tol == 0.0) still_water_tol = 1e-12;
     }
 
+    // the refinement-limit gate: no cell may end up more than max_levels
+    // bisections below the base cell it descends from
+    PetscBool check_max_level = PETSC_FALSE;
+    PetscInt  max_levels      = 0;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_max_level", &check_max_level, NULL));
+    if (check_max_level) PetscCall(RDyGetAMRMaxLevels(rdy, &max_levels));
+
     RDyTimeUnit time_unit;
     PetscReal   time, prev_time;
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
@@ -365,6 +427,7 @@ int main(int argc, char *argv[]) {
       PetscInt ncells;
       PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
       if (!myrank) printf("AMR: %" PetscInt_FMT " cells after adapting to the initial condition\n", ncells);
+      if (check_max_level) PetscCall(CheckRefinementLimit(rdy, max_levels));
     }
 
     PetscCall(RDyAdvance(rdy));
@@ -421,6 +484,8 @@ int main(int argc, char *argv[]) {
         PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
         if (!myrank) printf("AMR: %" PetscInt_FMT " cells after adapt\n", ncells);
       }
+
+      if (check_max_level) PetscCall(CheckRefinementLimit(rdy, max_levels));
 
       if (check_volume) {
         PetscCall(ComputeWaterVolume(rdy, &volume_after));

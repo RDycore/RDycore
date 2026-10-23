@@ -101,7 +101,12 @@ typedef struct {
   // criterion (src/rdyamr_adaptor.c) rather than from the caller marking them
   PetscBool use_surface_jump;
 
-  // deepest refinement any base cell may reach, from -rdy_amr_max_levels
+  // deepest refinement any base cell may be MARKED at, from -rdy_amr_max_levels.
+  // The mesh can come back one level finer than this: refine_sbr splits a
+  // marked triangle into two children or, where conformity needs a second
+  // edge split, into three of areas 1/2, 1/4, 1/4 (plexrefsbr.c,
+  // SBRGetTriangleSplit{Single,Double}), so a marked cell at max_levels - 1
+  // can land at max_levels + 1.
   PetscInt max_levels;
 
   // when set, each adapt rebuilds the mesh from dm_base instead of refining
@@ -112,11 +117,12 @@ typedef struct {
   PetscInt *base_level;
   PetscInt  num_base_cells;
 
-  // smallest owned cell area of the unrefined mesh, recorded by RDyEnableAMR.
-  // Solution-driven marking caps refinement against it: a cell smaller than
-  // base_min_cell_area / 2^max_levels is never marked (refine_sbr bisects, so
-  // one level is a factor of two in area)
-  PetscReal base_min_cell_area;
+  // area of each base cell, recorded by RDyEnableAMR alongside base_level.
+  // Solution-driven marking caps refinement against a cell's OWN base cell:
+  // refine_sbr bisects, so a cell max_levels below its base cell has 2^-max_levels
+  // of its area and is never marked again. One threshold for the whole mesh
+  // would cap a graded mesh at the wrong depth everywhere but its finest base cell.
+  PetscReal *base_cell_area;
 } RDyAMR;
 
 // This type serves as a "virtual table" containing function pointers that

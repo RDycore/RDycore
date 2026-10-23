@@ -1,0 +1,81 @@
+# The channel dam break again, on a graded mesh: the cells grow geometrically
+# along x, so the largest base cell has eight times the area of the smallest.
+#
+# Every other AMR case here is uniform, and a uniform mesh cannot tell a
+# refinement limit taken against each cell's own base cell from one taken
+# against the smallest base cell in the mesh. RDycore's real meshes are graded,
+# so this is the case that exercises the limit.
+#
+# The step sits at mid-channel, where the cells are mid-sized, and the shock
+# runs into the coarse end -- so the cells the criterion keeps marking are the
+# large ones, which is where an over-generous limit shows.
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 4
+  unit: seconds
+  time_step: 0.002
+  coupling_interval: 0.5
+
+output:
+  format: xdmf
+  output_interval: 50
+
+grid:
+  file: graded_40x2_tri.msh
+
+regions:
+  - name: left
+    grid_region_id: 1
+  - name: right
+    grid_region_id: 2
+
+surface_composition:
+  - region: left
+    material: frictionless
+  - region: right
+    material: frictionless
+
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: left
+    flow: deep_ic
+  - region: right
+    flow: shallow_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [boundary]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: deep_ic
+    type: dirichlet
+    height: 2
+    x_momentum: 0
+    y_momentum: 0
+  - name: shallow_ic
+    type: dirichlet
+    height: 1
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting

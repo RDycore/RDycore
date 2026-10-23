@@ -707,11 +707,38 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   rdy->amr.num_base_cells = rdy->mesh.num_cells;
   PetscCall(PetscCalloc1(rdy->amr.num_base_cells, &rdy->amr.base_level));
 
-  PetscReal local_min = PETSC_MAX_REAL;
+  // the depth a cell may be refined to is measured against its own base cell,
+  // so the base areas are kept for as long as base_level is
+  PetscCall(PetscCalloc1(rdy->amr.num_base_cells, &rdy->amr.base_cell_area));
+  for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) rdy->amr.base_cell_area[c] = rdy->mesh.cells.areas[c];
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief The deepest refinement any base cell may reach, as
+///        `-rdy_amr_max_levels` set it.
+PetscErrorCode RDyGetAMRMaxLevels(RDy rdy, PetscInt *max_levels) {
+  PetscFunctionBeginUser;
+  PetscCheck(rdy->amr.is_refinement_on, rdy->comm, PETSC_ERR_ARG_WRONGSTATE, "AMR is not enabled, so there is no refinement limit to report");
+  *max_levels = rdy->amr.max_levels;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief The area of the base cell each owned cell descends from, in the same
+///        order as RDyGetOwnedCellAreas(). Dividing the two gives 2^level, so a
+///        caller can check how deep the mesh has been refined.
+PetscErrorCode RDyGetOwnedCellBaseAreas(RDy rdy, const PetscInt size, PetscReal *values) {
+  PetscFunctionBeginUser;
+  PetscCheck(rdy->amr.base_cell_area, rdy->comm, PETSC_ERR_ARG_WRONGSTATE, "AMR is not enabled, so no base mesh was recorded");
+  PetscCheck(size == rdy->mesh.num_owned_cells, rdy->comm, PETSC_ERR_ARG_SIZ,
+             "Wrong size (%" PetscInt_FMT ") for owned cells in domain (%" PetscInt_FMT ")", size, rdy->mesh.num_owned_cells);
+
+  PetscInt count = 0;
   for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
-    if (rdy->mesh.cells.is_owned[c]) local_min = PetscMin(local_min, rdy->mesh.cells.areas[c]);
+    if (!rdy->mesh.cells.is_owned[c]) continue;
+    PetscInt base;
+    PetscCall(RDyAMRBaseCellOfLocalCell(rdy, c, &base));
+    values[count++] = (base >= 0) ? rdy->amr.base_cell_area[base] : rdy->mesh.cells.areas[c];
   }
-  PetscCallMPI(MPI_Allreduce(&local_min, &rdy->amr.base_min_cell_area, 1, MPIU_REAL, MPI_MIN, rdy->comm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

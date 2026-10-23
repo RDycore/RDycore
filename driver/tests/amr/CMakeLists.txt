@@ -39,13 +39,15 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/dam_break_amr.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/still_water_dem.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/graded_wave_amr.yaml
      ${MESH_DIR}/channel_100x4_tri.msh
      ${MESH_DIR}/planar_dam_20x10_tri.msh
      ${MESH_DIR}/ramp_100x4_tri.msh
+     ${MESH_DIR}/graded_40x2_tri.msh
      ${MESH_DIR}/channel_ramp_elevation.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-# The transform RDycore's AMR needs is set in the code, so the cases ask only
+# the transform RDycore's AMR needs is set in the code, so the cases ask only
 # for the criterion.
 #
 # -refine_check_volume is a gate (exactness class: machine precision, with the
@@ -140,6 +142,26 @@ add_test(NAME amr_relaxes_to_base_mesh
 foreach(np 1 3)
   add_test(amr_still_water_dem_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} still_water_dem.yaml -options_left
            -refine_still_water 1.5 -refine_box -5,5,-1,3 -refine_box_speed 10 -refine_allow_coarsening -refine_check_volume)
+endforeach()
+
+# Gate (exactness class: exact degeneration -- the refinement level is an
+# integer read off an area ratio that is a power of two, so the limit holds or
+# it does not; there is no tolerance). On a graded base mesh, refine-only, no
+# cell may end up more than one level below -rdy_amr_max_levels: the option caps
+# the level a cell may be MARKED at, and refine_sbr's conformity closure splits
+# a marked triangle into three children of areas 1/2, 1/4, 1/4 where it needs a
+# second edge split, which accounts for the one level and no more.
+#
+# What this catches, measured at max_levels 2 with the fix reverted:
+#   graded,  limit per base cell : depth 2 3 3 3 3 3 3 3,  570 cells at the end
+#   graded,  one limit for all   : depth 2 4 6 6 6 6 7 7, 1447 cells at the end
+#   uniform, one limit for all   : depth 2 4 4 4 4 4 4 4  -- bounded, so no
+#                                  uniform mesh can see the runaway
+# The uniform run is one level too deep either way until the test is written >=
+# rather than >, which is the second half of the same fix.
+foreach(np 1 3)
+  add_test(amr_graded_max_level_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} graded_wave_amr.yaml -options_left
+           ${amr_jump_args} -refine_check_max_level -rdy_amr_max_levels 2)
 endforeach()
 
 # The same lake-at-rest gates under CEED. Running the demonstration cases under

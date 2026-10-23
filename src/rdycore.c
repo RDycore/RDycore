@@ -276,8 +276,9 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
-  // allocated by RDyEnableAMR, so it outlives an AMR run that never adapted
+  // allocated by RDyEnableAMR, so they outlive an AMR run that never adapted
   PetscCall(PetscFree((*rdy)->amr.base_level));
+  PetscCall(PetscFree((*rdy)->amr.base_cell_area));
 
   // the base DMs are referenced from RDyEnableAMR, whether or not an adapt
   // ever happened
