@@ -23,14 +23,17 @@ give 9/9 AMR tests and identical cell counts and volumes.
 
 ## A. PETSc usage worth a second opinion
 
-1. **Private header dependency.** `src/rdyamr_adaptor.c` includes
-   `petsc/private/dmadaptorimpl.h` for two reasons: to set
-   `ops->computeerrorindicator` and `ops->transfersolution` in the registered
-   type's create function, and to reach `adaptor->refineTag` /
-   `adaptor->coarsenTag`, for which PETSc exposes no accessor.
+1. **Private header dependency, now down to two uses.**
+   `src/rdyamr_adaptor.c` includes `petsc/private/dmadaptorimpl.h` to set
+   `ops->computeerrorindicator` in the registered type's create function, and
+   to reach `adaptor->refineTag` / `adaptor->coarsenTag`, for which PETSc
+   exposes no accessor. (The transfer hook no longer needs it:
+   `DMAdaptorSetTransferFunction` is public and is now used.)
    `DMAdaptorRegister` is public but what it configures is not. Worth asking
    PETSc for `DMAdaptorGetRefinementTagger()`/`GetCoarseningTagger()` and a
    public way to set the indicator of a registered type.
+   `src/rdyamr.c` also includes `petsc/private/dmpleximpl.h`, which predates
+   this work and is **not needed** -- it compiles with plain `petscdmplex.h`.
 2. **Unchecked PETSc calls.** `InitBoundaries(rdy)` is called bare in
    `RDyPerformAMR` (`src/rdyamr.c:998`); its errors print and execution
    continues. That is how a misconfigured transform stayed invisible for a

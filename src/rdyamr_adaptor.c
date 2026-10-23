@@ -286,8 +286,10 @@ static PetscErrorCode DMAdaptLabel_RDyRebuild(DM dm, PETSC_UNUSED Vec metric, DM
 
 static PetscErrorCode DMAdaptorCreate_SurfaceJump(DMAdaptor adaptor) {
   PetscFunctionBegin;
+  // the transfer has a public setter; the indicator does not, so it is set
+  // through the implementation header
   adaptor->ops->computeerrorindicator = ComputeErrorIndicator_SurfaceJump;
-  adaptor->ops->transfersolution      = TransferSolution_SurfaceJump;
+  PetscCall(DMAdaptorSetTransferFunction(adaptor, TransferSolution_SurfaceJump));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
