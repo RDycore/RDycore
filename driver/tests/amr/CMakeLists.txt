@@ -38,9 +38,11 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/dam_break_amr.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/still_water_dem.yaml
      ${MESH_DIR}/channel_100x4_tri.msh
      ${MESH_DIR}/planar_dam_20x10_tri.msh
      ${MESH_DIR}/ramp_100x4_tri.msh
+     ${MESH_DIR}/channel_ramp_elevation.${PETSC_ID_TYPE}.bin
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # The transform RDycore's AMR needs is set in the code, so the cases ask only
@@ -129,6 +131,16 @@ add_test(NAME amr_relaxes_to_base_mesh
                  -DMPIEXEC=${MPIEXEC}
                  -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_relaxes_to_base_mesh
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_relaxes_to_base_mesh.cmake)
+
+# The same gate with the bed read from a file instead of the mesh. It is a
+# separate run because it is a separate path: the operator takes the cell-centre
+# z the file gives, and the adapt has to carry those values from the base mesh
+# rather than re-read a file holding one value per base cell, which is what used
+# to make the first adapt fail outright.
+foreach(np 1 3)
+  add_test(amr_still_water_dem_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} still_water_dem.yaml -options_left
+           -refine_still_water 1.5 -refine_box -5,5,-1,3 -refine_box_speed 10 -refine_allow_coarsening -refine_check_volume)
+endforeach()
 
 # The same lake-at-rest gates under CEED. Running the demonstration cases under
 # CEED would not do: they only report the water volume, so a wrong-but-finite

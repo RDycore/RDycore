@@ -243,6 +243,37 @@ static PetscErrorCode SurfaceToDepth(RDyMesh *mesh, const PetscInt ndof, Vec u_l
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Puts the bed elevations the configuration names back on an adapted
+///        mesh.
+///
+///        OverrideCellElevation() cannot be used after an adapt: it reads a
+///        file holding one value per base cell into a vector sized for the mesh
+///        in hand, and the two stopped matching at the first refinement. The
+///        bed belongs to the base mesh, so the values are injected along the
+///        base-to-current interpolation instead, which gives every descendant
+///        of a base cell its elevation.
+static PetscErrorCode OverrideCellElevationFromBase(RDy rdy) {
+  PetscFunctionBeginUser;
+
+  Vec global_base, local_base, local_current;
+  PetscCall(RDyReadAMRScalarGlobalVecLevel0FromBinary(rdy, rdy->config.grid.cell_elevation.file, &global_base));
+  PetscCall(DMCreateLocalVector(rdy->amr.dm_1dof_base, &local_base));
+  PetscCall(DMGlobalToLocal(rdy->amr.dm_1dof_base, global_base, INSERT_VALUES, local_base));
+  PetscCall(DMCreateLocalVector(rdy->dm_1dof, &local_current));
+  PetscCall(MatMult(rdy->amr.BaseToCurrentMat1Dof, local_base, local_current));
+
+  const PetscScalar *z;
+  PetscCall(VecGetArrayRead(local_current, &z));
+  RDyCells *cells = &rdy->mesh.cells;
+  for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) cells->centroids[c].X[2] = PetscRealPart(z[c]);
+  PetscCall(VecRestoreArrayRead(local_current, &z));
+
+  PetscCall(VecDestroy(&global_base));
+  PetscCall(VecDestroy(&local_base));
+  PetscCall(VecDestroy(&local_current));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Updates each base cell's target refinement level from this adapt's
 ///        marks: a base cell with a marked descendant goes one level deeper,
 ///        one without comes one level back. One level per adapt in either
@@ -909,7 +940,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
   if (rdy->config.grid.cell_elevation.file[0]) {
-    PetscCall(OverrideCellElevation(rdy));
+    PetscCall(OverrideCellElevationFromBase(rdy));
   }
 
   // initialize the solution on the new mesh from the old one: injection when

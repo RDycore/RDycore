@@ -1,0 +1,81 @@
+# A lake at rest on a bed that comes from a file, adapted underneath.
+#
+# still_water_ramp.yaml tilts the mesh itself; this one leaves the mesh flat
+# and takes the bed from grid.cell_elevation, the way a run driven by a DEM
+# does. The two paths are not the same code: the operator reads the file's
+# cell-centre z instead of averaging the mesh's vertex z, and the adapt has to
+# carry those values onto the refined mesh rather than re-read a file that has
+# one value per base cell.
+#
+# The bed is the same 1 m rise over the 50 m channel, so still water at 1.5 m
+# is 1.5 m deep at one end and 0.5 m deep at the other, and nothing should ever
+# move.
+physics:
+  flow:
+    mode: swe
+    well_balancing: hydrostatic_reconstruction
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 4
+  unit: seconds
+  time_step: 0.002
+  coupling_interval: 0.5
+
+output:
+  format: xdmf
+  output_interval: 2000
+
+grid:
+  file: channel_100x4_tri.msh
+  cell_elevation:
+    file: channel_ramp_elevation.${PETSC_ID_TYPE}.bin
+
+regions:
+  - name: left
+    grid_region_id: 1
+  - name: right
+    grid_region_id: 2
+
+surface_composition:
+  - region: left
+    material: frictionless
+  - region: right
+    material: frictionless
+
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+# the driver replaces these with h = eta - z
+initial_conditions:
+  - region: left
+    flow: still_ic
+  - region: right
+    flow: still_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [boundary]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: still_ic
+    type: dirichlet
+    height: 1
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting
