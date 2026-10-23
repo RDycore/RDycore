@@ -9,6 +9,27 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
+/// Timing for the adapt, reported by -log_view. An adapt destroys and
+/// recreates the TS, the operator, the boundaries and the regions, and a
+/// rebuild that rebalances adds two mesh migrations and two field migrations
+/// on top, so the question "does the adapt cost more than the imbalance it
+/// removes" needs the parts separately, not just the total.
+static PetscLogEvent RDY_AMR_Adapt, RDY_AMR_Mark, RDY_AMR_Balance, RDY_AMR_Rebuild, RDY_AMR_Transfer, RDY_AMR_Rewire;
+
+static PetscErrorCode RegisterAMRLogEvents(void) {
+  static PetscBool registered = PETSC_FALSE;
+  PetscFunctionBeginUser;
+  if (registered) PetscFunctionReturn(PETSC_SUCCESS);
+  PetscCall(PetscLogEventRegister("RDyAMRAdapt", DM_CLASSID, &RDY_AMR_Adapt));
+  PetscCall(PetscLogEventRegister("RDyAMRMark", DM_CLASSID, &RDY_AMR_Mark));
+  PetscCall(PetscLogEventRegister("RDyAMRBalance", DM_CLASSID, &RDY_AMR_Balance));
+  PetscCall(PetscLogEventRegister("RDyAMRRebuild", DM_CLASSID, &RDY_AMR_Rebuild));
+  PetscCall(PetscLogEventRegister("RDyAMRTransfer", DM_CLASSID, &RDY_AMR_Transfer));
+  PetscCall(PetscLogEventRegister("RDyAMRRewire", DM_CLASSID, &RDY_AMR_Rewire));
+  registered = PETSC_TRUE;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Saves information regarding refinement of owned cells.
 /// @param rdy         A RDy struct
 /// @param size        The number of owned cells
@@ -560,6 +581,8 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   Vec      U_coarse_local = NULL;
   PetscInt ndof_coarse;
   PetscFunctionBeginUser;
+  PetscCall(RegisterAMRLogEvents());
+  PetscCall(PetscLogEventBegin(RDY_AMR_Adapt, 0, 0, 0, 0));
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
 
   // With coarsening the new mesh is built from the base mesh rather than
@@ -584,13 +607,16 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // rebalances has to know them before it moves the base mesh.
   DMLabel label = NULL;
   if (rdy->amr.use_surface_jump) {
+    PetscCall(PetscLogEventBegin(RDY_AMR_Mark, 0, 0, 0, 0));
     PetscCall(RDyAMRMarkBySurfaceJump(rdy, &label));
+    PetscCall(PetscLogEventEnd(RDY_AMR_Mark, 0, 0, 0, 0));
 
     PetscInt num_marked;
     PetscCall(DMLabelGetNumValues(label, &num_marked));
     if (!num_marked) {  // nothing was tagged anywhere: leave the mesh alone
       PetscCall(DMLabelDestroy(&label));
       PetscCall(MatDestroy(&base_to_old_1dof));
+      PetscCall(PetscLogEventEnd(RDY_AMR_Adapt, 0, 0, 0, 0));
       PetscFunctionReturn(PETSC_SUCCESS);
     }
   } else if (rebuilt) {
@@ -633,11 +659,15 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     // Spread the work evenly before rebuilding: the partition follows the base
     // mesh, weighted by the cells each base cell is about to carry, and the
     // packed solution rides along with it.
+    PetscCall(PetscLogEventBegin(RDY_AMR_Balance, 0, 0, 0, 0));
     PetscCall(RDyAMRBalanceBaseMesh(rdy, dm_base_old, old_level, ndof_coarse, &old_sec, &old_packed));
+    PetscCall(PetscLogEventEnd(RDY_AMR_Balance, 0, 0, 0, 0));
     PetscCall(PetscFree(old_level));
 
+    PetscCall(PetscLogEventBegin(RDY_AMR_Rebuild, 0, 0, 0, 0));
     PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, rdy->amr.max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof,
                                         &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+    PetscCall(PetscLogEventEnd(RDY_AMR_Rebuild, 0, 0, 0, 0));
   } else if (label) {
     PetscCall(RDyAMRRefineFromLabel(rdy, label, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
   } else {
@@ -754,7 +784,9 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // packed old cells when it was rebuilt and some of it coarsened. Either way
   // the free surface crosses and the depth is rebuilt against the new mesh's bed.
   if (rebuilt) {
+    PetscCall(PetscLogEventBegin(RDY_AMR_Transfer, 0, 0, 0, 0));
     PetscCall(RDyAMRTransferFromPacked(&rdy->mesh, rdy->amr.dm_base, rdy->amr.BaseToCurrentMat1Dof, ndof_coarse, old_sec, old_packed, rdy->u_local));
+    PetscCall(PetscLogEventEnd(RDY_AMR_Transfer, 0, 0, 0, 0));
     PetscCall(PetscSectionDestroy(&old_sec));
     PetscCall(PetscFree(old_packed));
   } else {
@@ -768,7 +800,8 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscCall(MatDestroy(&FineToCoarseMat1Dof));
   PetscCall(VecDestroy(&U_coarse_local));
 
-  // destroy the operator
+  // the operator, the boundaries, the regions and the TS all go and come back
+  PetscCall(PetscLogEventBegin(RDY_AMR_Rewire, 0, 0, 0, 0));
   PetscCall(DestroyOperator(&rdy->operator));
 
   // destroy the boundaries and reallocate memory. The conditions are indexed
@@ -818,6 +851,8 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
 
   // initialize the source terms
   PetscCall(InitSourceConditions(rdy));
+  PetscCall(PetscLogEventEnd(RDY_AMR_Rewire, 0, 0, 0, 0));
 
+  PetscCall(PetscLogEventEnd(RDY_AMR_Adapt, 0, 0, 0, 0));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

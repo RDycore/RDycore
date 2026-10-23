@@ -15,6 +15,14 @@ PetscErrorCode RDyGetNumOwnedCells(RDy rdy, PetscInt *num_cells) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// The cells this rank holds, ghosts included. Subtracting the owned count
+/// gives the halo, which is the cheap proxy for a partition's edge cut.
+PetscErrorCode RDyGetNumLocalCells(RDy rdy, PetscInt *num_cells) {
+  PetscFunctionBegin;
+  *num_cells = rdy->mesh.num_cells;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetNumBoundaryConditions(RDy rdy, PetscInt *num_bnd_conds) {
   PetscFunctionBegin;
   *num_bnd_conds = rdy->num_boundaries;

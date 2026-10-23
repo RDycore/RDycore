@@ -55,16 +55,26 @@ static PetscErrorCode OwnedCells(DM dm, PetscInt ncells, PetscBool *owned) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Gives each rank a contiguous run of the global base-cell order
-///        carrying about the same number of adapted cells.
+/// @brief How many cells base cell `c` is about to carry: the number it
+///        carries now, which the packed section records exactly, doubled or
+///        halved for each level this adapt moves it.
 ///
-///        The weight of a base cell is how many cells it is about to carry:
-///        the number it carries now, which the packed section records exactly,
-///        doubled or halved for each level this adapt moves it. Counting it as
-///        2^level instead is noticeably worse, because refine_sbr splits a
-///        marked triangle into two children or three, so a base cell deep in a
-///        refined region holds more than 2^level cells and holds them in a
-///        proportion no formula gives.
+///        Counting it as 2^level instead is noticeably worse, because
+///        refine_sbr splits a marked triangle into two children or three, so a
+///        base cell deep in a refined region holds more than 2^level cells and
+///        holds them in a proportion no formula gives.
+static PetscInt CellsAfterAdapt(RDy rdy, PetscInt c, PetscInt cStart, const PetscInt *old_level, PetscInt stride, PetscSection sec) {
+  PetscInt dof;
+  PetscCallAbort(rdy->comm, PetscSectionGetDof(sec, c + cStart, &dof));
+  PetscInt now   = dof / stride;
+  PetscInt delta = rdy->amr.base_level[c] - old_level[c];
+  PetscInt next  = (delta >= 0) ? (now << delta) : (now >> PetscMin(-delta, 30));
+  return PetscMax(next, 1);
+}
+
+/// @brief Gives each rank a contiguous run of the global base-cell order
+///        carrying about the same number of adapted cells, as a
+///        `PETSCPARTITIONERSHELL`.
 ///
 ///        The run boundaries fall where the cumulative weight crosses a
 ///        multiple of total/nranks, so the order of the base cells is
@@ -91,12 +101,7 @@ static PetscErrorCode WeightedChop(RDy rdy, DM dm_base, const PetscBool *owned, 
   PetscCall(PetscMalloc1(nowned, &w));
   for (PetscInt c = 0; c < nlocal; ++c) {
     if (!owned[c]) continue;
-    PetscInt dof;
-    PetscCall(PetscSectionGetDof(sec, c + cStart, &dof));
-    PetscInt now   = dof / stride;
-    PetscInt delta = rdy->amr.base_level[c] - old_level[c];
-    PetscInt next  = (delta >= 0) ? (now << delta) : (now >> PetscMin(-delta, 30));
-    w[mine++]      = PetscMax(next, 1);
+    w[mine++] = CellsAfterAdapt(rdy, c, cStart, old_level, stride, sec);
   }
 
   PetscInt sum = 0;
@@ -253,7 +258,7 @@ PetscErrorCode RDyAMRBalanceBaseMesh(RDy rdy, DM dm_base_old, const PetscInt *ol
   PetscCall(PetscMalloc1(nlocal, &owned));
   PetscCall(OwnedCells(dm_base_old, nlocal, owned));
 
-  PetscPartitioner part;
+  PetscPartitioner part = NULL;
   PetscCall(WeightedChop(rdy, dm_base_old, owned, old_level, ndof, *sec, &part));
   PetscCall(PetscFree(owned));
 

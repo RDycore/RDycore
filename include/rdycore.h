@@ -70,6 +70,7 @@ PETSC_EXTERN PetscErrorCode RDySetCouplingInterval(RDy, RDyTimeUnit, PetscReal);
 
 PETSC_EXTERN PetscErrorCode RDyGetNumGlobalCells(RDy, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetNumOwnedCells(RDy, PetscInt *);
+PETSC_EXTERN PetscErrorCode RDyGetNumLocalCells(RDy, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryConditions(RDy, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetNumBoundaryEdges(RDy, const PetscInt, PetscInt *);
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryConditionFlowType(RDy, const PetscInt, PetscInt *);
