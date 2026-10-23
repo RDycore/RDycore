@@ -85,8 +85,8 @@ static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   // allocate memory
-  PetscCalloc1(ncells_local, &refine_cell);
-  PetscCalloc1(ncells_local, &area_local);
+  PetscCall(PetscCalloc1(ncells_local, &refine_cell));
+  PetscCall(PetscCalloc1(ncells_local, &area_local));
 
   PetscCall(RDyGetOwnedCellAreas(rdy, ncells_local, area_local));
 
@@ -105,8 +105,8 @@ static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscCall(RDyMarkOwnedCellsForAMR(rdy, ncells_local, refine_cell));
 
   // free up memory
-  PetscFree(refine_cell);
-  PetscFree(area_local);
+  PetscCall(PetscFree(refine_cell));
+  PetscCall(PetscFree(area_local));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -122,9 +122,9 @@ PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   // allocate memory
-  PetscCalloc1(ncells_local, &xc_local);
-  PetscCalloc1(ncells_local, &yc_local);
-  PetscCalloc1(ncells_local, &refine_cell);
+  PetscCall(PetscCalloc1(ncells_local, &xc_local));
+  PetscCall(PetscCalloc1(ncells_local, &yc_local));
+  PetscCall(PetscCalloc1(ncells_local, &refine_cell));
 
   // get the x and y coordinates of the local cells
   PetscCall(RDyGetOwnedCellXCentroids(rdy, ncells_local, xc_local));
@@ -144,9 +144,9 @@ PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscCall(RDyMarkOwnedCellsForAMR(rdy, ncells_local, refine_cell));
 
   // free up memory
-  PetscFree(xc_local);
-  PetscFree(yc_local);
-  PetscFree(refine_cell);
+  PetscCall(PetscFree(xc_local));
+  PetscCall(PetscFree(yc_local));
+  PetscCall(PetscFree(refine_cell));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

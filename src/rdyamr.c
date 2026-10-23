@@ -1,5 +1,4 @@
 #include <muParserDLL.h>
-#include <petsc/private/dmpleximpl.h> /*I      "petscdmplex.h"   I*/
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <petscsys.h>
@@ -52,7 +51,7 @@ PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const Petsc
   PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
 
   // copy the data
-  PetscCalloc1(size, &rdy->amr.refine_cell);
+  PetscCall(PetscCalloc1(size, &rdy->amr.refine_cell));
   for (PetscInt icell = 0; icell < size; ++icell) {
     rdy->amr.refine_cell[icell] = refine_cell[icell];
   }
@@ -163,11 +162,12 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
                                 Mat *FineToCoarseMat1Dof) {
   PetscFunctionBeginUser;
 
-  DM       dm = rdy->dm;
-  DM       dmAdapt;
-  DMLabel  adaptLabel;
-  PetscInt d_nz = 4, ccStart, ccEnd, fcStart, fcEnd;
-  char     opt[128];
+  DM             dm = rdy->dm;
+  DM             dmAdapt;
+  DMLabel        adaptLabel;
+  const PetscInt d_nz = 4;  // one level of simplex bisection splits a cell into at most four
+  PetscInt       ccStart, ccEnd, fcStart, fcEnd;
+  char           opt[128];
 
   PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
@@ -176,7 +176,7 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   } else {
     PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
     rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
-    PetscFree(rdy->amr.refine_cell);
+    PetscCall(PetscFree(rdy->amr.refine_cell));
   }
 
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
@@ -443,25 +443,20 @@ extern PetscErrorCode InitSolver(RDy rdy);
 extern PetscErrorCode InitDirichletBoundaryConditions(RDy rdy);
 extern PetscErrorCode InitSourceConditions(RDy rdy);
 
-/// @brief Computes A * B, and updates A or B with the result.
-/// @param A Matrix
-/// @param B Matrix
+/// @brief Computes A * B and replaces one of the two with it, destroying what
+///        was there.
+/// @param A        left factor
+/// @param B        right factor
+/// @param update_B replace B with the product, rather than A
 /// @return PETSC_SUCESS on success
-static PetscErrorCode MatMultResuse(Mat *A, Mat *B, PetscBool update_B) {
+static PetscErrorCode MatMatMultReplace(Mat *A, Mat *B, PetscBool update_B) {
   PetscFunctionBeginUser;
   Mat tmp;
 
   PetscCall(MatMatMult(*A, *B, MAT_INITIAL_MATRIX, PETSC_DETERMINE, &tmp));
-
-  if (update_B) {
-    PetscCall(MatDestroy(B));
-    PetscCall(MatDuplicate(tmp, MAT_COPY_VALUES, B));
-  } else {
-    PetscCall(MatDestroy(A));
-    PetscCall(MatDuplicate(tmp, MAT_COPY_VALUES, A));
-  }
-
-  PetscCall(MatDestroy(&tmp));
+  PetscCall(MatDestroy(update_B ? B : A));
+  if (update_B) *B = tmp;
+  else *A = tmp;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -494,60 +489,19 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
   PetscCall(DMGetCoordinatesLocalSetUp(dm_fine));
 
-  if (0) {
-    PetscSection sec;
-    PetscCall(DMGetLocalSection(rdy->dm, &sec));
-    PetscInt nfields;
-    PetscSectionGetNumFields(sec, &nfields);
-    printf("++++++++++++++++++++++++++++++++++++\n");
-    printf("About coarse DM: \n");
-    printf("nfields = %d\n", (int)nfields);
-    for (PetscInt f = 0; f < nfields; f++) {
-      PetscInt ncomp;
-      PetscCall(PetscSectionGetFieldComponents(sec, f, &ncomp));
-      printf("  field = %d; num_component = %d\n", (int)f, (int)ncomp);
-      for (PetscInt c = 0; c < ncomp; c++) {
-        const char *comp_name;
-        PetscSectionGetComponentName(sec, f, c, &comp_name);
-        printf("    field = %d; component = %d; comp_name = %s\n", (int)f, (int)c, comp_name);
-      }
-    }
-  }
-
-  if (0) {
-    PetscSection sec;
-    PetscCall(DMGetLocalSection(dm_fine, &sec));
-    PetscInt nfields;
-    PetscSectionGetNumFields(sec, &nfields);
-    printf("++++++++++++++++++++++++++++++++++++\n");
-    printf("About refined DM: \n");
-    printf("nfields = %d\n", (int)nfields);
-    for (PetscInt f = 0; f < nfields; f++) {
-      PetscInt ncomp;
-      PetscCall(PetscSectionGetFieldComponents(sec, f, &ncomp));
-      printf("  field = %d; num_component = %d\n", (int)f, (int)ncomp);
-      for (PetscInt c = 0; c < ncomp; c++) {
-        const char *comp_name;
-        PetscSectionGetComponentName(sec, f, c, &comp_name);
-        printf("    field = %d; component = %d; comp_name = %s\n", (int)f, (int)c, comp_name);
-      }
-    }
-    printf("++++++++++++++++++++++++++++++++++++\n");
-  }
-
   {
     PetscSection coarse_sec, fine_sec;
     PetscCall(DMGetLocalSection(rdy->dm, &coarse_sec));
     PetscCall(DMGetLocalSection(dm_fine, &fine_sec));
     PetscInt nfields;
-    PetscSectionGetNumFields(coarse_sec, &nfields);
+    PetscCall(PetscSectionGetNumFields(coarse_sec, &nfields));
     for (PetscInt f = 0; f < nfields; f++) {
       PetscInt ncomp;
       PetscCall(PetscSectionGetFieldComponents(coarse_sec, f, &ncomp));
       for (PetscInt c = 0; c < ncomp; c++) {
         const char *comp_name;
-        PetscSectionGetComponentName(coarse_sec, f, c, &comp_name);
-        PetscSectionSetComponentName(fine_sec, f, c, comp_name);
+        PetscCall(PetscSectionGetComponentName(coarse_sec, f, c, &comp_name));
+        PetscCall(PetscSectionSetComponentName(fine_sec, f, c, comp_name));
       }
     }
   }
@@ -613,10 +567,10 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(DMDestroy(&rdy->dm));
     PetscCall(DMDestroy(&rdy->dm_1dof));
 
-    PetscCall(MatMultResuse(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof, PETSC_TRUE));
-    PetscCall(MatMultResuse(&rdy->amr.CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
-    PetscCall(MatMultResuse(&CoarseToFineMat1Dof, &rdy->amr.BaseToCurrentMat1Dof, PETSC_TRUE));
-    PetscCall(MatMultResuse(&rdy->amr.CurrentToBaseMat1Dof, &FineToCoarseMat1Dof, PETSC_FALSE));
+    PetscCall(MatMatMultReplace(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof, PETSC_TRUE));
+    PetscCall(MatMatMultReplace(&rdy->amr.CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
+    PetscCall(MatMatMultReplace(&CoarseToFineMat1Dof, &rdy->amr.BaseToCurrentMat1Dof, PETSC_TRUE));
+    PetscCall(MatMatMultReplace(&rdy->amr.CurrentToBaseMat1Dof, &FineToCoarseMat1Dof, PETSC_FALSE));
   }
 
   // set the DM to be the refined DM
@@ -633,7 +587,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   for (PetscInt i = 0; i < rdy->num_regions; ++i) {
     PetscCall(DestroyRegion(&rdy->regions[i]));
   }
-  if (rdy->regions) PetscFree(rdy->regions);
+  if (rdy->regions) PetscCall(PetscFree(rdy->regions));
 
   // set region as the new refined regions
   rdy->num_regions = num_regions;
@@ -668,7 +622,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
 
   // destroy the boundaries and reallocate memory
   PetscCall(RDyDestroyBoundaries(&rdy));
-  InitBoundaries(rdy);
+  PetscCall(InitBoundaries(rdy));
 
   // reinitialize the operator
   PetscCall(InitOperator(rdy));
