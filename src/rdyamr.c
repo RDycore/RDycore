@@ -2,6 +2,7 @@
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <petscsys.h>
+#include <private/rdyamrimpl.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdymathimpl.h>
@@ -353,25 +354,22 @@ static PetscErrorCode ConstructRefineTree(DM odm, DM dm, Mat CoarseToFineMatNDof
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof, Mat *CoarseToFineMat1Dof,
-                                Mat *FineToCoarseMat1Dof) {
+/// @brief Refines `dm` wherever `adaptLabel` marks a cell, and builds the four
+///        interpolation matrices between it and the result. The label is
+///        consumed (destroyed) here.
+/// @param [in] dm         the mesh to refine
+/// @param [in] adaptLabel cells marked DM_ADAPT_REFINE
+/// @param [in] bs         components per cell for the NDof matrices
+/// @param [out] dm_fine   the refined mesh
+static PetscErrorCode RefineDMByLabel(DM dm, DMLabel adaptLabel, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof,
+                                      Mat *CoarseToFineMat1Dof, Mat *FineToCoarseMat1Dof) {
   PetscFunctionBeginUser;
 
-  DM             dm = rdy->dm;
   DM             dmAdapt;
-  DMLabel        adaptLabel;
   const PetscInt d_nz = 4;  // one level of simplex bisection splits a cell into at most four
   PetscInt       ccStart, ccEnd, fcStart, fcEnd;
-  char           opt[128];
 
   PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
-
-  PetscCheck(rdy->amr.cells_marked_for_refinement, rdy->comm, PETSC_ERR_ARG_WRONGSTATE,
-             "no cells are marked: call RDyMarkOwnedCellsForAMR() before every RDyPerformAMR()");
-
-  PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
-  rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
-  PetscCall(PetscFree(rdy->amr.refine_cell));
 
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
   PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
@@ -380,8 +378,7 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   PetscCheck(dmAdapt, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
 
   PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
-  PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view"));
-  PetscCall(DMViewFromOptions(dmAdapt, NULL, opt));
+  PetscCall(DMViewFromOptions(dmAdapt, NULL, "-adapt_dm_view"));
 
   // make interpolation matrix
   PetscCall(DMPlexGetHeightStratum(dm, 0, &ccStart, &ccEnd));
@@ -401,6 +398,157 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
 
   *dm_fine = dmAdapt;
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode MatMatMultReplace(Mat *, Mat *, PetscBool);
+
+/// @brief Updates each base cell's target refinement level from this adapt's
+///        marks: a base cell with a marked descendant goes one level deeper,
+///        one without comes one level back. One level per adapt in either
+///        direction keeps the mesh from thrashing between two states.
+static PetscErrorCode UpdateBaseLevels(RDy rdy, PetscInt max_levels) {
+  PetscFunctionBeginUser;
+
+  RDyMesh *mesh  = &rdy->mesh;
+  PetscInt nbase = rdy->amr.num_base_cells;
+
+  PetscBool *base_marked;
+  PetscCall(PetscCalloc1(nbase, &base_marked));
+
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    if (!mesh->cells.is_owned[c]) continue;
+    PetscInt owned = mesh->cells.local_to_owned[c];
+    if (!rdy->amr.refine_cell[owned]) continue;
+
+    if (!rdy->amr.BaseToCurrentMat1Dof) {  // nothing adapted yet: this IS the base mesh
+      base_marked[c] = PETSC_TRUE;
+      continue;
+    }
+    PetscInt           ncols;
+    const PetscInt    *cols;
+    const PetscScalar *vals;
+    PetscCall(MatGetRow(rdy->amr.BaseToCurrentMat1Dof, c, &ncols, &cols, &vals));
+    if (ncols) base_marked[cols[0]] = PETSC_TRUE;
+    PetscCall(MatRestoreRow(rdy->amr.BaseToCurrentMat1Dof, c, &ncols, &cols, &vals));
+  }
+
+  for (PetscInt b = 0; b < nbase; ++b) {
+    if (base_marked[b]) {
+      rdy->amr.base_level[b] = PetscMin(rdy->amr.base_level[b] + 1, max_levels);
+    } else {
+      rdy->amr.base_level[b] = PetscMax(rdy->amr.base_level[b] - 1, 0);
+    }
+  }
+
+  PetscCall(PetscFree(base_marked));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Builds a mesh from the base mesh by refining each base cell to its
+///        target level, level by level, and accumulates the interpolation
+///        matrices between the base mesh and the result.
+///
+///        Refining from the base rather than from the current mesh is what
+///        makes coarsening possible: a region the indicator has stopped
+///        marking is simply built with fewer levels this time.
+static PetscErrorCode RebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt max_levels, DM *dm_new, Mat *BaseToNewNDof, Mat *NewToBaseNDof,
+                                          Mat *BaseToNew1Dof, Mat *NewToBase1Dof) {
+  PetscFunctionBeginUser;
+
+  DM  dm_base = rdy->amr.dm_base ? rdy->amr.dm_base : rdy->dm;
+  DM  dm      = dm_base;
+  Mat b2n_n = NULL, n2b_n = NULL, b2n_1 = NULL, n2b_1 = NULL;
+
+  for (PetscInt level = 0; level < max_levels; ++level) {
+    PetscInt cStart, cEnd;
+    PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+
+    DMLabel label;
+    PetscCall(DMLabelCreate(PETSC_COMM_SELF, "Adaptation Label", &label));
+    PetscInt marked = 0;
+    for (PetscInt c = cStart; c < cEnd; ++c) {
+      PetscInt base = c - cStart;  // at level 0 the mesh IS the base mesh
+      if (b2n_1) {
+        PetscInt           ncols;
+        const PetscInt    *cols;
+        const PetscScalar *vals;
+        PetscCall(MatGetRow(b2n_1, c - cStart, &ncols, &cols, &vals));
+        base = ncols ? cols[0] : -1;
+        PetscCall(MatRestoreRow(b2n_1, c - cStart, &ncols, &cols, &vals));
+      }
+      if (base >= 0 && rdy->amr.base_level[base] > level) {
+        PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
+        ++marked;
+      }
+    }
+
+    PetscInt marked_global;
+    PetscCallMPI(MPI_Allreduce(&marked, &marked_global, 1, MPIU_INT, MPI_SUM, rdy->comm));
+    if (!marked_global) {
+      PetscCall(DMLabelDestroy(&label));
+      break;
+    }
+
+    DM  dm_next;
+    Mat c2f_n, f2c_n, c2f_1, f2c_1;
+    PetscCall(RefineDMByLabel(dm, label, bs, &dm_next, &c2f_n, &f2c_n, &c2f_1, &f2c_1));
+
+    if (!b2n_n) {  // first level: the matrices already run from the base mesh
+      b2n_n = c2f_n;
+      n2b_n = f2c_n;
+      b2n_1 = c2f_1;
+      n2b_1 = f2c_1;
+    } else {
+      PetscCall(MatMatMultReplace(&c2f_n, &b2n_n, PETSC_TRUE));
+      PetscCall(MatMatMultReplace(&n2b_n, &f2c_n, PETSC_FALSE));
+      PetscCall(MatMatMultReplace(&c2f_1, &b2n_1, PETSC_TRUE));
+      PetscCall(MatMatMultReplace(&n2b_1, &f2c_1, PETSC_FALSE));
+      PetscCall(MatDestroy(&c2f_n));
+      PetscCall(MatDestroy(&f2c_n));
+      PetscCall(MatDestroy(&c2f_1));
+      PetscCall(MatDestroy(&f2c_1));
+    }
+
+    if (dm != dm_base) PetscCall(DMDestroy(&dm));
+    dm = dm_next;
+  }
+
+  if (!b2n_n) {  // nothing is refined this time: the new mesh is the base mesh
+    PetscInt cStart, cEnd;
+    PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
+    PetscInt n = cEnd - cStart;
+    PetscCall(MatCreateConstantDiagonal(PETSC_COMM_SELF, bs * n, bs * n, bs * n, bs * n, 1.0, &b2n_n));
+    PetscCall(MatConvert(b2n_n, MATSEQAIJ, MAT_INPLACE_MATRIX, &b2n_n));
+    PetscCall(MatDuplicate(b2n_n, MAT_COPY_VALUES, &n2b_n));
+    PetscCall(MatCreateConstantDiagonal(PETSC_COMM_SELF, n, n, n, n, 1.0, &b2n_1));
+    PetscCall(MatConvert(b2n_1, MATSEQAIJ, MAT_INPLACE_MATRIX, &b2n_1));
+    PetscCall(MatDuplicate(b2n_1, MAT_COPY_VALUES, &n2b_1));
+    PetscCall(PetscObjectReference((PetscObject)dm));  // the caller takes a reference
+  }
+
+  *dm_new        = dm;
+  *BaseToNewNDof = b2n_n;
+  *NewToBaseNDof = n2b_n;
+  *BaseToNew1Dof = b2n_1;
+  *NewToBase1Dof = n2b_1;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Refines the current mesh where this adapt's marks ask for it.
+static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof, Mat *CoarseToFineMat1Dof,
+                                Mat *FineToCoarseMat1Dof) {
+  PetscFunctionBeginUser;
+
+  PetscCheck(rdy->amr.cells_marked_for_refinement, rdy->comm, PETSC_ERR_ARG_WRONGSTATE,
+             "no cells are marked: call RDyMarkOwnedCellsForAMR() before every RDyPerformAMR()");
+
+  DMLabel adaptLabel;
+  PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
+  rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
+  PetscCall(PetscFree(rdy->amr.refine_cell));
+
+  PetscCall(RefineDMByLabel(rdy->dm, adaptLabel, bs, dm_fine, CoarseToFineMatNDof, FineToCoarseMatNDof, CoarseToFineMat1Dof, FineToCoarseMat1Dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -665,6 +813,12 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   rdy->amr.is_refinement_on                = PETSC_TRUE;
   rdy->amr.last_refinement_level_outputted = -1;
 
+  // with coarsening, each adapt rebuilds the mesh from this one, so the level
+  // every base cell is refined to has to be remembered between adapts
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_allow_coarsening", &rdy->amr.allow_coarsening, NULL));
+  rdy->amr.num_base_cells = rdy->mesh.num_cells;
+  PetscCall(PetscCalloc1(rdy->amr.num_base_cells, &rdy->amr.base_level));
+
   PetscReal local_min = PETSC_MAX_REAL;
   for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
     if (rdy->mesh.cells.is_owned[c]) local_min = PetscMin(local_min, rdy->mesh.cells.areas[c]);
@@ -682,11 +836,45 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscFunctionBeginUser;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
 
-  /* Adapt */
-  PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+  // With coarsening the new mesh is built from the base mesh rather than
+  // refined from the current one, so that regions the indicator has stopped
+  // marking come back coarse. The solution then moves between two meshes that
+  // are different triangulations of the same domain, which needs a
+  // conservative transfer; refinement alone can inject.
+  PetscBool rebuilt          = rdy->amr.allow_coarsening;
+  Mat       SolutionTransfer = NULL, CellAssign = NULL, old_base_to_current_1dof = NULL;
+
+  if (rebuilt) {
+    PetscInt max_levels = 3;
+    PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-max_levels", &max_levels, NULL));
+    PetscCheck(rdy->amr.cells_marked_for_refinement, rdy->comm, PETSC_ERR_USER,
+               "-refine_allow_coarsening needs solution-driven marking (RDyMarkOwnedCellsForAMR) before every adapt");
+    PetscCall(UpdateBaseLevels(rdy, max_levels));
+    rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
+    PetscCall(PetscFree(rdy->amr.refine_cell));
+
+    PetscCall(RebuildMeshFromBase(rdy, ndof_coarse, max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof,
+                                  &FineToCoarseMat1Dof));
+
+    // region membership and ownership ride along on an assignment to any old
+    // cell under the same base cell, which needs no geometry; the conservative
+    // solution transfer is built further down, once the new mesh exists
+    PetscInt ncStart, ncEnd;
+    PetscCall(DMPlexGetHeightStratum(dm_fine, 0, &ncStart, &ncEnd));
+    PetscCall(RDyAMRCreateSiblingAssign(rdy->mesh.num_cells, ncEnd - ncStart, rdy->amr.BaseToCurrentMat1Dof, CoarseToFineMat1Dof,
+                                        rdy->amr.num_base_cells, ndof_coarse, &CellAssign));
+    old_base_to_current_1dof = rdy->amr.BaseToCurrentMat1Dof;
+    if (old_base_to_current_1dof) PetscCall(PetscObjectReference((PetscObject)old_base_to_current_1dof));
+  } else {
+    PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+    SolutionTransfer = CoarseToFineMatNDof;
+    CellAssign       = CoarseToFineMatNDof;
+  }
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
-  PetscCall(DMSetCoarseDM(dm_fine, rdy->dm));
+  // Do not make the old mesh this one's coarse DM. A rebuild that refines
+  // nothing returns the base mesh itself, which is already at the tail of that
+  // chain, and SNESDestroy() walks it with no cycle guard.
   PetscCall(DMGetCoordinatesLocalSetUp(dm_fine));
 
   {
@@ -729,7 +917,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscCall(PetscCalloc1(numFine, &coarseToFineMap));
 
   // determine the mapping of cells from coarse to fine mesh
-  PetscCall(DetermineCoarseToFineCellMapping(rdy, CoarseToFineMatNDof, U_coarse_local, U_fine_local, fineIsOwned, fineToCoarseMap, coarseToFineMap,
+  PetscCall(DetermineCoarseToFineCellMapping(rdy, CellAssign, U_coarse_local, U_fine_local, fineIsOwned, fineToCoarseMap, coarseToFineMap,
                                              coarseNumFine, coarseOffsetFine));
 
   // create data structure for the refined regions from existing coarse regions
@@ -762,6 +950,20 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMat1Dof));
     PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMat1Dof));
 
+  } else if (rebuilt) {
+    // the rebuild's matrices run from the base mesh already -- replace rather
+    // than compose
+    PetscCall(DMDestroy(&rdy->dm));
+    PetscCall(DMDestroy(&rdy->dm_1dof));
+
+    PetscCall(MatDestroy(&rdy->amr.BaseToCurrentMatNDof));
+    PetscCall(MatDestroy(&rdy->amr.CurrentToBaseMatNDof));
+    PetscCall(MatDestroy(&rdy->amr.BaseToCurrentMat1Dof));
+    PetscCall(MatDestroy(&rdy->amr.CurrentToBaseMat1Dof));
+    PetscCall(MatDuplicate(CoarseToFineMatNDof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMatNDof));
+    PetscCall(MatDuplicate(FineToCoarseMatNDof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMatNDof));
+    PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMat1Dof));
+    PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMat1Dof));
   } else {
     // destroy the coarse DM
     PetscCall(DMDestroy(&rdy->dm));
@@ -797,9 +999,18 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   rdy->amr.mesh_was_refined = PETSC_TRUE;
   rdy->amr.num_refinements++;
 
-  // destroy and recreate mesh
+  // build the new mesh beside the old one: a rebuilt mesh is a different
+  // triangulation of the same domain, and the conservative transfer between
+  // them needs the geometry of both
+  RDyMesh new_mesh;
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &new_mesh));
+  if (rebuilt) {
+    PetscCall(RDyAMRCreateTransferMatrix(&rdy->mesh, &new_mesh, old_base_to_current_1dof, rdy->amr.BaseToCurrentMat1Dof, rdy->amr.num_base_cells,
+                                         ndof_coarse, &SolutionTransfer));
+    PetscCall(MatDestroy(&old_base_to_current_1dof));
+  }
   PetscCall(RDyMeshDestroy(rdy->mesh));
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &rdy->mesh));
+  rdy->mesh = new_mesh;
   if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
@@ -807,9 +1018,15 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(OverrideCellElevation(rdy));
   }
 
-  // initialize the refined solution from existing previous solution
-  PetscCall(MatMult(CoarseToFineMatNDof, U_coarse_local, rdy->u_local));
+  // initialize the solution on the new mesh from the old one: injection when
+  // the mesh was refined from the current one, area-weighted averaging when it
+  // was rebuilt and some of it coarsened
+  PetscCall(MatMult(SolutionTransfer, U_coarse_local, rdy->u_local));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
+  if (rebuilt) {
+    PetscCall(MatDestroy(&SolutionTransfer));
+    PetscCall(MatDestroy(&CellAssign));
+  }
   PetscCall(MatDestroy(&CoarseToFineMatNDof));
   PetscCall(MatDestroy(&FineToCoarseMatNDof));
   PetscCall(MatDestroy(&CoarseToFineMat1Dof));

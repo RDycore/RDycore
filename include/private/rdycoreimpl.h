@@ -97,6 +97,14 @@ typedef struct {
   // is refinement on or off
   PetscBool is_refinement_on;
 
+  // when set, each adapt rebuilds the mesh from dm_base instead of refining
+  // the current one, so regions the indicator no longer marks come back coarse
+  PetscBool allow_coarsening;
+  // refinement level of each base cell (allocated with the base mesh); the
+  // rebuild refines a base cell's descendants to this depth
+  PetscInt *base_level;
+  PetscInt  num_base_cells;
+
   // smallest owned cell area of the unrefined mesh, recorded by RDyEnableAMR.
   // Solution-driven marking caps refinement against it: a cell smaller than
   // base_min_cell_area / 2^max_levels is never marked (refine_sbr bisects, so

@@ -276,15 +276,18 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->dm_1dof) DMDestroy(&((*rdy)->dm_1dof));
   if ((*rdy)->dm) DMDestroy(&((*rdy)->dm));
 
-  if ((*rdy)->amr.num_refinements) {
-    if ((*rdy)->amr.dm_base) DMDestroy(&((*rdy)->amr.dm_base));
-    if ((*rdy)->amr.dm_1dof_base) DMDestroy(&((*rdy)->amr.dm_1dof_base));
+  // allocated by RDyEnableAMR, so it outlives an AMR run that never adapted
+  PetscCall(PetscFree((*rdy)->amr.base_level));
 
-    if ((*rdy)->amr.BaseToCurrentMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMatNDof));
-    if ((*rdy)->amr.CurrentToBaseMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMatNDof));
-    if ((*rdy)->amr.BaseToCurrentMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMat1Dof));
-    if ((*rdy)->amr.CurrentToBaseMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMat1Dof));
-  }
+  // the base DMs are referenced from RDyEnableAMR, whether or not an adapt
+  // ever happened
+  if ((*rdy)->amr.dm_base) DMDestroy(&((*rdy)->amr.dm_base));
+  if ((*rdy)->amr.dm_1dof_base) DMDestroy(&((*rdy)->amr.dm_1dof_base));
+
+  if ((*rdy)->amr.BaseToCurrentMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMatNDof));
+  if ((*rdy)->amr.CurrentToBaseMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMatNDof));
+  if ((*rdy)->amr.BaseToCurrentMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMat1Dof));
+  if ((*rdy)->amr.CurrentToBaseMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMat1Dof));
 
   // destroy config data
   PetscCall(DestroyConfig((*rdy)));
