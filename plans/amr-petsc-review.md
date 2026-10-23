@@ -106,3 +106,36 @@ Classes claimed so far: bit-identical for the adapt-with-nothing-marked gate;
 machine precision with the mechanism for the water volume across an adapt
 (area-weighted transfer, only summation order changes, <= 8.2e-15 relative);
 physics rate for the Stoker comparison. See [[verification-exactness-classes]].
+
+## D. Draft questions for PETSc -- VET BEFORE SENDING
+
+These are to be asked of the DMPlex/DMAdaptor developers, so each one costs
+somebody's attention. Check every one against the current PETSc source before
+it goes out, and drop any that already have a public answer. State plainly
+which ones you dropped and why. We are NOT asking about DMForest or p4est:
+those are for non-conforming AMR, which RDycore cannot use -- `RDyEdges` stores
+exactly two cells per edge, so a hanging node has nowhere to go.
+
+1. **The ask: a public setter for a registered DMAdaptor type's error
+   indicator.** `DMAdaptorRegister` is public, but a create function has to
+   write `adaptor->ops->computeerrorindicator`, which needs
+   `petsc/private/dmadaptorimpl.h`. The transfer has
+   `DMAdaptorSetTransferFunction`, so this looks like an omission. *Vet:*
+   confirm there is still no public route in current main, and that nothing
+   else in RDycore's AMR needs that header any more.
+2. **What is the supported way to get each refined cell's parent?** We walk
+   the saved transform (`DMPlexGetTransform`, `DMPlexTransformCellTransform`,
+   `DMPlexTransformGetTargetPoint`), which broke when `DMPlexSetTransform`
+   began clearing the transform's base DM. All of these are "Level:
+   developer". *Vet:* look for a public parent/child or interpolation API
+   between a mesh and its refinement -- `DMCreateInterpolation`,
+   `DMPlexTransformGetChart`, the tree interface -- before asking.
+3. **Should label adaptation of a plex have a default transfer?** With
+   `DM_ADAPTATION_LABEL` and no transfer set, `DMAdaptorTransferSolution`
+   calls `DMForestTransferVec` and crashes on a plex. *Vet:* confirm on
+   current main; this may be worth an MR rather than a question.
+4. **Is there a conservative transfer between two plexes derived from a common
+   base?** Ours is Sutherland-Hodgman clipping in `src/rdyamr_transfer.c`.
+   *Vet:* check `DMPlexTransferVecTree`, `DMPlexComputeClementInterpolant`,
+   and anything under supermesh/intersection (`DMPlexIntersect`?) first. If
+   PETSc has it, we should delete our clipping and use it.
