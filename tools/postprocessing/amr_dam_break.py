@@ -186,8 +186,11 @@ def movie(xmf_paths, out, fps):
 
     steps = sorted(xmf_paths)
     first = read_step(steps[0])
-    lo = min(float(np.min(read_step(p)[3])) for p in (steps[0], steps[-1]))
-    hi = max(float(np.max(read_step(p)[3])) for p in (steps[0], steps[-1]))
+    # the colour scale is fixed over the whole movie, and taken from every
+    # frame so that none of them clips: the mesh is what should be moving
+    depths = [read_step(p)[3] for p in steps]
+    lo = min(float(np.min(d)) for d in depths)
+    hi = max(float(np.max(d)) for d in depths)
 
     fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
     ax.set_aspect("equal")

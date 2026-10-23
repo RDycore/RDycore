@@ -29,13 +29,22 @@ execute_process(
   COMMAND ${RDYCORE_AMR} amr_off.yaml
           -refine_criterion jump
           -rdy_amr_refine_vec_tagger_type absolute -rdy_amr_refine_vec_tagger_box 1e30,1e31
+          -options_left
   WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_QUIET)
 if (NOT rc EQUAL 0)
   message(FATAL_ERROR "the AMR driver failed (${rc})")
 endif()
 
-execute_process(COMMAND ${H5DIFF} output/plain-2000.h5 output/amr_off-2000.h5
+# h5diff exits 0 when two datasets are not even comparable -- different shapes
+# report "Not comparable" and still succeed -- so a mesh that was refined when
+# it should not have been would slip through an exit-status check. Both
+# conditions are asserted.
+execute_process(COMMAND ${H5DIFF} -v output/plain-2000.h5 output/amr_off-2000.h5
                 WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_VARIABLE diff)
 if (NOT rc EQUAL 0)
   message(FATAL_ERROR "AMR with nothing marked changed the answer:\n${diff}")
+endif()
+string(FIND "${diff}" "Not comparable" incomparable)
+if (NOT incomparable EQUAL -1)
+  message(FATAL_ERROR "AMR with nothing marked produced a different mesh, so the two runs cannot be compared:\n${diff}")
 endif()

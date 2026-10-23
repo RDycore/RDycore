@@ -293,6 +293,16 @@ static PetscErrorCode DMAdaptorCreate_SurfaceJump(DMAdaptor adaptor) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Sets an option unless the user has already given it, so that everything
+/// RDycore's AMR needs can still be overridden from the command line.
+static PetscErrorCode SetOptionDefault(const char name[], const char value[]) {
+  PetscFunctionBegin;
+  PetscBool set;
+  PetscCall(PetscOptionsHasName(NULL, NULL, name, &set));
+  if (!set) PetscCall(PetscOptionsSetValue(NULL, name, value));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Creates the DMAdaptor that drives RDycore's AMR: the "surfacejump"
 ///        criterion, a relative refine box and a coarsen box that only an
 ///        adaptor able to coarsen will act on.
@@ -317,7 +327,10 @@ PetscErrorCode RDyAMRCreateAdaptor(RDy rdy, DMAdaptor *adaptor) {
   }
 
   PetscCall(DMAdaptorCreate(rdy->comm, adaptor));
-  PetscCall(PetscObjectSetOptionsPrefix((PetscObject)*adaptor, "rdy_amr_"));
+  // DMAdaptorSetOptionsPrefix, not PetscObjectSetOptionsPrefix: it also
+  // prefixes the two taggers, so their options are -rdy_amr_refine_vec_tagger_*
+  // and -rdy_amr_coarsen_vec_tagger_* rather than the bare -refine_vec_tagger_*
+  PetscCall(DMAdaptorSetOptionsPrefix(*adaptor, "rdy_amr_"));
   PetscCall(DMAdaptorSetType(*adaptor, RDYADAPTORSURFACEJUMP));
   // the indicator and the transfer are handed the adaptor; the registered mesh
   // adaptor is handed only the mesh
@@ -335,40 +348,30 @@ PetscErrorCode RDyAMRCreateAdaptor(RDy rdy, DMAdaptor *adaptor) {
 
   // DMAdaptor appends "adapt_" to the mesh's options prefix for the duration of
   // the DMAdaptLabel call, so the refinement's own options have to be given
-  // under that prefix. Setting them here rather than asking for them on the
-  // command line: AMR in RDycore needs simplex bisection, and needs the
+  // under that prefix. AMR in RDycore needs simplex bisection, and needs the
   // transform to match strata or the boundary edges of the refined mesh come
-  // back as the wrong mesh points. A value already set is left alone.
-  const char *required[][2] = {
-      {"-adapt_dm_adaptor",                           rdy->amr.allow_coarsening ? RDYMESHADAPTORREBUILD : "cellrefiner"},
-      {"-adapt_dm_plex_transform_type",               "refine_sbr" },
-      {"-adapt_dm_plex_transform_label_match_strata", NULL         },
-  };
-  for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i) {
-    PetscBool set;
-    PetscCall(PetscOptionsHasName(NULL, NULL, required[i][0], &set));
-    if (!set) PetscCall(PetscOptionsSetValue(NULL, required[i][0], required[i][1]));
-  }
+  // back as the wrong mesh points.
+  PetscCall(SetOptionDefault("-adapt_dm_adaptor", rdy->amr.allow_coarsening ? RDYMESHADAPTORREBUILD : "cellrefiner"));
+  PetscCall(SetOptionDefault("-adapt_dm_plex_transform_type", "refine_sbr"));
+  PetscCall(SetOptionDefault("-adapt_dm_plex_transform_label_match_strata", NULL));
 
-  // refine the cells whose indicator is at least half the largest, which is
-  // scale-free on purpose: an absolute threshold disables itself, since
-  // halving a cell halves the jump across its faces
-  // PETSc exposes no accessor for the two taggers, so they are reached through
-  // the implementation header this file already includes for ops
-  VecTagger    refine_tag = (*adaptor)->refineTag;
-  VecTaggerBox refine_box = {.min = 0.5, .max = 1.0};
-  PetscCall(VecTaggerSetType(refine_tag, VECTAGGERRELATIVE));
-  PetscCall(VecTaggerRelativeSetBox(refine_tag, &refine_box));
+  // Refine the cells whose indicator is at least half the largest. Scale-free
+  // on purpose: an absolute threshold disables itself, since halving a cell
+  // halves the jump across its faces.
+  //
+  // The taggers are configured through options rather than through their
+  // objects -- the same way a DMPlex is -- so that everything here can be
+  // overridden on the command line and nothing is hidden in the code.
+  PetscCall(SetOptionDefault("-rdy_amr_refine_vec_tagger_type", "relative"));
+  PetscCall(SetOptionDefault("-rdy_amr_refine_vec_tagger_box", "0.5,1"));
 
-  // the coarsening tagger stays at PETSc's default (which tags nothing) unless
+  // The coarsening tagger keeps PETSc's default, which tags nothing, unless
   // the mesh adaptor can act on it: cellrefiner refines every cell the label
   // carries, whatever value it carries, so a cell tagged for coarsening there
-  // would be refined instead
+  // would be refined instead.
   if (rdy->amr.allow_coarsening) {
-    VecTagger    coarsen_tag  = (*adaptor)->coarsenTag;
-    VecTaggerBox coarsen_box = {.min = 0.0, .max = 0.1};
-    PetscCall(VecTaggerSetType(coarsen_tag, VECTAGGERRELATIVE));
-    PetscCall(VecTaggerRelativeSetBox(coarsen_tag, &coarsen_box));
+    PetscCall(SetOptionDefault("-rdy_amr_coarsen_vec_tagger_type", "relative"));
+    PetscCall(SetOptionDefault("-rdy_amr_coarsen_vec_tagger_box", "0,0.1"));
   }
 
   PetscCall(DMAdaptorSetFromOptions(*adaptor));

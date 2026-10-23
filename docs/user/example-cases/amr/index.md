@@ -29,12 +29,15 @@ the largest jump in water-surface elevation `h + z` across its faces. Free
 surface rather than depth, so still water over a varying bed indicates nothing,
 and a dam is marked at step 0 before anything moves.
 
-Which cells that selects is a PETSc `VecTagger`, so it is a runtime choice:
+Which cells that selects is a PETSc `VecTagger` owned by the `DMAdaptor`, so it
+is a runtime choice; RDycore only sets the defaults, and anything given on the
+command line wins:
 
 | option | effect |
 | --- | --- |
-| `-rdy_amr_vec_tagger_type relative -rdy_amr_vec_tagger_box 0.5,1` | at least half the largest jump (default) |
-| `-rdy_amr_vec_tagger_type cdf -rdy_amr_vec_tagger_box 0.95,1` | the worst 5% of cells |
+| `-rdy_amr_refine_vec_tagger_type relative -rdy_amr_refine_vec_tagger_box 0.5,1` | at least half the largest jump (default) |
+| `-rdy_amr_refine_vec_tagger_type cdf -rdy_amr_refine_vec_tagger_box 0.95,1` | the worst 5% of cells |
+| `-rdy_amr_coarsen_vec_tagger_box 0,0.05` | coarsen the quietest 5% (needs `-refine_allow_coarsening`) |
 | `-rdy_amr_buffer_layers <n>` | also refine `n` cell layers around each marked cell |
 | `-rdy_amr_max_levels <n>` | deepest level below the starting mesh (default 3) |
 
@@ -52,7 +55,8 @@ middle pierced by a central breach, 10 m of water upstream and 5 m downstream,
 
 The mesh is refined along the dam before the first step, follows the jet
 through the breach and the front spreading downstream, and coarsens behind
-them: the cell count rises and falls (448, 642, 522, 680) rather than growing.
+them: 448 cells at the start, 968 at t = 1 s, 1150 at t = 2 s, 1272 at t = 4 s,
+with the count falling again wherever the flow has settled.
 The same four instants, side by side:
 
 <img src="amr-dam-break-panels.png" width="60%" height="60%">
@@ -68,8 +72,8 @@ problem run on a 2D mesh, and it has an exact solution -- Stoker's -- which
 <img src="amr-channel-stoker.png" width="80%" height="80%">
 
 The computed star depth, the shock position and the rarefaction fan all sit on
-the exact solution; the area-weighted L1 depth error is 0.0145 m at t = 4 s on
-1140 cells. L1 rather than Linf because the solution has a shock, where a
+the exact solution; the area-weighted L1 depth error is 0.0144 m at t = 4 s on
+1184 cells. L1 rather than Linf because the solution has a shock, where a
 first-order scheme's pointwise error does not converge.
 
 ## Why coarsening matters
@@ -79,12 +83,12 @@ allowed to coarsen.
 
 <img src="amr-channel-wake.png" width="90%" height="90%">
 
-Refining alone (top, 2550 cells) spends the mesh on the wake: a cell refined at
+Refining alone (top, 2788 cells) spends the mesh on the wake: a cell refined at
 any adapt stays refined, so the fine region becomes the union of every past
 position of the wave, where the solution is flat and the error is near zero.
 Measured, 99.6% of its refined cells sit there. Rebuilding the mesh from the
-base mesh at every adapt (bottom, 1140 cells) puts them on the shock instead,
-for the same error at less than half the cells.
+base mesh at every adapt (bottom, 1184 cells) puts them on the shock instead,
+for the same error at well under half the cells.
 
 ## Conservation and the gates
 
