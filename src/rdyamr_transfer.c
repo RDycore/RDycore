@@ -16,6 +16,12 @@
 /// both meshes tile every base cell, the per-rank interpolation matrices mean a
 /// base cell's descendants stay on one rank, and the number of descendants is
 /// small, so the search is local and cheap.
+///
+/// The old side of the transfer is a packed array rather than an `RDyMesh`:
+/// per base cell, its descendants' polygons and values, laid out under a
+/// `PetscSection` over the base mesh's cells. That is what lets the old cells
+/// arrive from another rank -- `DMPlexDistributeField()` moves exactly this
+/// shape along a base-mesh migration -- and the clipping needs nothing else.
 
 #include <petscdmplex.h>
 #include <private/rdyamrimpl.h>
@@ -156,35 +162,106 @@ static PetscErrorCode GroupByBaseCell(PetscInt ncells, const PetscInt *base_of, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Builds the conservative old-to-new transfer for a cell-centred field
-///        of `ndof` components per cell: row block n, column block o, weight
-///        |n ^ o| / |n|.
-/// @param [in] old_mesh      the mesh the solution is on
-/// @param [in] new_mesh      the mesh it is going to
-/// @param [in] base_to_old   base-to-old interpolation matrix (1 dof)
-/// @param [in] base_to_new   base-to-new interpolation matrix (1 dof)
-/// @param [in] nbase         number of base cells on this rank
-/// @param [in] ndof          components per cell
-/// @param [out] transfer     the conservative transfer, created here (sequential, per rank)
-PetscErrorCode RDyAMRCreateTransferMatrix(RDyMesh *old_mesh, RDyMesh *new_mesh, Mat base_to_old, Mat base_to_new, PetscInt nbase, PetscInt ndof,
-                                          Mat *transfer) {
+/// @brief Packs, per base cell, the polygon and the `ndof` values of each cell
+///        of `mesh` that descends from it.
+///
+///        The section is over the base mesh's cell points, so the result is in
+///        the shape `DMPlexDistributeField()` moves along a base-mesh
+///        migration: a rank that is given a base cell is given its old
+///        descendants with it.
+///
+/// @param [in] mesh         the mesh the solution is on
+/// @param [in] dm_base      the base mesh, for the section's chart
+/// @param [in] base_to_mesh base-to-mesh interpolation matrix (1 dof), or NULL
+///                          if `mesh` is the base mesh
+/// @param [in] ndof         components per cell
+/// @param [in] u_local      the solution, by local cell
+/// @param [out] sec         the layout, created here
+/// @param [out] packed      the data, created here
+PetscErrorCode RDyAMRPackCellsByBaseCell(RDyMesh *mesh, DM dm_base, Mat base_to_mesh, PetscInt ndof, Vec u_local, PetscSection *sec,
+                                         PetscScalar **packed) {
   PetscFunctionBegin;
 
-  PetscInt *base_of_old, *base_of_new, *old_start, *old_cells, *new_start, *new_cells;
-  PetscCall(BaseCellOfEachCell(old_mesh, base_to_old, &base_of_old));
+  PetscInt cStart, cEnd;
+  PetscCall(DMPlexGetHeightStratum(dm_base, 0, &cStart, &cEnd));
+  const PetscInt nbase  = cEnd - cStart;
+  const PetscInt stride = RDyAMRPackStride(ndof);
+
+  PetscInt *base_of, *start, *cells;
+  PetscCall(BaseCellOfEachCell(mesh, base_to_mesh, &base_of));
+  PetscCall(GroupByBaseCell(mesh->num_cells, base_of, nbase, &start, &cells));
+
+  PetscCall(PetscSectionCreate(PETSC_COMM_SELF, sec));
+  PetscCall(PetscSectionSetChart(*sec, cStart, cEnd));
+  for (PetscInt b = 0; b < nbase; ++b) PetscCall(PetscSectionSetDof(*sec, b + cStart, (start[b + 1] - start[b]) * stride));
+  PetscCall(PetscSectionSetUp(*sec));
+
+  PetscInt total;
+  PetscCall(PetscSectionGetStorageSize(*sec, &total));
+  PetscCall(PetscCalloc1(total, packed));
+
+  const PetscScalar *u;
+  PetscCall(VecGetArrayRead(u_local, &u));
+  for (PetscInt b = 0; b < nbase; ++b) {
+    PetscInt off;
+    PetscCall(PetscSectionGetOffset(*sec, b + cStart, &off));
+    for (PetscInt i = start[b]; i < start[b + 1]; ++i) {
+      PetscInt     c = cells[i];
+      PetscReal    x[MAX_CLIP_VERTICES], y[MAX_CLIP_VERTICES];
+      PetscInt     nv;
+      PetscScalar *slot = *packed + off + (i - start[b]) * stride;
+      PetscCall(CellPolygon(mesh, c, x, y, &nv));
+      PetscCheck(nv <= RDY_AMR_PACK_MAX_V, PETSC_COMM_SELF, PETSC_ERR_SUP,
+                 "cell %" PetscInt_FMT " has %" PetscInt_FMT " vertices, more than the %d a packed cell holds", c, nv, RDY_AMR_PACK_MAX_V);
+      slot[0] = (PetscScalar)nv;
+      for (PetscInt v = 0; v < nv; ++v) {
+        slot[1 + 2 * v]     = x[v];
+        slot[1 + 2 * v + 1] = y[v];
+      }
+      for (PetscInt d = 0; d < ndof; ++d) slot[1 + 2 * RDY_AMR_PACK_MAX_V + d] = u[ndof * c + d];
+    }
+  }
+  PetscCall(VecRestoreArrayRead(u_local, &u));
+
+  PetscCall(PetscFree(base_of));
+  PetscCall(PetscFree(start));
+  PetscCall(PetscFree(cells));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief The conservative transfer: every cell of `new_mesh` takes the
+///        area-weighted average of the packed old cells under the same base
+///        cell that it overlaps.
+///
+/// @param [in] new_mesh    the mesh the solution is going to
+/// @param [in] dm_base     the base mesh, for the section's chart
+/// @param [in] base_to_new base-to-new interpolation matrix (1 dof)
+/// @param [in] ndof        components per cell
+/// @param [in] sec         the packed layout, over the base mesh's cells
+/// @param [in] packed      the packed old cells
+/// @param [out] u_new      the solution on the new mesh, by local cell
+PetscErrorCode RDyAMRTransferFromPacked(RDyMesh *new_mesh, DM dm_base, Mat base_to_new, PetscInt ndof, PetscSection sec, const PetscScalar *packed,
+                                        Vec u_new) {
+  PetscFunctionBegin;
+
+  PetscInt cStart, cEnd;
+  PetscCall(DMPlexGetHeightStratum(dm_base, 0, &cStart, &cEnd));
+  const PetscInt nbase  = cEnd - cStart;
+  const PetscInt stride = RDyAMRPackStride(ndof);
+
+  PetscInt *base_of_new, *new_start, *new_cells;
   PetscCall(BaseCellOfEachCell(new_mesh, base_to_new, &base_of_new));
-  PetscCall(GroupByBaseCell(old_mesh->num_cells, base_of_old, nbase, &old_start, &old_cells));
   PetscCall(GroupByBaseCell(new_mesh->num_cells, base_of_new, nbase, &new_start, &new_cells));
 
-  // a new cell overlaps only cells under the same base cell, and the deepest
-  // allowed level bounds how many that can be
-  PetscInt max_overlap = 1;
-  for (PetscInt b = 0; b < nbase; ++b) max_overlap = PetscMax(max_overlap, old_start[b + 1] - old_start[b]);
-
-  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, ndof * new_mesh->num_cells, ndof * old_mesh->num_cells, max_overlap, NULL, transfer));
-  PetscCall(MatSetBlockSize(*transfer, ndof));
+  PetscScalar *un;
+  PetscCall(VecGetArray(u_new, &un));
 
   for (PetscInt b = 0; b < nbase; ++b) {
+    PetscInt off, dof;
+    PetscCall(PetscSectionGetOffset(sec, b + cStart, &off));
+    PetscCall(PetscSectionGetDof(sec, b + cStart, &dof));
+    const PetscInt nold = dof / stride;
+
     for (PetscInt in = new_start[b]; in < new_start[b + 1]; ++in) {
       PetscInt  n = new_cells[in];
       PetscReal nx[MAX_CLIP_VERTICES], ny[MAX_CLIP_VERTICES];
@@ -196,18 +273,21 @@ PetscErrorCode RDyAMRCreateTransferMatrix(RDyMesh *old_mesh, RDyMesh *new_mesh, 
       PetscReal new_area = 0.5 * PetscAbsReal(Shoelace2(nx, ny, nn));
       PetscReal covered  = 0.0;
 
-      for (PetscInt io = old_start[b]; io < old_start[b + 1]; ++io) {
-        PetscInt  o = old_cells[io];
-        PetscReal ox[MAX_CLIP_VERTICES], oy[MAX_CLIP_VERTICES];
-        PetscInt  no;
-        PetscCall(CellPolygon(old_mesh, o, ox, oy, &no));
+      for (PetscInt d = 0; d < ndof; ++d) un[ndof * n + d] = 0.0;
+
+      for (PetscInt io = 0; io < nold; ++io) {
+        const PetscScalar *slot = packed + off + io * stride;
+        PetscReal          ox[MAX_CLIP_VERTICES], oy[MAX_CLIP_VERTICES];
+        PetscInt           no = (PetscInt)PetscRealPart(slot[0]);
+        for (PetscInt v = 0; v < no; ++v) {
+          ox[v] = PetscRealPart(slot[1 + 2 * v]);
+          oy[v] = PetscRealPart(slot[1 + 2 * v + 1]);
+        }
         PetscReal area;
         PetscCall(ConvexIntersectionArea(nx, ny, nn, ox, oy, no, &area));
         if (area <= 0.0) continue;
         covered += area;
-        for (PetscInt d = 0; d < ndof; ++d) {
-          PetscCall(MatSetValue(*transfer, ndof * n + d, ndof * o + d, area / new_area, INSERT_VALUES));
-        }
+        for (PetscInt d = 0; d < ndof; ++d) un[ndof * n + d] += (area / new_area) * slot[1 + 2 * RDY_AMR_PACK_MAX_V + d];
       }
 
       PetscCheck(PetscAbsReal(covered - new_area) <= 1e-10 * new_area, PETSC_COMM_SELF, PETSC_ERR_PLIB,
@@ -216,13 +296,8 @@ PetscErrorCode RDyAMRCreateTransferMatrix(RDyMesh *old_mesh, RDyMesh *new_mesh, 
     }
   }
 
-  PetscCall(MatAssemblyBegin(*transfer, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(*transfer, MAT_FINAL_ASSEMBLY));
-
-  PetscCall(PetscFree(base_of_old));
+  PetscCall(VecRestoreArray(u_new, &un));
   PetscCall(PetscFree(base_of_new));
-  PetscCall(PetscFree(old_start));
-  PetscCall(PetscFree(old_cells));
   PetscCall(PetscFree(new_start));
   PetscCall(PetscFree(new_cells));
   PetscFunctionReturn(PETSC_SUCCESS);

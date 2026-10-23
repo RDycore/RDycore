@@ -475,6 +475,7 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   // with coarsening, each adapt rebuilds the mesh from this one, so the level
   // every base cell is refined to has to be remembered between adapts
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_allow_coarsening", &rdy->amr.allow_coarsening, NULL));
+
   rdy->amr.max_levels = 3;
   PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-max_levels", &rdy->amr.max_levels, NULL));
   rdy->amr.num_base_cells = rdy->mesh.num_cells;
@@ -533,7 +534,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   Mat      CoarseToFineMatNDof, FineToCoarseMatNDof;
   Mat      CoarseToFineMat1Dof, FineToCoarseMat1Dof;
   DM       dm_fine;
-  Vec      U_coarse_local;
+  Vec      U_coarse_local = NULL;
   PetscInt ndof_coarse;
   PetscFunctionBeginUser;
   PetscCall(VecGetBlockSize(rdy->u_global, &ndof_coarse));
@@ -544,17 +545,22 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // are different triangulations of the same domain, which needs a
   // conservative transfer; refinement alone can inject.
   PetscBool rebuilt          = rdy->amr.allow_coarsening;
-  Mat       SolutionTransfer = NULL, old_base_to_current_1dof = NULL;
+  Mat       SolutionTransfer = NULL;
+
+  // the old mesh's cells, grouped by base cell, for the conservative transfer
+  PetscSection old_sec    = NULL;
+  PetscScalar *old_packed = NULL;
 
   // a rebuild has to know, before it adapts, what the mesh it is about to
   // replace maps to in the base mesh
   Mat base_to_old_1dof = rdy->amr.BaseToCurrentMat1Dof;
   if (base_to_old_1dof) PetscCall(PetscObjectReference((PetscObject)base_to_old_1dof));
 
+  // The cells to adapt, as a label on the mesh in hand. Nothing is changed
+  // yet: the levels the rebuild will use come next, and they are what a
+  // rebuild has to settle before it touches the base mesh.
+  DMLabel label = NULL;
   if (rdy->amr.use_surface_jump) {
-    // the cells to adapt come from the solution: compute the indicator, let the
-    // two VecTaggers threshold it, and act on the label they produce
-    DMLabel label;
     PetscCall(RDyAMRMarkBySurfaceJump(rdy, &label));
 
     PetscInt num_marked;
@@ -564,37 +570,49 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
       PetscCall(MatDestroy(&base_to_old_1dof));
       PetscFunctionReturn(PETSC_SUCCESS);
     }
-
-    if (rebuilt) {
-      PetscCall(RDyAMRRebuildFromLabel(rdy, label, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
-    } else {
-      PetscCall(RDyAMRRefineFromLabel(rdy, label, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
-    }
-    PetscCall(DMLabelDestroy(&label));
   } else if (rebuilt) {
     PetscCheck(rdy->amr.cells_marked_for_refinement, rdy->comm, PETSC_ERR_USER,
                "-refine_allow_coarsening needs solution-driven marking (RDyMarkOwnedCellsForAMR) before every adapt");
-    PetscCall(UpdateBaseLevels(rdy, rdy->amr.max_levels));
-    rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
-    PetscCall(PetscFree(rdy->amr.refine_cell));
-
-    PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, rdy->amr.max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof,
-                                        &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
-  } else {
-    PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
   }
 
   if (rebuilt) {
-    // a rebuilt mesh is a different triangulation of the same domain, so the
-    // solution crosses by the conservative transfer built further down, once
-    // the new mesh's geometry exists
-    old_base_to_current_1dof = base_to_old_1dof;
-    base_to_old_1dof         = NULL;  // handed on
+    // Copy the old solution and pack it, by base cell, before anything moves:
+    // the pack is what crosses to another rank when the base mesh is
+    // repartitioned, and it has to be taken on the partition it is still on.
+    PetscCall(VecDuplicate(rdy->u_local, &U_coarse_local));
+    PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, U_coarse_local));
+
+    // The transfer carries the free surface, not the depth: a child cell's bed
+    // elevation is not its parent's, so injecting h tilts a lake at rest. Mass
+    // is still conserved exactly, because a triangle's bed is planar and
+    // refinement splits it at edge midpoints, so sum(z * area) is the same on
+    // both meshes.
+    PetscCall(DepthToSurface(&rdy->mesh, ndof_coarse, U_coarse_local));
+
+    DM dm_base_old = rdy->amr.dm_base ? rdy->amr.dm_base : rdy->dm;
+    PetscCall(RDyAMRPackCellsByBaseCell(&rdy->mesh, dm_base_old, base_to_old_1dof, ndof_coarse, U_coarse_local, &old_sec, &old_packed));
+
+    // move each base cell to the level this adapt asks for
+    if (label) {
+      PetscCall(RDyAMRUpdateBaseLevelsFromLabel(rdy, label));
+    } else {
+      PetscCall(UpdateBaseLevels(rdy, rdy->amr.max_levels));
+      rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
+      PetscCall(PetscFree(rdy->amr.refine_cell));
+    }
+
+    PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, rdy->amr.max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof,
+                                        &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+  } else if (label) {
+    PetscCall(RDyAMRRefineFromLabel(rdy, label, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
   } else {
-    // a refinement of the mesh in hand: each new cell takes its parent's value
-    SolutionTransfer = CoarseToFineMatNDof;
+    PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
   }
-  PetscCall(MatDestroy(&base_to_old_1dof));  // unused unless the mesh was rebuilt
+  PetscCall(DMLabelDestroy(&label));
+
+  // a refinement of the mesh in hand: each new cell takes its parent's value
+  if (!rebuilt) SolutionTransfer = CoarseToFineMatNDof;
+  PetscCall(MatDestroy(&base_to_old_1dof));
   PetscCall(DMLocalizeCoordinates(dm_fine));
   PetscCall(DMViewFromOptions(dm_fine, NULL, "-dm_fine_view"));
   // Do not make the old mesh this one's coarse DM. A rebuild that refines
@@ -619,17 +637,19 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     }
   }
 
-  // create a local vector for the coarse mesh
-  PetscCall(VecDuplicate(rdy->u_local, &U_coarse_local));
+  // a refinement injects straight from the old local solution, which a rebuild
+  // took and packed before the base mesh moved
+  if (!rebuilt) {
+    PetscCall(VecDuplicate(rdy->u_local, &U_coarse_local));
+    PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, U_coarse_local));
 
-  // make a copy of the old solution
-  PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, U_coarse_local));
-
-  // The transfer carries the free surface, not the depth: a child cell's bed
-  // elevation is not its parent's, so injecting h tilts a lake at rest. Mass is
-  // still conserved exactly, because a triangle's bed is planar and refinement
-  // splits it at edge midpoints, so sum(z * area) is the same on both meshes.
-  PetscCall(DepthToSurface(&rdy->mesh, ndof_coarse, U_coarse_local));
+    // The transfer carries the free surface, not the depth: a child cell's bed
+    // elevation is not its parent's, so injecting h tilts a lake at rest. Mass
+    // is still conserved exactly, because a triangle's bed is planar and
+    // refinement splits it at edge midpoints, so sum(z * area) is the same on
+    // both meshes.
+    PetscCall(DepthToSurface(&rdy->mesh, ndof_coarse, U_coarse_local));
+  }
 
   // destroy the coarse vectors
   PetscCall(RDyDestroyVectors(&rdy));
@@ -688,11 +708,6 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // them needs the geometry of both
   RDyMesh new_mesh;
   PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &new_mesh));
-  if (rebuilt) {
-    PetscCall(RDyAMRCreateTransferMatrix(&rdy->mesh, &new_mesh, old_base_to_current_1dof, rdy->amr.BaseToCurrentMat1Dof, rdy->amr.num_base_cells,
-                                         ndof_coarse, &SolutionTransfer));
-    PetscCall(MatDestroy(&old_base_to_current_1dof));
-  }
   PetscCall(RDyMeshDestroy(rdy->mesh));
   rdy->mesh = new_mesh;
   if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
@@ -713,14 +728,18 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscCall(InitRegions(rdy));
 
   // initialize the solution on the new mesh from the old one: injection when
-  // the mesh was refined from the current one, area-weighted averaging when it
-  // was rebuilt and some of it coarsened
-  // Either way the free surface crosses and the depth is rebuilt against the
-  // new mesh's bed.
-  PetscCall(MatMult(SolutionTransfer, U_coarse_local, rdy->u_local));
+  // the mesh was refined from the current one, area-weighted averaging of the
+  // packed old cells when it was rebuilt and some of it coarsened. Either way
+  // the free surface crosses and the depth is rebuilt against the new mesh's bed.
+  if (rebuilt) {
+    PetscCall(RDyAMRTransferFromPacked(&rdy->mesh, rdy->amr.dm_base, rdy->amr.BaseToCurrentMat1Dof, ndof_coarse, old_sec, old_packed, rdy->u_local));
+    PetscCall(PetscSectionDestroy(&old_sec));
+    PetscCall(PetscFree(old_packed));
+  } else {
+    PetscCall(MatMult(SolutionTransfer, U_coarse_local, rdy->u_local));
+  }
   PetscCall(SurfaceToDepth(&rdy->mesh, ndof_coarse, rdy->u_local));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
-  if (rebuilt) PetscCall(MatDestroy(&SolutionTransfer));
   PetscCall(MatDestroy(&CoarseToFineMatNDof));
   PetscCall(MatDestroy(&FineToCoarseMatNDof));
   PetscCall(MatDestroy(&CoarseToFineMat1Dof));

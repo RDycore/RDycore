@@ -302,14 +302,15 @@ PetscErrorCode RDyAMRRefineFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c2
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Builds the adapted mesh from the base mesh rather than by refining
-///        the mesh in hand, which is what lets a region coarsen again.
+/// @brief Moves each base cell's target refinement level by what this adapt's
+///        label says about its descendants: a cell marked DM_ADAPT_REFINE
+///        takes its base cell one level deeper, one marked DM_ADAPT_COARSEN
+///        brings it one level back, and a cell in neither stratum leaves it
+///        where it is.
 ///
-///        Both strata of the label mean what they say: a cell marked
-///        DM_ADAPT_REFINE takes its base cell one level deeper, one marked
-///        DM_ADAPT_COARSEN brings it one level back, and a cell in neither
-///        stratum leaves it where it is.
-PetscErrorCode RDyAMRRebuildFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c2f_ndof, Mat *f2c_ndof, Mat *c2f_1dof, Mat *f2c_1dof) {
+///        Separate from the rebuild because load balancing goes between them:
+///        the partition is chosen from the levels the rebuild is about to use.
+PetscErrorCode RDyAMRUpdateBaseLevelsFromLabel(RDy rdy, DMLabel label) {
   PetscFunctionBegin;
 
   const PetscInt max_levels = rdy->amr.max_levels;
@@ -335,9 +336,5 @@ PetscErrorCode RDyAMRRebuildFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c
     rdy->amr.base_level[b] = PetscMax(0, PetscMin(rdy->amr.base_level[b] + delta[b], max_levels));
   }
   PetscCall(PetscFree(delta));
-
-  PetscInt bs;
-  PetscCall(VecGetBlockSize(rdy->u_global, &bs));
-  PetscCall(RDyAMRRebuildMeshFromBase(rdy, bs, max_levels, dm_new, c2f_ndof, f2c_ndof, c2f_1dof, f2c_1dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
