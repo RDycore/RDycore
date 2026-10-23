@@ -81,9 +81,9 @@ typedef struct {
   PetscBool  cells_marked_for_refinement;
   PetscBool *refine_cell;
 
-  // for mapping data between base and current meshes
-  Mat BaseToCurrentMatNDof, CurrentToBaseMatNDof;
-  Mat BaseToCurrentMat1Dof, CurrentToBaseMat1Dof;
+  // injects a field from the base mesh onto the current one; also what says
+  // which base cell a current cell descends from (RDyAMRBaseCellOfLocalCell)
+  Mat BaseToCurrentMatNDof, BaseToCurrentMat1Dof;
 
   // identifies if the mesh has been refined and the model has not taken a step
   PetscBool mesh_was_refined;

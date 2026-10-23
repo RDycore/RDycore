@@ -286,7 +286,7 @@ PetscErrorCode RDyAMRMarkBySurfaceJump(RDy rdy, DMLabel *label) {
 
 /// @brief Refines the mesh in hand wherever the label marks DM_ADAPT_REFINE,
 ///        and ignores the coarsen stratum, which a refinement cannot act on.
-PetscErrorCode RDyAMRRefineFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c2f_ndof, Mat *f2c_ndof, Mat *c2f_1dof, Mat *f2c_1dof) {
+PetscErrorCode RDyAMRRefineFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c2f_ndof, Mat *c2f_1dof) {
   PetscFunctionBegin;
 
   DMLabel refine;
@@ -298,7 +298,7 @@ PetscErrorCode RDyAMRRefineFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c2
 
   PetscInt bs;
   PetscCall(VecGetBlockSize(rdy->u_global, &bs));
-  PetscCall(RDyAMRRefineByLabel(rdy->dm, refine, bs, dm_new, c2f_ndof, f2c_ndof, c2f_1dof, f2c_1dof));
+  PetscCall(RDyAMRRefineByLabel(rdy->dm, refine, bs, dm_new, c2f_ndof, c2f_1dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

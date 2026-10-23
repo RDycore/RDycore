@@ -84,24 +84,26 @@ static PetscErrorCode CreateAdaptLabelFromMarkedCells(RDy rdy, DMLabel *adaptLab
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Creates matrices for the interpolation between coarse and fine meshes.
+/// @brief Creates the matrices that inject a coarse field onto the mesh refined
+///        from it: each child cell takes its parent's value.
 /// @param odm          The coarse DM that was refined; it cannot be recovered
 ///                     from the transform, whose base DM DMPlexSetTransform() clears
 /// @param dm           The fine DM
 /// @param CoarseToFine Matrix for interpolating local Vec from coarse to fine grid
-/// @param FineToCoarse Matrix for interpolating local Vec from fine to coarse grid
 /// @return PETSC_SUCESS on success
-static PetscErrorCode ConstructRefineTree(DM odm, DM dm, Mat CoarseToFineMatNDof, Mat FineToCoarseMatNDof, Mat CoarseToFineMat1Dof,
-                                          Mat FineToCoarseMat1Dof) {
+static PetscErrorCode ConstructRefineTree(DM odm, DM dm, Mat CoarseToFineMatNDof, Mat CoarseToFineMat1Dof) {
   DMPlexTransform tr;
-  PetscInt        cStart, cEnd, bs, Istart, Jstart, Istart_1Dof, Jstart_1Dof;
+  PetscInt        cStart, cEnd, fStart, bs, Istart, Jstart, Istart_1Dof, Jstart_1Dof;
   PetscScalar     val = 1.0;
 
   PetscFunctionBegin;
   PetscCall(MatGetBlockSize(CoarseToFineMatNDof, &bs));
   PetscCall(DMPlexGetTransform(dm, &tr));
-  if (!tr) PetscFunctionReturn(PETSC_SUCCESS);
+  // returning early here would hand the caller unassembled matrices
+  PetscCheck(tr, PetscObjectComm((PetscObject)dm), PETSC_ERR_ARG_WRONGSTATE,
+             "the refined mesh carries no transform to read the parent of each cell from");
   PetscCall(DMPlexGetHeightStratum(odm, 0, &cStart, &cEnd));
+  PetscCall(DMPlexGetHeightStratum(dm, 0, &fStart, NULL));
 
   PetscCall(MatGetOwnershipRange(CoarseToFineMatNDof, &Istart, NULL));
   PetscCall(MatGetOwnershipRangeColumn(CoarseToFineMatNDof, &Jstart, NULL));
@@ -122,13 +124,12 @@ static PetscErrorCode ConstructRefineTree(DM odm, DM dm, Mat CoarseToFineMatNDof
       if (DMPolytopeTypeGetDim(rct[n]) != dim) continue;
       for (PetscInt r = 0; r < rsize[n]; ++r) {
         PetscCall(DMPlexTransformGetTargetPoint(tr, ct, rct[n], c, r, &pNew));
+        const PetscInt fine = pNew - fStart;  // the matrices are indexed from the first cell, not the first point
         for (PetscInt i = 0; i < bs; i++) {
-          PetscCall(MatSetValue(CoarseToFineMatNDof, Istart + bs * (pNew - 0) + i, Jstart + bs * (c - cStart) + i, val, INSERT_VALUES));
-          PetscCall(MatSetValue(FineToCoarseMatNDof, Jstart + bs * (c - cStart) + i, Istart + bs * (pNew - 0) + i, 1.0 / rsize[n], INSERT_VALUES));
+          PetscCall(MatSetValue(CoarseToFineMatNDof, Istart + bs * fine + i, Jstart + bs * (c - cStart) + i, val, INSERT_VALUES));
         }
 
-        PetscCall(MatSetValue(CoarseToFineMat1Dof, Istart + (pNew - 0), Jstart + (c - cStart), val, INSERT_VALUES));
-        PetscCall(MatSetValue(FineToCoarseMat1Dof, Jstart + (c - cStart), Istart + (pNew - 0), 1.0 / rsize[n], INSERT_VALUES));
+        PetscCall(MatSetValue(CoarseToFineMat1Dof, Istart_1Dof + fine, Jstart_1Dof + (c - cStart), val, INSERT_VALUES));
       }
     }
   }
@@ -138,33 +139,22 @@ static PetscErrorCode ConstructRefineTree(DM odm, DM dm, Mat CoarseToFineMatNDof
   PetscCall(MatAssemblyEnd(CoarseToFineMatNDof, MAT_FINAL_ASSEMBLY));
   PetscCall(MatViewFromOptions(CoarseToFineMatNDof, NULL, "-adapt_c2f_mat_view"));
 
-  PetscCall(MatSetFromOptions(FineToCoarseMatNDof));
-  PetscCall(MatAssemblyBegin(FineToCoarseMatNDof, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(FineToCoarseMatNDof, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatViewFromOptions(FineToCoarseMatNDof, NULL, "-adapt_f2c_mat_view"));
-
   PetscCall(MatSetFromOptions(CoarseToFineMat1Dof));
   PetscCall(MatAssemblyBegin(CoarseToFineMat1Dof, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(CoarseToFineMat1Dof, MAT_FINAL_ASSEMBLY));
   PetscCall(MatViewFromOptions(CoarseToFineMat1Dof, NULL, "-adapt_c2f_1dof_mat_view"));
 
-  PetscCall(MatSetFromOptions(FineToCoarseMat1Dof));
-  PetscCall(MatAssemblyBegin(FineToCoarseMat1Dof, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatAssemblyEnd(FineToCoarseMat1Dof, MAT_FINAL_ASSEMBLY));
-  PetscCall(MatViewFromOptions(FineToCoarseMat1Dof, NULL, "-adapt_f2c_1dof_mat_view"));
-
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Refines `dm` wherever `adaptLabel` marks a cell, and builds the four
-///        interpolation matrices between it and the result. The label is
+/// @brief Refines `dm` wherever `adaptLabel` marks a cell, and builds the two
+///        injection matrices between it and the result. The label is
 ///        consumed (destroyed) here.
 /// @param [in] dm         the mesh to refine
 /// @param [in] adaptLabel cells marked DM_ADAPT_REFINE
-/// @param [in] bs         components per cell for the NDof matrices
+/// @param [in] bs         components per cell for the NDof matrix
 /// @param [out] dm_fine   the refined mesh
-PetscErrorCode RDyAMRRefineByLabel(DM dm, DMLabel adaptLabel, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof,
-                                   Mat *CoarseToFineMat1Dof, Mat *FineToCoarseMat1Dof) {
+PetscErrorCode RDyAMRRefineByLabel(DM dm, DMLabel adaptLabel, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *CoarseToFineMat1Dof) {
   PetscFunctionBeginUser;
 
   DM dmAdapt;
@@ -201,20 +191,17 @@ PetscErrorCode RDyAMRRefineByLabel(DM dm, DMLabel adaptLabel, const PetscInt bs,
   PetscCall(DMPlexTransformDestroy(&tr));
   PetscCall(DMLabelDestroy(&adaptLabel));
 
-  PetscCheck(dmAdapt, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
-
   PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
   PetscCall(DMViewFromOptions(dmAdapt, NULL, "-adapt_dm_view"));
 
-  PetscCall(RDyAMRBuildInterpolationMatrices(dm, dmAdapt, bs, CoarseToFineMatNDof, FineToCoarseMatNDof, CoarseToFineMat1Dof, FineToCoarseMat1Dof));
+  PetscCall(RDyAMRBuildInterpolationMatrices(dm, dmAdapt, bs, CoarseToFineMatNDof, CoarseToFineMat1Dof));
   *dm_fine = dmAdapt;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Builds the four interpolation matrices between a mesh and the mesh
+/// @brief Builds the two injection matrices between a mesh and the mesh
 ///        refined from it, from the transform the refinement saved.
-PetscErrorCode RDyAMRBuildInterpolationMatrices(DM dm, DM dmAdapt, const PetscInt bs, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof,
-                                                Mat *CoarseToFineMat1Dof, Mat *FineToCoarseMat1Dof) {
+PetscErrorCode RDyAMRBuildInterpolationMatrices(DM dm, DM dmAdapt, const PetscInt bs, Mat *CoarseToFineMatNDof, Mat *CoarseToFineMat1Dof) {
   PetscFunctionBeginUser;
   const PetscInt d_nz = 4;  // one level of simplex bisection splits a cell into at most four
   PetscInt       ccStart, ccEnd, fcStart, fcEnd;
@@ -223,20 +210,16 @@ PetscErrorCode RDyAMRBuildInterpolationMatrices(DM dm, DM dmAdapt, const PetscIn
   PetscCall(DMPlexGetHeightStratum(dmAdapt, 0, &fcStart, &fcEnd));
 
   PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (fcEnd - fcStart), bs * (ccEnd - ccStart), d_nz, NULL, CoarseToFineMatNDof));
-  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, bs * (ccEnd - ccStart), bs * (fcEnd - fcStart), d_nz, NULL, FineToCoarseMatNDof));
   PetscCall(MatSetBlockSize(*CoarseToFineMatNDof, bs));
-  PetscCall(MatSetBlockSize(*FineToCoarseMatNDof, bs));
 
   PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, (fcEnd - fcStart), (ccEnd - ccStart), d_nz, NULL, CoarseToFineMat1Dof));
-  PetscCall(MatCreateSeqAIJ(PETSC_COMM_SELF, (ccEnd - ccStart), (fcEnd - fcStart), d_nz, NULL, FineToCoarseMat1Dof));
   PetscCall(MatSetBlockSize(*CoarseToFineMat1Dof, 1));
-  PetscCall(MatSetBlockSize(*FineToCoarseMat1Dof, 1));
 
-  PetscCall(ConstructRefineTree(dm, dmAdapt, *CoarseToFineMatNDof, *FineToCoarseMatNDof, *CoarseToFineMat1Dof, *FineToCoarseMat1Dof));
+  PetscCall(ConstructRefineTree(dm, dmAdapt, *CoarseToFineMatNDof, *CoarseToFineMat1Dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-static PetscErrorCode MatMatMultReplace(Mat *, Mat *, PetscBool);
+static PetscErrorCode MatMatMultReplace(Mat *, Mat *);
 
 /// @brief Replaces the depth in a local solution vector with the free surface
 ///        h + z, so that an interpolation between two meshes carries a quantity
@@ -359,13 +342,12 @@ static PetscErrorCode UpdateBaseLevels(RDy rdy, PetscInt max_levels) {
 ///        Refining from the base rather than from the current mesh is what
 ///        makes coarsening possible: a region the indicator has stopped
 ///        marking is simply built with fewer levels this time.
-PetscErrorCode RDyAMRRebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt max_levels, DM *dm_new, Mat *BaseToNewNDof, Mat *NewToBaseNDof,
-                                         Mat *BaseToNew1Dof, Mat *NewToBase1Dof) {
+PetscErrorCode RDyAMRRebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt max_levels, DM *dm_new, Mat *BaseToNewNDof, Mat *BaseToNew1Dof) {
   PetscFunctionBeginUser;
 
   DM  dm_base = rdy->amr.dm_base ? rdy->amr.dm_base : rdy->dm;
   DM  dm      = dm_base;
-  Mat b2n_n = NULL, n2b_n = NULL, b2n_1 = NULL, n2b_1 = NULL;
+  Mat b2n_n = NULL, b2n_1 = NULL;
 
   for (PetscInt level = 0; level < max_levels; ++level) {
     PetscInt cStart, cEnd;
@@ -398,23 +380,17 @@ PetscErrorCode RDyAMRRebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt ma
     }
 
     DM  dm_next;
-    Mat c2f_n, f2c_n, c2f_1, f2c_1;
-    PetscCall(RDyAMRRefineByLabel(dm, label, bs, &dm_next, &c2f_n, &f2c_n, &c2f_1, &f2c_1));
+    Mat c2f_n, c2f_1;
+    PetscCall(RDyAMRRefineByLabel(dm, label, bs, &dm_next, &c2f_n, &c2f_1));
 
     if (!b2n_n) {  // first level: the matrices already run from the base mesh
       b2n_n = c2f_n;
-      n2b_n = f2c_n;
       b2n_1 = c2f_1;
-      n2b_1 = f2c_1;
     } else {
-      PetscCall(MatMatMultReplace(&c2f_n, &b2n_n, PETSC_TRUE));
-      PetscCall(MatMatMultReplace(&n2b_n, &f2c_n, PETSC_FALSE));
-      PetscCall(MatMatMultReplace(&c2f_1, &b2n_1, PETSC_TRUE));
-      PetscCall(MatMatMultReplace(&n2b_1, &f2c_1, PETSC_FALSE));
+      PetscCall(MatMatMultReplace(&c2f_n, &b2n_n));
+      PetscCall(MatMatMultReplace(&c2f_1, &b2n_1));
       PetscCall(MatDestroy(&c2f_n));
-      PetscCall(MatDestroy(&f2c_n));
       PetscCall(MatDestroy(&c2f_1));
-      PetscCall(MatDestroy(&f2c_1));
     }
 
     if (dm != dm_base) PetscCall(DMDestroy(&dm));
@@ -427,36 +403,31 @@ PetscErrorCode RDyAMRRebuildMeshFromBase(RDy rdy, const PetscInt bs, PetscInt ma
     PetscInt n = cEnd - cStart;
     PetscCall(MatCreateConstantDiagonal(PETSC_COMM_SELF, bs * n, bs * n, bs * n, bs * n, 1.0, &b2n_n));
     PetscCall(MatConvert(b2n_n, MATSEQAIJ, MAT_INPLACE_MATRIX, &b2n_n));
-    PetscCall(MatDuplicate(b2n_n, MAT_COPY_VALUES, &n2b_n));
     PetscCall(MatCreateConstantDiagonal(PETSC_COMM_SELF, n, n, n, n, 1.0, &b2n_1));
     PetscCall(MatConvert(b2n_1, MATSEQAIJ, MAT_INPLACE_MATRIX, &b2n_1));
-    PetscCall(MatDuplicate(b2n_1, MAT_COPY_VALUES, &n2b_1));
     PetscCall(PetscObjectReference((PetscObject)dm));  // the caller takes a reference
   }
 
   *dm_new        = dm;
   *BaseToNewNDof = b2n_n;
-  *NewToBaseNDof = n2b_n;
   *BaseToNew1Dof = b2n_1;
-  *NewToBase1Dof = n2b_1;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 /// @brief Refines the current mesh where this adapt's marks ask for it.
-static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *FineToCoarseMatNDof, Mat *CoarseToFineMat1Dof,
-                                Mat *FineToCoarseMat1Dof) {
+static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *CoarseToFineMatNDof, Mat *CoarseToFineMat1Dof) {
   PetscFunctionBeginUser;
 
   PetscCheck(rdy->amr.cells_marked_for_refinement, rdy->comm, PETSC_ERR_ARG_WRONGSTATE,
-             "no cells are marked: call RDyMarkOwnedCellsForAMR() before every RDyPerformAMR()");
+             "no cells are marked: call RDyMarkOwnedCellsForAMR() before every RDyPerformAMR(), or let RDycore mark them with "
+             "RDyEnableAMRBySurfaceJump()");
 
   DMLabel adaptLabel;
   PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
   rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
   PetscCall(PetscFree(rdy->amr.refine_cell));
 
-  PetscCall(
-      RDyAMRRefineByLabel(rdy->dm, adaptLabel, bs, dm_fine, CoarseToFineMatNDof, FineToCoarseMatNDof, CoarseToFineMat1Dof, FineToCoarseMat1Dof));
+  PetscCall(RDyAMRRefineByLabel(rdy->dm, adaptLabel, bs, dm_fine, CoarseToFineMatNDof, CoarseToFineMat1Dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -466,20 +437,17 @@ extern PetscErrorCode InitSolver(RDy rdy);
 extern PetscErrorCode InitDirichletBoundaryConditions(RDy rdy);
 extern PetscErrorCode InitSourceConditions(RDy rdy);
 
-/// @brief Computes A * B and replaces one of the two with it, destroying what
-///        was there.
-/// @param A        left factor
-/// @param B        right factor
-/// @param update_B replace B with the product, rather than A
+/// @brief Computes A * B and replaces B with it, destroying what was there.
+/// @param A left factor
+/// @param B right factor, replaced by the product
 /// @return PETSC_SUCESS on success
-static PetscErrorCode MatMatMultReplace(Mat *A, Mat *B, PetscBool update_B) {
+static PetscErrorCode MatMatMultReplace(Mat *A, Mat *B) {
   PetscFunctionBeginUser;
   Mat tmp;
 
   PetscCall(MatMatMult(*A, *B, MAT_INITIAL_MATRIX, PETSC_DETERMINE, &tmp));
-  PetscCall(MatDestroy(update_B ? B : A));
-  if (update_B) *B = tmp;
-  else *A = tmp;
+  PetscCall(MatDestroy(B));
+  *B = tmp;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -575,11 +543,11 @@ PetscErrorCode RDyEnableAMRBySurfaceJump(RDy rdy) {
 }
 
 PetscErrorCode RDyPerformAMR(RDy rdy) {
-  Mat      CoarseToFineMatNDof, FineToCoarseMatNDof;
-  Mat      CoarseToFineMat1Dof, FineToCoarseMat1Dof;
+  Mat      CoarseToFineMatNDof, CoarseToFineMat1Dof;
   DM       dm_fine;
   Vec      U_coarse_local = NULL;
   PetscInt ndof_coarse;
+
   PetscFunctionBeginUser;
   PetscCall(RegisterAMRLogEvents());
   PetscCall(PetscLogEventBegin(RDY_AMR_Adapt, 0, 0, 0, 0));
@@ -665,13 +633,12 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(PetscFree(old_level));
 
     PetscCall(PetscLogEventBegin(RDY_AMR_Rebuild, 0, 0, 0, 0));
-    PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, rdy->amr.max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof,
-                                        &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+    PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, rdy->amr.max_levels, &dm_fine, &CoarseToFineMatNDof, &CoarseToFineMat1Dof));
     PetscCall(PetscLogEventEnd(RDY_AMR_Rebuild, 0, 0, 0, 0));
   } else if (label) {
-    PetscCall(RDyAMRRefineFromLabel(rdy, label, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+    PetscCall(RDyAMRRefineFromLabel(rdy, label, &dm_fine, &CoarseToFineMatNDof, &CoarseToFineMat1Dof));
   } else {
-    PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof, &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));
+    PetscCall(AdaptMesh(rdy, ndof_coarse, &dm_fine, &CoarseToFineMatNDof, &CoarseToFineMat1Dof));
   }
   PetscCall(DMLabelDestroy(&label));
 
@@ -727,18 +694,12 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     // the matrices run from the base mesh already -- replace rather than
     // compose. On the first adapt there is nothing yet to replace.
     PetscCall(MatDestroy(&rdy->amr.BaseToCurrentMatNDof));
-    PetscCall(MatDestroy(&rdy->amr.CurrentToBaseMatNDof));
     PetscCall(MatDestroy(&rdy->amr.BaseToCurrentMat1Dof));
-    PetscCall(MatDestroy(&rdy->amr.CurrentToBaseMat1Dof));
     PetscCall(MatDuplicate(CoarseToFineMatNDof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMatNDof));
-    PetscCall(MatDuplicate(FineToCoarseMatNDof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMatNDof));
     PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMat1Dof));
-    PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMat1Dof));
   } else {
-    PetscCall(MatMatMultReplace(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof, PETSC_TRUE));
-    PetscCall(MatMatMultReplace(&rdy->amr.CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
-    PetscCall(MatMatMultReplace(&CoarseToFineMat1Dof, &rdy->amr.BaseToCurrentMat1Dof, PETSC_TRUE));
-    PetscCall(MatMatMultReplace(&rdy->amr.CurrentToBaseMat1Dof, &FineToCoarseMat1Dof, PETSC_FALSE));
+    PetscCall(MatMatMultReplace(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof));
+    PetscCall(MatMatMultReplace(&CoarseToFineMat1Dof, &rdy->amr.BaseToCurrentMat1Dof));
   }
 
   // set the DM to be the refined DM
@@ -795,9 +756,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscCall(SurfaceToDepth(&rdy->mesh, ndof_coarse, rdy->u_local));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   PetscCall(MatDestroy(&CoarseToFineMatNDof));
-  PetscCall(MatDestroy(&FineToCoarseMatNDof));
   PetscCall(MatDestroy(&CoarseToFineMat1Dof));
-  PetscCall(MatDestroy(&FineToCoarseMat1Dof));
   PetscCall(VecDestroy(&U_coarse_local));
 
   // the operator, the boundaries, the regions and the TS all go and come back

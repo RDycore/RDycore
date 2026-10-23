@@ -286,9 +286,7 @@ PetscErrorCode RDyDestroy(RDy *rdy) {
   if ((*rdy)->amr.dm_1dof_base) DMDestroy(&((*rdy)->amr.dm_1dof_base));
 
   if ((*rdy)->amr.BaseToCurrentMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMatNDof));
-  if ((*rdy)->amr.CurrentToBaseMatNDof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMatNDof));
   if ((*rdy)->amr.BaseToCurrentMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.BaseToCurrentMat1Dof));
-  if ((*rdy)->amr.CurrentToBaseMat1Dof) PetscCall(MatDestroy(&(*rdy)->amr.CurrentToBaseMat1Dof));
 
   // destroy config data
   PetscCall(DestroyConfig((*rdy)));

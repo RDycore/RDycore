@@ -14,15 +14,15 @@ static inline PetscInt RDyAMRPackStride(PetscInt ndof) { return 1 + 2 * RDY_AMR_
 PETSC_INTERN PetscErrorCode RDyAMRPackCellsByBaseCell(RDyMesh *, DM, Mat, PetscInt, Vec, PetscSection *, PetscScalar **);
 PETSC_INTERN PetscErrorCode RDyAMRTransferFromPacked(RDyMesh *, DM, Mat, PetscInt, PetscSection, const PetscScalar *, Vec);
 
-// interpolation matrices between a mesh and the mesh refined from it
-PETSC_INTERN PetscErrorCode RDyAMRBuildInterpolationMatrices(DM, DM, const PetscInt, Mat *, Mat *, Mat *, Mat *);
+// injection matrices (ndof and 1 dof) from a mesh to the mesh refined from it
+PETSC_INTERN PetscErrorCode RDyAMRBuildInterpolationMatrices(DM, DM, const PetscInt, Mat *, Mat *);
 
 // refines a mesh by simplex bisection where a label marks it, and builds the
-// interpolation matrices; the label is consumed
-PETSC_INTERN PetscErrorCode RDyAMRRefineByLabel(DM, DMLabel, const PetscInt, DM *, Mat *, Mat *, Mat *, Mat *);
+// injection matrices; the label is consumed
+PETSC_INTERN PetscErrorCode RDyAMRRefineByLabel(DM, DMLabel, const PetscInt, DM *, Mat *, Mat *);
 
 // rebuilds the mesh from the base mesh at the levels rdy->amr.base_level asks for
-PETSC_INTERN PetscErrorCode RDyAMRRebuildMeshFromBase(RDy, const PetscInt, PetscInt, DM *, Mat *, Mat *, Mat *, Mat *);
+PETSC_INTERN PetscErrorCode RDyAMRRebuildMeshFromBase(RDy, const PetscInt, PetscInt, DM *, Mat *, Mat *);
 
 // the base cell a local cell of the current mesh descends from, or -1
 PETSC_INTERN PetscErrorCode RDyAMRBaseCellOfLocalCell(RDy, PetscInt, PetscInt *);
@@ -34,7 +34,7 @@ PETSC_INTERN PetscErrorCode RDyAMRBalanceBaseMesh(RDy, DM, const PetscInt *, Pet
 
 // the refinement criterion and the two ways to act on it (src/rdyamr_adaptor.c)
 PETSC_INTERN PetscErrorCode RDyAMRMarkBySurfaceJump(RDy, DMLabel *);
-PETSC_INTERN PetscErrorCode RDyAMRRefineFromLabel(RDy, DMLabel, DM *, Mat *, Mat *, Mat *, Mat *);
+PETSC_INTERN PetscErrorCode RDyAMRRefineFromLabel(RDy, DMLabel, DM *, Mat *, Mat *);
 PETSC_INTERN PetscErrorCode RDyAMRUpdateBaseLevelsFromLabel(RDy, DMLabel);
 
 #endif
