@@ -41,14 +41,16 @@ file(COPY
      ${MESH_DIR}/planar_dam_20x10_tri.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
+# The transform RDycore's AMR needs is set in the code, so the cases ask only
+# for the criterion.
+#
 # -refine_check_volume is a gate (exactness class: machine precision, with the
 # mechanism -- the area-weighted transfer reproduces sum(h * area) exactly and
 # only the summation order changes). It used to print the number and check
 # nothing, so these cases passed on exit status and a transfer that lost mass
 # would have gone through them; the worst departure measured over every case in
 # this directory is 1.4e-14 relative, against the 1e-11 the driver holds it to.
-set(amr_jump_args -dm_adaptor cellrefiner -dm_plex_transform_type refine_sbr -dm_plex_transform_label_match_strata
-                  -refine_criterion jump -refine_at_start -refine_check_volume)
+set(amr_jump_args -refine_criterion jump -refine_at_start -refine_check_volume)
 
 # 1D dam break on a 2D mesh: the case checked against the Stoker solution
 foreach(np 1 3)
@@ -70,6 +72,33 @@ foreach(np 1 3)
 endforeach()
 add_test(amr_dam_break_coarsen_c_np_1 ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${amr_c_driver} dam_break_amr.yaml -options_left
          ${amr_jump_args} -refine_allow_coarsening)
+
+# Gate: solution-driven AMR chooses the same mesh on one rank and on three,
+# with and without coarsening. See the script for what used to go wrong.
+foreach(mode refine coarsen)
+  set(refine_extra "")
+  set(coarsen_extra "-refine_allow_coarsening")
+  # and the same under CEED, which is what caught the operator scattering its
+  # fluxes by the wrong index on an adapted mesh: 1148 cells on one rank
+  # against 1150 on three
+  set(basic_ceed "")
+  set(ceed_ceed "-ceed /cpu/self")
+  foreach(backend basic ceed)
+    set(suffix "")
+    if (backend STREQUAL ceed)
+      set(suffix "_ceed")
+    endif()
+    add_test(NAME amr_same_on_any_ranks_${mode}${suffix}
+             COMMAND ${CMAKE_COMMAND}
+                     -DRDYCORE_AMR=$<TARGET_FILE:rdycore_amr>
+                     -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
+                     -DMESH=${MESH_DIR}/channel_100x4_tri.msh
+                     -DMPIEXEC=${MPIEXEC}
+                     "-DEXTRA=${${mode}_extra} ${${backend}_ceed}"
+                     -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_same_on_any_ranks_${mode}${suffix}
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_same_on_any_ranks.cmake)
+  endforeach()
+endforeach()
 
 # Gate: the adapt machinery with nothing marked leaves the answer untouched
 if (NOT H5DIFF)

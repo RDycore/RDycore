@@ -9,6 +9,7 @@ set(RDYCORE_C_SOURCE_FILES
   rdymesh.c
   rdymms.c
   rdyamr.c
+  rdyamr_adaptor.c
   rdyamr_transfer.c
   rdysetup.c
   operator.c

@@ -14,17 +14,24 @@ static const char *help_str =
     "  -refine_allow_coarsening      rebuild the mesh from the base mesh at every\n"
     "                                adapt, so cells the criterion no longer marks\n"
     "                                come back coarse\n"
-    "  -refine_check_volume          report sum(h * area) across every adapt\n"
+    "  -refine_check_volume          check sum(h * area) across every adapt, and\n"
+    "                                fail if it moves by more than\n"
+    "                                -refine_check_volume_tol (default 1e-11)\n"
+    "                                relative\n"
+    "  -refine_check_volume_tol <t>  that tolerance\n"
     "  -refine_data_dir <dir>        refine from marker files instead (with\n"
     "                                -refine_data_start_date Y,M,D,h,m)\n"
     "\n"
-    "  the jump criterion is tuned with -rdy_amr_vec_tagger_type <relative|cdf|absolute>\n"
-    "  and -rdy_amr_vec_tagger_box <lo,hi>, -rdy_amr_buffer_layers <n> and\n"
-    "  -rdy_amr_max_levels <n>\n"
+    "  -refine_box <x0,x1,y0,y1>     the box the box criterion marks\n"
+    "  -refine_box_speed <v>         translate that box along x at v m/s, so\n"
+    "                                that cells behind it coarsen again\n"
     "\n"
-    "  the mesh must be simplicial and the adapt needs\n"
-    "  -dm_adaptor cellrefiner -dm_plex_transform_type refine_sbr\n"
-    "  -dm_plex_transform_label_match_strata\n";
+    "  the jump criterion is tuned with\n"
+    "  -rdy_amr_refine_vec_tagger_type <relative|cdf|absolute> and\n"
+    "  -rdy_amr_refine_vec_tagger_box <lo,hi>, plus -rdy_amr_buffer_layers <n>\n"
+    "  and -rdy_amr_max_levels <n>\n"
+    "\n"
+    "  the mesh must be simplicial; the adapt refines it by bisection\n";
 
 static void usage(const char *exe_name) {
   fprintf(stderr, "%s: usage:\n", exe_name);
@@ -144,8 +151,8 @@ static PetscErrorCode ComputeWaterVolume(RDy rdy, PetscReal *total) {
   PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
 
   PetscReal *h, *area;
-  PetscCalloc1(ncells_local, &h);
-  PetscCalloc1(ncells_local, &area);
+  PetscCall(PetscCalloc1(ncells_local, &h));
+  PetscCall(PetscCalloc1(ncells_local, &area));
   PetscCall(RDyGetOwnedCellHeights(rdy, ncells_local, h));
   PetscCall(RDyGetOwnedCellAreas(rdy, ncells_local, area));
 
@@ -153,13 +160,15 @@ static PetscErrorCode ComputeWaterVolume(RDy rdy, PetscReal *total) {
   for (PetscInt icell = 0; icell < ncells_local; icell++) local += h[icell] * area[icell];
   PetscCallMPI(MPI_Allreduce(&local, total, 1, MPIU_REAL, MPI_SUM, PETSC_COMM_WORLD));
 
-  PetscFree(h);
-  PetscFree(area);
+  PetscCall(PetscFree(h));
+  PetscCall(PetscFree(area));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
+/// @brief Marks the cells whose centroid lies in `box` = {x0, x1, y0, y1},
+///        shifted along x by `shift`.
+PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy, const PetscReal box[4], PetscReal shift) {
   PetscFunctionBegin;
 
   PetscInt   ncells_local;
@@ -179,14 +188,8 @@ PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy) {
   PetscCall(RDyGetOwnedCellYCentroids(rdy, ncells_local, yc_local));
 
   for (PetscInt icell = 0; icell < ncells_local; icell++) {
-    // check if the cell is inside the region of interest
-    if (xc_local[icell] > 0.0 && xc_local[icell] < 1.0 && yc_local[icell] > 3.0 && yc_local[icell] < 4.0) {
-      // mark the cell for refinement
-      refine_cell[icell] = PETSC_TRUE;
-    } else {
-      // do not mark the cell for refinement
-      refine_cell[icell] = PETSC_FALSE;
-    }
+    PetscReal x = xc_local[icell] - shift, y = yc_local[icell];
+    refine_cell[icell] = (PetscBool)(x > box[0] && x < box[1] && y > box[2] && y < box[3]);
   }
 
   PetscCall(RDyMarkOwnedCellsForAMR(rdy, ncells_local, refine_cell));
@@ -223,27 +226,30 @@ int main(int argc, char *argv[]) {
     PetscCall(RDyCreate(comm, argv[1], &rdy));
     PetscCall(RDySetup(rdy));
 
-    // enable refinement
-    PetscCall(RDyEnableAMR(rdy));
-
-    RefinementDataset refinement_dataset;
-    PetscCall(ParseRefinementDataOptions(&refinement_dataset));
-
-    // -refine_criterion speed marks cells by the local flow speed instead of
-    // the static box of MarkOwnedCellsForRefinement, so the mesh follows the
-    // solution. -refine_check_volume reports sum(h * area) across each adapt.
+    // enable refinement. -refine_criterion jump marks cells by the water-surface
+    // jump of the solution instead of the box of MarkOwnedCellsForRefinement, so
+    // the mesh follows the solution; it has to be known before RDyEnableAMR.
     char      criterion[32] = "box";
-    PetscBool check_volume = PETSC_FALSE, refine_at_start = PETSC_FALSE;
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-refine_criterion", criterion, sizeof(criterion), NULL));
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_volume", &check_volume, NULL));
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_at_start", &refine_at_start, NULL));
     PetscBool by_jump;
+    PetscCall(PetscOptionsGetString(NULL, NULL, "-refine_criterion", criterion, sizeof(criterion), NULL));
     PetscCall(PetscStrcmp(criterion, "jump", &by_jump));
     if (!by_jump) {
       PetscBool by_box;
       PetscCall(PetscStrcmp(criterion, "box", &by_box));
       PetscCheck(by_box, comm, PETSC_ERR_USER, "-refine_criterion must be 'box' or 'jump', got '%s'", criterion);
     }
+    if (by_jump) {
+      PetscCall(RDyEnableAMRBySurfaceJump(rdy));  // the solution marks the cells
+    } else {
+      PetscCall(RDyEnableAMR(rdy));
+    }
+
+    RefinementDataset refinement_dataset;
+    PetscCall(ParseRefinementDataOptions(&refinement_dataset));
+
+    PetscBool check_volume = PETSC_FALSE, refine_at_start = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_volume", &check_volume, NULL));
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_at_start", &refine_at_start, NULL));
 
     // sum(h * area) is what the transfer promises to preserve: the area-weighted
     // average reproduces it exactly and only the summation order changes, so the
@@ -252,6 +258,13 @@ int main(int argc, char *argv[]) {
     // be held to something, or a transfer that loses mass passes on exit status.
     PetscReal volume_tol = 1e-11;
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_check_volume_tol", &volume_tol, NULL));
+
+    PetscReal box[4] = {0.0, 1.0, 3.0, 4.0}, box_speed = 0.0;
+    PetscInt  nbox = 4;
+    PetscBool box_set;
+    PetscCall(PetscOptionsGetRealArray(NULL, NULL, "-refine_box", box, &nbox, &box_set));
+    PetscCheck(!box_set || nbox == 4, comm, PETSC_ERR_USER, "-refine_box takes four values x0,x1,y0,y1, got %" PetscInt_FMT, nbox);
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_box_speed", &box_speed, NULL));
 
     RDyTimeUnit time_unit;
     PetscReal   time, prev_time;
@@ -271,11 +284,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (refine_at_start && by_jump) {
-      PetscInt nmarked, ncells;
-      PetscCall(RDyMarkCellsForAMRBySurfaceJump(rdy, &nmarked));
-      PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
-      if (!myrank) printf("AMR: marked %" PetscInt_FMT " of %" PetscInt_FMT " cells by water-surface jump (initial condition)\n", nmarked, ncells);
       PetscCall(RDyPerformAMR(rdy));
+      PetscInt ncells;
+      PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
+      if (!myrank) printf("AMR: %" PetscInt_FMT " cells after adapting to the initial condition\n", ncells);
     }
 
     PetscCall(RDyAdvance(rdy));
@@ -299,18 +311,22 @@ int main(int argc, char *argv[]) {
         PetscCall(VecDestroy(&global_base));
         PetscCall(VecDestroy(&global_current));
       } else if (by_jump) {
-        PetscInt nmarked, ncells;
-        PetscCall(RDyMarkCellsForAMRBySurfaceJump(rdy, &nmarked));
-        PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
-        if (!myrank) printf("AMR: marked %" PetscInt_FMT " of %" PetscInt_FMT " cells by water-surface jump\n", nmarked, ncells);
+        // nothing to do: RDyPerformAMR computes the indicator and marks the cells
       } else {
-        PetscCall(MarkOwnedCellsForRefinement(rdy));
+        PetscCall(RDyGetTime(rdy, time_unit, &time));
+        PetscCall(MarkOwnedCellsForRefinement(rdy, box, box_speed * time));
       }
 
       PetscReal volume_before = 0.0, volume_after = 0.0;
       if (check_volume) PetscCall(ComputeWaterVolume(rdy, &volume_before));
 
       PetscCall(RDyPerformAMR(rdy));
+
+      {
+        PetscInt ncells;
+        PetscCall(RDyGetNumGlobalCells(rdy, &ncells));
+        if (!myrank) printf("AMR: %" PetscInt_FMT " cells after adapt\n", ncells);
+      }
 
       if (check_volume) {
         PetscCall(ComputeWaterVolume(rdy, &volume_after));

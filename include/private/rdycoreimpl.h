@@ -97,6 +97,13 @@ typedef struct {
   // is refinement on or off
   PetscBool is_refinement_on;
 
+  // when set, the cells to adapt come from RDycore's own water-surface-jump
+  // criterion (src/rdyamr_adaptor.c) rather than from the caller marking them
+  PetscBool use_surface_jump;
+
+  // deepest refinement any base cell may reach, from -rdy_amr_max_levels
+  PetscInt max_levels;
+
   // when set, each adapt rebuilds the mesh from dm_base instead of refining
   // the current one, so regions the indicator no longer marks come back coarse
   PetscBool allow_coarsening;

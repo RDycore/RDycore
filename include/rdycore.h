@@ -45,7 +45,7 @@ PETSC_EXTERN PetscErrorCode RDyMMSRun(RDy);
 PETSC_EXTERN PetscErrorCode RDyEnableAMR(RDy);
 PETSC_EXTERN PetscErrorCode RDyPerformAMR(RDy);
 PETSC_EXTERN PetscErrorCode RDyMarkOwnedCellsForAMR(RDy, const PetscInt, const PetscBool *);
-PETSC_EXTERN PetscErrorCode RDyMarkCellsForAMRBySurfaceJump(RDy, PetscInt *);
+PETSC_EXTERN PetscErrorCode RDyEnableAMRBySurfaceJump(RDy);
 
 // time integration
 PETSC_EXTERN PetscErrorCode DestroyOutputViewer(RDy);
