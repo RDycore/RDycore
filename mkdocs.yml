@@ -10,6 +10,7 @@ nav:
     - 'RDycore Example Cases':
       - 'Overview': 'user/example-cases/example-cases.md'
       - 'Idealized dam break problem': 'user/example-cases/dam-break/index.md'
+      - 'Adaptive mesh refinement': 'user/example-cases/amr/index.md'
       - 'Hurricane Harvey':
         - 'Overview': 'user/example-cases/harvey-flooding/harvey-flooding.md'
         - 'With MRMS rainfall and outflow BC': 'user/example-cases/harvey-flooding/critical-outflow-bc/index.md'
