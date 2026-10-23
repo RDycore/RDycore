@@ -7,36 +7,6 @@
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
-static PetscErrorCode CreateAdaptLabelInternal(RDy rdy, DMLabel *adaptLabel) {
-  /* PetscMPIInt rank; */
-  DMLabel  label;
-  PetscInt cStart, cEnd, c;
-
-  PetscFunctionBegin;
-  PetscCall(DMLabelCreate(PETSC_COMM_SELF, "Adaptation Label", adaptLabel));
-  label = *adaptLabel;
-
-  DM dm = rdy->dm;
-  PetscCall(DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd));
-
-  RDyMesh  *mesh  = &rdy->mesh;
-  RDyCells *cells = &mesh->cells;
-
-  for (c = cStart; c < cEnd; ++c) {
-    PetscReal x, y;
-
-    PetscInt icell = c - cStart;
-    if (cells->is_owned[icell]) {
-      x = cells->centroids[icell].X[0];
-      y = cells->centroids[icell].X[1];
-      if ((x >= 0.0 && x < 1.) && (y >= 3. && y <= 4.)) {
-        PetscCall(DMLabelSetValue(label, c, DM_ADAPT_REFINE));
-      }
-    }
-  }
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// @brief Saves information regarding refinement of owned cells.
 /// @param rdy         A RDy struct
 /// @param size        The number of owned cells
@@ -47,8 +17,13 @@ PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const Petsc
 
   rdy->amr.cells_marked_for_refinement = PETSC_TRUE;
 
-  // check if the size of the array is equal to the number of owned cells
-  PetscAssert(rdy->mesh.num_owned_cells == size, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ, "The size of array is not equal to the number of owned cells");
+  // PetscCheck, not PetscAssert: this is a caller's array length, and
+  // PetscAssert compiles out of an optimized build, which is what RDycore runs
+  PetscCheck(rdy->mesh.num_owned_cells == size, rdy->comm, PETSC_ERR_ARG_SIZ,
+             "refine_cell has %" PetscInt_FMT " entries but the domain owns %" PetscInt_FMT " cells", size, rdy->mesh.num_owned_cells);
+
+  // a second call before the next adapt would otherwise leak the first array
+  PetscCall(PetscFree(rdy->amr.refine_cell));
 
   // copy the data
   PetscCall(PetscCalloc1(size, &rdy->amr.refine_cell));
@@ -171,13 +146,12 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
 
   PetscCall(DMViewFromOptions(dm, NULL, "-adapt_pre_dm_view"));
 
-  if (!rdy->amr.cells_marked_for_refinement) {
-    PetscCall(CreateAdaptLabelInternal(rdy, &adaptLabel));
-  } else {
-    PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
-    rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
-    PetscCall(PetscFree(rdy->amr.refine_cell));
-  }
+  PetscCheck(rdy->amr.cells_marked_for_refinement, rdy->comm, PETSC_ERR_ARG_WRONGSTATE,
+             "no cells are marked: call RDyMarkOwnedCellsForAMR() before every RDyPerformAMR()");
+
+  PetscCall(CreateAdaptLabelFromMarkedCells(rdy, &adaptLabel));
+  rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
+  PetscCall(PetscFree(rdy->amr.refine_cell));
 
   PetscCall(DMPlexSetSaveTransform(dm, PETSC_TRUE));
   PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
@@ -465,8 +439,8 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
 
   PetscInt nstep;
   PetscCall(RDyGetStep(rdy, &nstep));
-  PetscAssert(nstep == 0, PETSC_COMM_WORLD, PETSC_ERR_ARG_SIZ,
-              "It seems the model has already taken few time steps. AMR cannot be enabled only during initialization.");
+  PetscCheck(nstep == 0, rdy->comm, PETSC_ERR_ARG_WRONGSTATE, "AMR must be enabled before the first step; the model has already taken %" PetscInt_FMT,
+             nstep);
 
   rdy->amr.is_refinement_on                = PETSC_TRUE;
   rdy->amr.last_refinement_level_outputted = -1;
