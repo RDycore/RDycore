@@ -23,15 +23,23 @@ give 9/9 AMR tests and identical cell counts and volumes.
 
 ## A. PETSc usage worth a second opinion
 
-1. **Private header dependency, now down to two uses.**
-   `src/rdyamr_adaptor.c` includes `petsc/private/dmadaptorimpl.h` to set
-   `ops->computeerrorindicator` in the registered type's create function, and
-   to reach `adaptor->refineTag` / `adaptor->coarsenTag`, for which PETSc
-   exposes no accessor. (The transfer hook no longer needs it:
-   `DMAdaptorSetTransferFunction` is public and is now used.)
-   `DMAdaptorRegister` is public but what it configures is not. Worth asking
-   PETSc for `DMAdaptorGetRefinementTagger()`/`GetCoarseningTagger()` and a
-   public way to set the indicator of a registered type.
+0. **Fixed 2026-10-22, after the list below was first written** (commit
+   b3126651): the taggers are now configured through options with
+   `DMAdaptorSetOptionsPrefix`, not by reaching into the adaptor. The bug that
+   exposed it is worth remembering -- `PetscObjectSetOptionsPrefix` does not
+   prefix a DMAdaptor's taggers, so every `-rdy_amr_refine_vec_tagger_*` option
+   in the code and the test suite was silently ignored, and the bit-identical
+   gate was comparing a refined mesh against an unrefined one. `h5diff` exits 0
+   when datasets are not comparable, so it never noticed. Gates that cannot
+   fail are the thing to look for here.
+
+1. **Private header dependency, now down to one use.**
+   `src/rdyamr_adaptor.c` includes `petsc/private/dmadaptorimpl.h` for one
+   thing only: setting `ops->computeerrorindicator` in the registered type's
+   create function. The transfer uses the public
+   `DMAdaptorSetTransferFunction`; the taggers are configured through options.
+   `DMAdaptorRegister` is public but the indicator it installs has no public
+   setter, so that is the one thing to ask PETSc for.
    `src/rdyamr.c` also includes `petsc/private/dmpleximpl.h`, which predates
    this work and is **not needed** -- it compiles with plain `petscdmplex.h`.
 2. **Unchecked PETSc calls.** `InitBoundaries(rdy)` is called bare in
