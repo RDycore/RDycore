@@ -34,6 +34,226 @@ PetscErrorCode RDyMarkOwnedCellsForAMR(RDy rdy, const PetscInt size, const Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Computes a per-owned-cell refinement indicator from the solution: the
+///        largest jump in water-surface elevation (h + z) across the cell's
+///        internal faces. Free surface rather than depth, so that water at rest
+///        over a varying bed indicates nothing; a dam, a bore and a wet/dry
+///        front all show up as a jump, including at step 0 before anything moves.
+/// @param [in] rdy       the dycore
+/// @param [out] indicator a Vec over owned cells, created here
+static PetscErrorCode ComputeSurfaceJumpIndicator(RDy rdy, Vec *indicator) {
+  PetscFunctionBegin;
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscCall(VecCreateMPI(rdy->comm, mesh->num_owned_cells, PETSC_DETERMINE, indicator));
+  PetscCall(VecZeroEntries(*indicator));
+
+  // the local vector carries ghost cells, so a face on the partition boundary
+  // sees the same jump from either side
+  PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, rdy->u_local));
+  const PetscScalar *u;
+  PetscCall(VecGetArrayRead(rdy->u_local, &u));
+  PetscScalar *ind;
+  PetscCall(VecGetArray(*indicator, &ind));
+
+  PetscInt ndof = 3;  // h, hu, hv
+  for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l = edges->cell_ids[2 * edge_id], r = edges->cell_ids[2 * edge_id + 1];
+    if (l < 0 || r < 0) continue;
+
+    PetscReal eta_l = u[ndof * l] + cells->centroids[l].X[2];
+    PetscReal eta_r = u[ndof * r] + cells->centroids[r].X[2];
+    PetscReal jump  = PetscAbsReal(eta_l - eta_r);
+
+    for (PetscInt i = 0; i < 2; ++i) {
+      PetscInt c = (i == 0) ? l : r;
+      if (!cells->is_owned[c]) continue;
+      PetscInt owned = cells->local_to_owned[c];
+      if (jump > PetscRealPart(ind[owned])) ind[owned] = jump;
+    }
+  }
+
+  // A surface jump below this is not a feature. The floor is what gives the
+  // criterion a notion of "nothing is happening", which a relative VecTagger
+  // does not have: its box is min + frac * (max - min), so a UNIFORM indicator
+  // -- whatever its value, zero included -- gives the degenerate box [v, v] and
+  // selects every cell, and roundoff noise around a flat surface selects about
+  // half the mesh. A lake at rest is exactly that case, and it is the standard
+  // well-balancedness benchmark. The default is the depth the scheme already
+  // calls dry, seven orders below the jump across a dam and nine above roundoff.
+  PetscReal min_jump = rdy->config.physics.flow.tiny_h;
+  PetscCall(PetscOptionsGetReal(NULL, "rdy_amr_", "-min_jump", &min_jump, NULL));
+  for (PetscInt o = 0; o < mesh->num_owned_cells; ++o) {
+    if (PetscRealPart(ind[o]) < min_jump) ind[o] = 0.0;
+  }
+
+  PetscCall(VecRestoreArray(*indicator, &ind));
+  PetscCall(VecRestoreArrayRead(rdy->u_local, &u));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Spreads the indicator outward by `layers` cell layers, so that cells
+///        the feature will reach before the next adapt are refined with it.
+///        Without this the mesh lags: a front crossing several coarse cells per
+///        coupling interval is resolved only after it has already passed.
+///
+///        The spread runs through the solution DM's halo exchange (component 0
+///        of a 3-dof work vector carries the indicator), so it crosses
+///        partition boundaries and gives the same result on any rank count.
+static PetscErrorCode DilateIndicator(RDy rdy, Vec indicator, PetscInt layers) {
+  PetscFunctionBegin;
+  if (layers <= 0) PetscFunctionReturn(PETSC_SUCCESS);
+
+  RDyMesh  *mesh  = &rdy->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  Vec work_global, work_local;
+  PetscCall(DMGetGlobalVector(rdy->dm, &work_global));
+  PetscCall(DMGetLocalVector(rdy->dm, &work_local));
+
+  for (PetscInt pass = 0; pass < layers; ++pass) {
+    const PetscScalar *ind;
+    PetscScalar       *w;
+    PetscCall(VecZeroEntries(work_global));
+    PetscCall(VecGetArrayRead(indicator, &ind));
+    PetscCall(VecGetArray(work_global, &w));
+    for (PetscInt o = 0; o < mesh->num_owned_cells; ++o) w[3 * o] = ind[o];
+    PetscCall(VecRestoreArray(work_global, &w));
+    PetscCall(VecRestoreArrayRead(indicator, &ind));
+
+    PetscCall(DMGlobalToLocal(rdy->dm, work_global, INSERT_VALUES, work_local));
+
+    const PetscScalar *wl;
+    PetscScalar       *out;
+    PetscCall(VecGetArrayRead(work_local, &wl));
+    PetscCall(VecGetArray(indicator, &out));
+    for (PetscInt e = 0; e < mesh->num_internal_edges; ++e) {
+      PetscInt edge_id = edges->internal_edge_ids[e];
+      PetscInt l = edges->cell_ids[2 * edge_id], r = edges->cell_ids[2 * edge_id + 1];
+      if (l < 0 || r < 0) continue;
+      if (cells->is_owned[l]) {
+        PetscInt o = cells->local_to_owned[l];
+        if (PetscRealPart(wl[3 * r]) > PetscRealPart(out[o])) out[o] = wl[3 * r];
+      }
+      if (cells->is_owned[r]) {
+        PetscInt o = cells->local_to_owned[r];
+        if (PetscRealPart(wl[3 * l]) > PetscRealPart(out[o])) out[o] = wl[3 * l];
+      }
+    }
+    PetscCall(VecRestoreArray(indicator, &out));
+    PetscCall(VecRestoreArrayRead(work_local, &wl));
+  }
+
+  PetscCall(DMRestoreLocalVector(rdy->dm, &work_local));
+  PetscCall(DMRestoreGlobalVector(rdy->dm, &work_global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Marks cells for refinement from the solution itself. The indicator is
+///        the water-surface jump of ComputeSurfaceJumpIndicator; which cells it
+///        selects is decided by a PETSc VecTagger under the "rdy_amr_" prefix,
+///        so the criterion is a runtime choice:
+///
+///          -rdy_amr_vec_tagger_type relative -rdy_amr_vec_tagger_box 0.5,1  (default)
+///          -rdy_amr_vec_tagger_type cdf      -rdy_amr_vec_tagger_box 0.95,1 (worst 5%)
+///          -rdy_amr_vec_tagger_type absolute -rdy_amr_vec_tagger_box 0.1,1e30
+///
+///        The default is deliberately scale-free. An absolute jump threshold
+///        disables itself: halving a cell halves the jump across its faces, so
+///        a front that was over the threshold drops under it after one adapt
+///        and the mesh stops following it. Relative and CDF boxes measure each
+///        cell against the current field instead.
+///
+///        Refinement is capped at -rdy_amr_max_levels (default 3) levels below
+///        the mesh AMR started from, since at a genuine discontinuity the
+///        indicator never runs out of signal.
+///
+/// @param [in] rdy      the dycore
+/// @param [out] nmarked number of cells marked across all ranks (may be NULL)
+/// @return PETSC_SUCCESS on success
+PetscErrorCode RDyMarkCellsForAMRBySurfaceJump(RDy rdy, PetscInt *nmarked) {
+  PetscFunctionBegin;
+
+  Vec indicator;
+  PetscCall(ComputeSurfaceJumpIndicator(rdy, &indicator));
+
+  // a front crosses several cells between adapts, so refine a band ahead of it
+  PetscInt buffer_layers = 2;
+  PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-buffer_layers", &buffer_layers, NULL));
+  PetscCall(DilateIndicator(rdy, indicator, buffer_layers));
+
+  // cells already at the finest allowed level cannot be marked, so zero their
+  // indicator before the tagger sees it (a relative or CDF box would otherwise
+  // keep selecting them)
+  PetscInt max_levels = 3;
+  PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-max_levels", &max_levels, NULL));
+  PetscReal min_area = rdy->amr.base_min_cell_area / PetscPowReal(2.0, (PetscReal)max_levels);
+  {
+    PetscScalar *ind;
+    PetscCall(VecGetArray(indicator, &ind));
+    for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
+      if (!rdy->mesh.cells.is_owned[c]) continue;
+      if (rdy->mesh.cells.areas[c] < min_area) ind[rdy->mesh.cells.local_to_owned[c]] = 0.0;
+    }
+    PetscCall(VecRestoreArray(indicator, &ind));
+  }
+
+  PetscBool *refine_cell;
+  PetscCall(PetscCalloc1(rdy->mesh.num_owned_cells, &refine_cell));
+
+  // Nothing is above the floor anywhere, so there is no feature to resolve and
+  // nothing to mark. Asking the tagger would be worse than useless: a relative
+  // tagger on a uniform vector selects every cell, so a lake at rest would
+  // refine without bound until the cells are small enough to violate the CFL
+  // condition at a fixed time step.
+  PetscReal err_max;
+  PetscCall(VecMax(indicator, NULL, &err_max));
+
+  PetscInt n = 0;
+  if (err_max > 0.0) {
+    VecTagger tagger;
+    PetscCall(VecTaggerCreate(rdy->comm, &tagger));
+    PetscCall(PetscObjectSetOptionsPrefix((PetscObject)tagger, "rdy_amr_"));
+    PetscCall(VecTaggerSetType(tagger, VECTAGGERRELATIVE));
+    VecTaggerBox box = {.min = 0.5, .max = 1.0};
+    PetscCall(VecTaggerRelativeSetBox(tagger, &box));
+    PetscCall(VecTaggerSetFromOptions(tagger));
+    PetscCall(VecTaggerSetUp(tagger));
+
+    IS        tagged;
+    PetscBool listed;
+    PetscCall(VecTaggerComputeIS(tagger, indicator, &tagged, &listed));
+    PetscCheck(listed, rdy->comm, PETSC_ERR_SUP, "The -rdy_amr_tagger_type in use cannot list the cells it tags");
+
+    // the tagger lists RANK-LOCAL indices into the indicator, not global ones
+    // (PETSc's own TS ex11 consumes them the same way)
+    const PetscInt *idx;
+    PetscCall(ISGetLocalSize(tagged, &n));
+    PetscCall(ISGetIndices(tagged, &idx));
+    for (PetscInt i = 0; i < n; ++i) {
+      PetscCheck(idx[i] >= 0 && idx[i] < rdy->mesh.num_owned_cells, PETSC_COMM_SELF, PETSC_ERR_PLIB,
+                 "tagged index %" PetscInt_FMT " outside this rank's %" PetscInt_FMT " owned cells", idx[i], rdy->mesh.num_owned_cells);
+      refine_cell[idx[i]] = PETSC_TRUE;
+    }
+    PetscCall(ISRestoreIndices(tagged, &idx));
+    PetscCall(ISDestroy(&tagged));
+    PetscCall(VecTaggerDestroy(&tagger));
+  }
+
+  PetscCall(RDyMarkOwnedCellsForAMR(rdy, rdy->mesh.num_owned_cells, refine_cell));
+
+  if (nmarked) PetscCallMPI(MPI_Allreduce(&n, nmarked, 1, MPIU_INT, MPI_SUM, rdy->comm));
+
+  PetscCall(PetscFree(refine_cell));
+  PetscCall(VecDestroy(&indicator));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Creates a label to refine cells based on the data previously provided by call
 ///        to RDyMarkOwnedCellsForAMR
 /// @param rdy        RDy struct
@@ -444,6 +664,12 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
 
   rdy->amr.is_refinement_on                = PETSC_TRUE;
   rdy->amr.last_refinement_level_outputted = -1;
+
+  PetscReal local_min = PETSC_MAX_REAL;
+  for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) {
+    if (rdy->mesh.cells.is_owned[c]) local_min = PetscMin(local_min, rdy->mesh.cells.areas[c]);
+  }
+  PetscCallMPI(MPI_Allreduce(&local_min, &rdy->amr.base_min_cell_area, 1, MPIU_REAL, MPI_MIN, rdy->comm));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
