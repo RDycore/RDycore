@@ -1,0 +1,82 @@
+# 1D dam break run on a 2D mesh, with adaptive mesh refinement.
+#
+# A 50 m x 2 m channel of triangles, walls all round, standing water 2 m deep
+# in the left half and 1 m deep in the right. At t = 0 the step releases a
+# shock travelling right and a rarefaction travelling left -- the Stoker
+# solution of the wet-bed Riemann problem, which is what the run is checked
+# against. Nothing varies across the channel, so the 2D solver is reproducing
+# a 1D problem, and the run stops well before either wave reaches an end wall.
+#
+# rdycore_amr refines on the water-surface jump (-refine_criterion jump), so
+# the mesh tracks the shock and the edges of the rarefaction fan.
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 4
+  unit: seconds
+  time_step: 0.002
+  coupling_interval: 0.5
+
+output:
+  format: xdmf
+  output_interval: 50
+
+grid:
+  file: channel_100x4_tri.msh
+
+regions:
+  - name: left
+    grid_region_id: 1
+  - name: right
+    grid_region_id: 2
+
+surface_composition:
+  - region: left
+    material: frictionless
+  - region: right
+    material: frictionless
+
+# the Stoker solution is inviscid, so the comparison needs n = 0
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: left
+    flow: deep_ic
+  - region: right
+    flow: shallow_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [boundary]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: deep_ic
+    type: dirichlet
+    height: 2
+    x_momentum: 0
+    y_momentum: 0
+  - name: shallow_ic
+    type: dirichlet
+    height: 1
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting

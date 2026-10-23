@@ -1,0 +1,90 @@
+# 2D dam break with adaptive mesh refinement.
+#
+# The geometry is the planar_dam case (a basin with a dam pierced by a central
+# breach), on triangles so the mesh can be refined by simplex bisection. Water
+# stands 10 m upstream and 5 m downstream; when the run starts, a jet forms
+# through the breach and two fronts travel outward from it.
+#
+# The mesh follows those fronts: rdycore_amr marks cells by the local flow
+# speed (-refine_criterion speed) at every coupling interval and refines them.
+physics:
+  flow:
+    mode: swe
+    source:
+      method: implicit_xq2018
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 4
+  unit: seconds
+  time_step: 0.002
+  coupling_interval: 0.5
+
+output:
+  format: xdmf
+  output_interval: 50
+
+grid:
+  file: planar_dam_20x10_tri.msh
+
+regions:
+  - name: upstream
+    grid_region_id: 1
+  - name: downstream
+    grid_region_id: 2
+
+surface_composition:
+  - region: upstream
+    material: smooth
+  - region: downstream
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.015
+
+initial_conditions:
+  - region: upstream
+    flow: dam_top_ic
+  - region: downstream
+    flow: dam_bottom_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+  - name: top_wall
+    grid_boundary_id: 2
+  - name: bottom_wall
+    grid_boundary_id: 3
+
+# the basin and both faces of the dam are walls
+boundary_conditions:
+  - boundaries: [boundary]
+    flow: reflecting_bc
+  - boundaries: [top_wall]
+    flow: reflecting_bc
+  - boundaries: [bottom_wall]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: dam_top_ic
+    type: dirichlet
+    height: 10
+    x_momentum: 0
+    y_momentum: 0
+  - name: dam_bottom_ic
+    type: dirichlet
+    height: 5
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting
