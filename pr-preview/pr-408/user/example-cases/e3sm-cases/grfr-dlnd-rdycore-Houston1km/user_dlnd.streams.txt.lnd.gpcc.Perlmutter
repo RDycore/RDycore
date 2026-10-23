@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<file id="stream" version="1.0">
+<dataSource>
+   GENERIC
+</dataSource>
+<domainInfo>
+  <variableNames>
+     time     time
+        LONGXY      lon
+        LATIXY      lat
+  </variableNames>
+  <filePath>
+     /global/cfs/cdirs/m4267/shared/data/grfr/dlnd
+  </filePath>
+  <fileNames>
+     GRFR.2001-01.v2.nc
+     GRFR.2001-02.v2.nc
+     GRFR.2001-03.v2.nc
+     GRFR.2001-04.v2.nc
+     GRFR.2001-05.v2.nc
+     GRFR.2001-06.v2.nc
+     GRFR.2001-07.v2.nc
+     GRFR.2001-08.v2.nc
+     GRFR.2001-09.v2.nc
+     GRFR.2001-10.v2.nc
+     GRFR.2001-11.v2.nc
+     GRFR.2001-12.v2.nc
+  </fileNames>
+</domainInfo>
+<fieldInfo>
+   <variableNames>
+     QDRAI     rofsub
+     QOVER     rofsur
+   </variableNames>
+   <filePath>
+     /global/cfs/cdirs/m4267/shared/data/grfr/dlnd
+   </filePath>
+   <fileNames>
+     GRFR.2001-01.v2.nc
+     GRFR.2001-02.v2.nc
+     GRFR.2001-03.v2.nc
+     GRFR.2001-04.v2.nc
+     GRFR.2001-05.v2.nc
+     GRFR.2001-06.v2.nc
+     GRFR.2001-07.v2.nc
+     GRFR.2001-08.v2.nc
+     GRFR.2001-09.v2.nc
+     GRFR.2001-10.v2.nc
+     GRFR.2001-11.v2.nc
+     GRFR.2001-12.v2.nc
+   </fileNames>
+   <offset>
+      0
+   </offset>
+</fieldInfo>
+</file>
