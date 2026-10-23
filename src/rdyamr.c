@@ -274,6 +274,27 @@ static PetscErrorCode OverrideCellElevationFromBase(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief The base cell a local cell of the mesh in hand descends from, or -1
+///        where the interpolation holds no parent for it. Before the first
+///        adapt the mesh IS the base mesh, so a cell is its own base cell.
+///
+///        Every descendant of a base cell has exactly one nonzero in its row of
+///        BaseToCurrentMat1Dof, which is why column 0 is the answer.
+PetscErrorCode RDyAMRBaseCellOfLocalCell(RDy rdy, PetscInt c, PetscInt *base) {
+  PetscFunctionBeginUser;
+  if (!rdy->amr.BaseToCurrentMat1Dof) {
+    *base = c;
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  PetscInt           ncols;
+  const PetscInt    *cols;
+  const PetscScalar *vals;
+  PetscCall(MatGetRow(rdy->amr.BaseToCurrentMat1Dof, c, &ncols, &cols, &vals));
+  *base = ncols ? cols[0] : -1;
+  PetscCall(MatRestoreRow(rdy->amr.BaseToCurrentMat1Dof, c, &ncols, &cols, &vals));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Updates each base cell's target refinement level from this adapt's
 ///        marks: a base cell with a marked descendant goes one level deeper,
 ///        one without comes one level back. One level per adapt in either
@@ -292,16 +313,9 @@ static PetscErrorCode UpdateBaseLevels(RDy rdy, PetscInt max_levels) {
     PetscInt owned = mesh->cells.local_to_owned[c];
     if (!rdy->amr.refine_cell[owned]) continue;
 
-    if (!rdy->amr.BaseToCurrentMat1Dof) {  // nothing adapted yet: this IS the base mesh
-      base_marked[c] = PETSC_TRUE;
-      continue;
-    }
-    PetscInt           ncols;
-    const PetscInt    *cols;
-    const PetscScalar *vals;
-    PetscCall(MatGetRow(rdy->amr.BaseToCurrentMat1Dof, c, &ncols, &cols, &vals));
-    if (ncols) base_marked[cols[0]] = PETSC_TRUE;
-    PetscCall(MatRestoreRow(rdy->amr.BaseToCurrentMat1Dof, c, &ncols, &cols, &vals));
+    PetscInt base;
+    PetscCall(RDyAMRBaseCellOfLocalCell(rdy, c, &base));
+    if (base >= 0) base_marked[base] = PETSC_TRUE;
   }
 
   for (PetscInt b = 0; b < nbase; ++b) {

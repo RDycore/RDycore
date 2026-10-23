@@ -19,6 +19,9 @@ PETSC_INTERN PetscErrorCode RDyAMRRefineByLabel(DM, DMLabel, const PetscInt, DM 
 // rebuilds the mesh from the base mesh at the levels rdy->amr.base_level asks for
 PETSC_INTERN PetscErrorCode RDyAMRRebuildMeshFromBase(RDy, const PetscInt, PetscInt, DM *, Mat *, Mat *, Mat *, Mat *);
 
+// the base cell a local cell of the current mesh descends from, or -1
+PETSC_INTERN PetscErrorCode RDyAMRBaseCellOfLocalCell(RDy, PetscInt, PetscInt *);
+
 // the refinement criterion and the two ways to act on it (src/rdyamr_adaptor.c)
 PETSC_INTERN PetscErrorCode RDyAMRMarkBySurfaceJump(RDy, DMLabel *);
 PETSC_INTERN PetscErrorCode RDyAMRRefineFromLabel(RDy, DMLabel, DM *, Mat *, Mat *, Mat *, Mat *);

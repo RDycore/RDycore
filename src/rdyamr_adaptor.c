@@ -311,15 +311,8 @@ PetscErrorCode RDyAMRRebuildFromLabel(RDy rdy, DMLabel label, DM *dm_new, Mat *c
     PetscCall(DMLabelGetValue(label, c, &value));
     if (value != DM_ADAPT_REFINE && value != DM_ADAPT_COARSEN) continue;
 
-    PetscInt base = c - cStart;
-    if (rdy->amr.BaseToCurrentMat1Dof) {
-      PetscInt           ncols;
-      const PetscInt    *cols;
-      const PetscScalar *vals;
-      PetscCall(MatGetRow(rdy->amr.BaseToCurrentMat1Dof, c - cStart, &ncols, &cols, &vals));
-      base = ncols ? cols[0] : -1;
-      PetscCall(MatRestoreRow(rdy->amr.BaseToCurrentMat1Dof, c - cStart, &ncols, &cols, &vals));
-    }
+    PetscInt base;
+    PetscCall(RDyAMRBaseCellOfLocalCell(rdy, c - cStart, &base));
     if (base < 0) continue;
     // refinement wins where a base cell has descendants marked both ways
     if (value == DM_ADAPT_REFINE) delta[base] = 1;
