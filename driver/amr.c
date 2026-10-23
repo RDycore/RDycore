@@ -19,6 +19,11 @@ static const char *help_str =
     "                                -refine_check_volume_tol (default 1e-11)\n"
     "                                relative\n"
     "  -refine_check_volume_tol <t>  that tolerance\n"
+    "  -refine_report_balance        report max/mean owned cells over the ranks\n"
+    "                                on either side of every adapt\n"
+    "  -rdy_amr_balance 0            do not repartition the base mesh at each\n"
+    "                                rebuild (on by default, and only a rebuild,\n"
+    "                                so -refine_allow_coarsening, can balance)\n"
     "  -refine_check_max_level       report how deep the mesh has been refined\n"
     "                                after every adapt, and fail more than one\n"
     "                                level past -rdy_amr_max_levels (which caps\n"
@@ -227,6 +232,33 @@ static PetscErrorCode CheckRefinementLimit(RDy rdy, PetscInt max_levels) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Reports how unevenly the adapted mesh is spread over the ranks:
+///        the largest number of owned cells on any rank against the mean.
+///
+///        Refinement concentrates on the feature, so the rank that owns it
+///        ends up doing most of the work while the others wait at the next
+///        halo exchange. The ratio is what load balancing has to bring down;
+///        1.0 is perfect.
+static PetscErrorCode ReportBalance(RDy rdy, const char when[]) {
+  PetscFunctionBegin;
+
+  PetscInt ncells_local, maxcells, sumcells;
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
+  PetscCallMPI(MPI_Allreduce(&ncells_local, &maxcells, 1, MPIU_INT, MPI_MAX, PETSC_COMM_WORLD));
+  PetscCallMPI(MPI_Allreduce(&ncells_local, &sumcells, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD));
+
+  PetscMPIInt size, myrank;
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &size));
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &myrank));
+  PetscReal mean = (PetscReal)sumcells / size;
+  if (!myrank) {
+    printf("AMR: owned cells %s the adapt: max %" PetscInt_FMT ", mean %.1f, max/mean %.3f\n", when, maxcells, (double)mean,
+           (double)(maxcells / mean));
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Marks the cells whose centroid lies in `box` = {x0, x1, y0, y1},
 ///        shifted along x by `shift`.
 PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy, const PetscReal box[4], PetscReal shift) {
@@ -405,6 +437,11 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_max_level", &check_max_level, NULL));
     if (check_max_level) PetscCall(RDyGetAMRMaxLevels(rdy, &max_levels));
 
+    // how unevenly the adapted mesh is spread over the ranks, reported on
+    // either side of each adapt
+    PetscBool report_balance = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_report_balance", &report_balance, NULL));
+
     RDyTimeUnit time_unit;
     PetscReal   time, prev_time;
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
@@ -463,7 +500,11 @@ int main(int argc, char *argv[]) {
       PetscReal departure_before = 0.0, departure_after = 0.0;
       if (check_still_water) PetscCall(StillWaterDeparture(rdy, still_water, &departure_before));
 
+      if (report_balance) PetscCall(ReportBalance(rdy, "before"));
+
       PetscCall(RDyPerformAMR(rdy));
+
+      if (report_balance) PetscCall(ReportBalance(rdy, "after "));
 
       if (check_still_water) {
         PetscCall(StillWaterDeparture(rdy, still_water, &departure_after));

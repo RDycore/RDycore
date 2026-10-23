@@ -112,6 +112,11 @@ typedef struct {
   // when set, each adapt rebuilds the mesh from dm_base instead of refining
   // the current one, so regions the indicator no longer marks come back coarse
   PetscBool allow_coarsening;
+
+  // when set, each rebuild repartitions the base mesh first, so that the ranks
+  // end up with about the same number of adapted cells. Only the rebuild can:
+  // refining the mesh in hand does not go near the base mesh.
+  PetscBool balance;
   // refinement level of each base cell (allocated with the base mesh); the
   // rebuild refines a base cell's descendants to this depth
   PetscInt *base_level;

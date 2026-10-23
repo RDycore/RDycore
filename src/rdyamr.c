@@ -5,6 +5,7 @@
 #include <private/rdyamrimpl.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
+#include <private/rdylogimpl.h>
 #include <private/rdymathimpl.h>
 #include <private/rdysweimpl.h>
 
@@ -476,6 +477,20 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   // every base cell is refined to has to be remembered between adapts
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_allow_coarsening", &rdy->amr.allow_coarsening, NULL));
 
+  // Balancing is on by default where it can act, which is the rebuild: a
+  // refinement of the mesh in hand never touches the base mesh, so there is
+  // nothing to repartition. -rdy_amr_balance 0 turns it off, which is what
+  // the gate that compares a balanced run against an unbalanced one uses.
+  PetscBool balance_set;
+  rdy->amr.balance = PETSC_TRUE;
+  PetscCall(PetscOptionsGetBool(NULL, "rdy_amr_", "-balance", &rdy->amr.balance, &balance_set));
+  if (rdy->amr.balance && !rdy->amr.allow_coarsening) {
+    // say so rather than quietly doing nothing: balancing rides on the rebuild
+    if (balance_set) {
+      RDyLogWarning(rdy, "-rdy_amr_balance has no effect without -refine_allow_coarsening: only a rebuild from the base mesh can repartition");
+    }
+    rdy->amr.balance = PETSC_FALSE;
+  }
   rdy->amr.max_levels = 3;
   PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-max_levels", &rdy->amr.max_levels, NULL));
   rdy->amr.num_base_cells = rdy->mesh.num_cells;
@@ -487,7 +502,7 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) rdy->amr.base_cell_area[c] = rdy->mesh.cells.areas[c];
 
   // The mesh in hand is the base mesh, and it is held from here rather than
-  // from the end of the first adapt: a rebuild that repartitions replaces the
+  // from the end of the first adapt: a rebuild that rebalances replaces the
   // base mesh, and the first adapt would then overwrite it with this one.
   rdy->amr.dm_base      = rdy->dm;
   rdy->amr.dm_1dof_base = rdy->dm_1dof;
@@ -565,8 +580,8 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   if (base_to_old_1dof) PetscCall(PetscObjectReference((PetscObject)base_to_old_1dof));
 
   // The cells to adapt, as a label on the mesh in hand. Nothing is changed
-  // yet: the levels the rebuild will use come next, and they are what a
-  // rebuild has to settle before it touches the base mesh.
+  // yet: the levels the rebuild will use come next, and a rebuild that
+  // rebalances has to know them before it moves the base mesh.
   DMLabel label = NULL;
   if (rdy->amr.use_surface_jump) {
     PetscCall(RDyAMRMarkBySurfaceJump(rdy, &label));
@@ -600,6 +615,12 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     DM dm_base_old = rdy->amr.dm_base ? rdy->amr.dm_base : rdy->dm;
     PetscCall(RDyAMRPackCellsByBaseCell(&rdy->mesh, dm_base_old, base_to_old_1dof, ndof_coarse, U_coarse_local, &old_sec, &old_packed));
 
+    // the balance weights a base cell by the cells it is about to carry, so
+    // it needs the level each one is coming from as well as going to
+    PetscInt *old_level;
+    PetscCall(PetscMalloc1(rdy->amr.num_base_cells, &old_level));
+    PetscCall(PetscArraycpy(old_level, rdy->amr.base_level, rdy->amr.num_base_cells));
+
     // move each base cell to the level this adapt asks for
     if (label) {
       PetscCall(RDyAMRUpdateBaseLevelsFromLabel(rdy, label));
@@ -608,6 +629,12 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
       rdy->amr.cells_marked_for_refinement = PETSC_FALSE;
       PetscCall(PetscFree(rdy->amr.refine_cell));
     }
+
+    // Spread the work evenly before rebuilding: the partition follows the base
+    // mesh, weighted by the cells each base cell is about to carry, and the
+    // packed solution rides along with it.
+    PetscCall(RDyAMRBalanceBaseMesh(rdy, dm_base_old, old_level, ndof_coarse, &old_sec, &old_packed));
+    PetscCall(PetscFree(old_level));
 
     PetscCall(RDyAMRRebuildMeshFromBase(rdy, ndof_coarse, rdy->amr.max_levels, &dm_fine, &CoarseToFineMatNDof, &FineToCoarseMatNDof,
                                         &CoarseToFineMat1Dof, &FineToCoarseMat1Dof));

@@ -176,6 +176,19 @@ foreach(np 1 3)
            -refine_still_water 1.5 -refine_box -5,5,-1,3 -refine_box_speed 10 -refine_allow_coarsening -refine_check_volume ${ceed_args})
 endforeach()
 
+# Gate: load balancing spreads an adapted mesh evenly without changing it.
+# See the script for the thresholds and for why the demonstration cases cannot
+# serve -- their features are broad enough to be balanced already.
+add_test(NAME amr_balance_improves
+         COMMAND ${CMAKE_COMMAND}
+                 -DRDYCORE_AMR=$<TARGET_FILE:rdycore_amr>
+                 -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/dam_break_amr.yaml
+                 -DMESH=${MESH_DIR}/planar_dam_20x10_tri.msh
+                 -DMPIEXEC=${MPIEXEC}
+                 -DNP=3
+                 -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_balance_improves
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_balance_improves.cmake)
+
 # Gate: a lake at rest, the standard well-balancedness benchmark, must not be
 # refined by a criterion that measures the jump in the water surface. See the
 # script for what the relative VecTagger does with a uniform indicator.

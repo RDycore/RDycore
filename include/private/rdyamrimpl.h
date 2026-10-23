@@ -27,6 +27,11 @@ PETSC_INTERN PetscErrorCode RDyAMRRebuildMeshFromBase(RDy, const PetscInt, Petsc
 // the base cell a local cell of the current mesh descends from, or -1
 PETSC_INTERN PetscErrorCode RDyAMRBaseCellOfLocalCell(RDy, PetscInt, PetscInt *);
 
+// repartitions the base mesh by the cells each base cell is about to carry,
+// bringing base_level, the base areas and the packed solution with it
+// (src/rdyamr_balance.c)
+PETSC_INTERN PetscErrorCode RDyAMRBalanceBaseMesh(RDy, DM, const PetscInt *, PetscInt, PetscSection *, PetscScalar **);
+
 // the refinement criterion and the two ways to act on it (src/rdyamr_adaptor.c)
 PETSC_INTERN PetscErrorCode RDyAMRMarkBySurfaceJump(RDy, DMLabel *);
 PETSC_INTERN PetscErrorCode RDyAMRRefineFromLabel(RDy, DMLabel, DM *, Mat *, Mat *, Mat *, Mat *);
