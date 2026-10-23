@@ -594,9 +594,12 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // destroy the operator
   PetscCall(DestroyOperator(&rdy->operator));
 
-  // destroy the boundaries and reallocate memory
+  // destroy the boundaries and reallocate memory. The conditions are indexed
+  // by boundary, so they are rebuilt with them: which boundaries a rank holds
+  // changes when the mesh is repartitioned.
   PetscCall(RDyDestroyBoundaries(&rdy));
   PetscCall(InitBoundaries(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
 
   // reinitialize the operator
   PetscCall(InitOperator(rdy));

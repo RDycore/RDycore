@@ -702,12 +702,22 @@ static PetscErrorCode InitSources(RDy rdy) {
 }
 
 // sets up boundary conditions
-//   can be run after refinement
-static PetscErrorCode InitBoundaryConditions(RDy rdy) {
+//   must be re-run after refinement, with InitBoundaries: the array is indexed
+//   by boundary, and which boundaries a rank holds changes when the mesh is
+//   repartitioned
+PetscErrorCode InitBoundaryConditions(RDy rdy) {
   PetscFunctionBegin;
-  // Set up a reflecting flow boundary condition.
+  // Set up a reflecting flow boundary condition, or find the one a previous
+  // call made: a second one would consume a slot on every adapt.
   RDyFlowCondition *reflecting_flow = NULL;
   for (PetscInt c = 0; c < MAX_NUM_CONDITIONS; ++c) {
+    // the type is matched too: a config may legally name a condition of its own
+    // "reflecting", and adopting that one would silently give every boundary
+    // without an explicit condition whatever it says instead of a wall
+    if (!strcmp(rdy->config.flow_conditions[c].name, "reflecting") && rdy->config.flow_conditions[c].type == CONDITION_REFLECTING) {
+      reflecting_flow = &rdy->config.flow_conditions[c];
+      break;
+    }
     if (!strlen(rdy->config.flow_conditions[c].name)) {
       reflecting_flow = &rdy->config.flow_conditions[c];
       strcpy((char *)reflecting_flow->name, "reflecting");
@@ -718,6 +728,7 @@ static PetscErrorCode InitBoundaryConditions(RDy rdy) {
   PetscCheck(reflecting_flow, rdy->comm, PETSC_ERR_USER, "Could not allocate a reflecting flow condition! Please increase MAX_BOUNDARY_ID.");
 
   // Allocate storage for boundary conditions.
+  PetscCall(PetscFree(rdy->boundary_conditions));
   PetscCall(PetscCalloc1(rdy->num_boundaries, &rdy->boundary_conditions));
 
   // Assign a boundary condition to each boundary.
