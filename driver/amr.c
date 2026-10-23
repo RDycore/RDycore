@@ -26,6 +26,12 @@ static const char *help_str =
     "  -refine_box_speed <v>         translate that box along x at v m/s, so\n"
     "                                that cells behind it coarsen again\n"
     "\n"
+    "  -refine_still_water <eta>     start from a lake at rest at elevation eta\n"
+    "                                (h = eta - z) and report how far the free\n"
+    "                                surface departs from it on either side of\n"
+    "                                every adapt\n"
+    "  -refine_still_water_tol <t>   fail if that departure exceeds t * eta\n"
+    "\n"
     "  the jump criterion is tuned with\n"
     "  -rdy_amr_refine_vec_tagger_type <relative|cdf|absolute> and\n"
     "  -rdy_amr_refine_vec_tagger_box <lo,hi>, plus -rdy_amr_buffer_layers <n>\n"
@@ -202,6 +208,64 @@ PetscErrorCode MarkOwnedCellsForRefinement(RDy rdy, const PetscReal box[4], Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Sets a lake at rest: still water whose free surface is everywhere at
+///        `eta`, so the depth h = eta - z varies from cell to cell wherever the
+///        bed does.
+static PetscErrorCode SetStillWater(RDy rdy, PetscReal eta) {
+  PetscFunctionBegin;
+
+  PetscInt ncells_local;
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
+
+  PetscReal *z;
+  PetscCall(PetscCalloc1(ncells_local, &z));
+  PetscCall(RDyGetOwnedCellZCentroids(rdy, ncells_local, z));
+
+  Vec ic;
+  PetscCall(RDyCreatePrognosticVec(rdy, &ic));
+  PetscInt ndof;
+  PetscCall(VecGetBlockSize(ic, &ndof));
+
+  PetscScalar *u;
+  PetscCall(VecZeroEntries(ic));
+  PetscCall(VecGetArray(ic, &u));
+  for (PetscInt icell = 0; icell < ncells_local; icell++) u[ndof * icell] = PetscMax(eta - z[icell], 0.0);
+  PetscCall(VecRestoreArray(ic, &u));
+
+  PetscCall(RDySetInitialConditions(rdy, ic));
+  PetscCall(VecDestroy(&ic));
+  PetscCall(PetscFree(z));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief How far the free surface has departed from a lake at rest at `eta`:
+///        max|h + z - eta| over the wet owned cells, reduced over all ranks.
+///        Dry cells are excluded -- there the surface is the bed, not eta.
+static PetscErrorCode StillWaterDeparture(RDy rdy, PetscReal eta, PetscReal *departure) {
+  PetscFunctionBegin;
+
+  PetscInt ncells_local;
+  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
+
+  PetscReal *h, *z;
+  PetscCall(PetscCalloc1(ncells_local, &h));
+  PetscCall(PetscCalloc1(ncells_local, &z));
+  PetscCall(RDyGetOwnedCellHeights(rdy, ncells_local, h));
+  PetscCall(RDyGetOwnedCellZCentroids(rdy, ncells_local, z));
+
+  PetscReal local = 0.0;
+  for (PetscInt icell = 0; icell < ncells_local; icell++) {
+    if (h[icell] > 0.0) local = PetscMax(local, PetscAbsReal(h[icell] + z[icell] - eta));
+  }
+  PetscCallMPI(MPI_Allreduce(&local, departure, 1, MPIU_REAL, MPI_MAX, PETSC_COMM_WORLD));
+
+  PetscCall(PetscFree(h));
+  PetscCall(PetscFree(z));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
   // print usage info if no arguments given
   if (argc < 2) {
@@ -266,6 +330,19 @@ int main(int argc, char *argv[]) {
     PetscCheck(!box_set || nbox == 4, comm, PETSC_ERR_USER, "-refine_box takes four values x0,x1,y0,y1, got %" PetscInt_FMT, nbox);
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_box_speed", &box_speed, NULL));
 
+    // the lake-at-rest gate: still water on a bed that is not flat must survive
+    // every adapt, because the transfer carries the free surface and not the
+    // depth. Reported on either side of each adapt so that a departure made by
+    // the time stepping is distinguishable from one made by the adapt.
+    PetscReal still_water = 0.0, still_water_tol = 0.0;
+    PetscBool check_still_water = PETSC_FALSE;
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_still_water", &still_water, &check_still_water));
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_still_water_tol", &still_water_tol, NULL));
+    if (check_still_water) {
+      PetscCall(SetStillWater(rdy, still_water));
+      if (still_water_tol == 0.0) still_water_tol = 1e-12;
+    }
+
     RDyTimeUnit time_unit;
     PetscReal   time, prev_time;
     PetscCall(RDyGetTimeUnit(rdy, &time_unit));
@@ -320,7 +397,24 @@ int main(int argc, char *argv[]) {
       PetscReal volume_before = 0.0, volume_after = 0.0;
       if (check_volume) PetscCall(ComputeWaterVolume(rdy, &volume_before));
 
+      PetscReal departure_before = 0.0, departure_after = 0.0;
+      if (check_still_water) PetscCall(StillWaterDeparture(rdy, still_water, &departure_before));
+
       PetscCall(RDyPerformAMR(rdy));
+
+      if (check_still_water) {
+        PetscCall(StillWaterDeparture(rdy, still_water, &departure_after));
+        if (!myrank) {
+          printf("AMR: lake at rest departs by %.3e before the adapt, %.3e after\n", (double)departure_before, (double)departure_after);
+        }
+        PetscReal tol = still_water_tol * still_water;
+        PetscCheck(departure_before <= tol, comm, PETSC_ERR_NOT_CONVERGED,
+                   "the time stepping disturbed the lake at rest: %g > %g -- the scheme is not well balanced on this mesh, so the adapt cannot be "
+                   "judged",
+                   (double)departure_before, (double)tol);
+        PetscCheck(departure_after <= tol, comm, PETSC_ERR_NOT_CONVERGED, "the adapt disturbed the lake at rest: %g > %g", (double)departure_after,
+                   (double)tol);
+      }
 
       {
         PetscInt ncells;

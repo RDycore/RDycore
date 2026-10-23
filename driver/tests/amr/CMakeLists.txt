@@ -37,8 +37,10 @@ endforeach()
 file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/dam_break_amr.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
      ${MESH_DIR}/channel_100x4_tri.msh
      ${MESH_DIR}/planar_dam_20x10_tri.msh
+     ${MESH_DIR}/ramp_100x4_tri.msh
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # The transform RDycore's AMR needs is set in the code, so the cases ask only
@@ -99,6 +101,59 @@ foreach(mode refine coarsen)
                      -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_same_on_any_ranks.cmake)
   endforeach()
 endforeach()
+
+# Gate (exactness class: exact degeneration). A lake at rest on a sloping bed
+# survives refinement and coarsening: the transfer carries the free surface, so
+# a child cell's depth is rebuilt against its own bed rather than inheriting its
+# parent's. The box sweeps along the channel so that cells refine ahead of it
+# and coarsen behind it, and the driver fails if the surface departs from rest
+# by more than 1e-12 of its elevation on either side of any adapt.
+#
+# -dm_plex_gmsh_spacedim 3 because PETSc's gmsh reader takes the embedding
+# dimension to be the topological one unless told otherwise, which would drop
+# the bed and leave the case flat.
+foreach(np 1 3)
+  add_test(amr_still_water_ramp_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} still_water_ramp.yaml -options_left
+           -dm_plex_gmsh_spacedim 3
+           -refine_still_water 1.5 -refine_box -5,5,-1,3 -refine_box_speed 10 -refine_allow_coarsening -refine_check_volume)
+endforeach()
+
+# Gate: the same case with the box sweeping off the end of the channel, so that
+# a rebuild eventually refines nothing and returns the base mesh itself. That is
+# the adapt the coarse-DM chain used to close on; see the script.
+add_test(NAME amr_relaxes_to_base_mesh
+         COMMAND ${CMAKE_COMMAND}
+                 -DRDYCORE_AMR=$<TARGET_FILE:rdycore_amr>
+                 -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
+                 -DMESH_DIR=${MESH_DIR}
+                 -DMPIEXEC=${MPIEXEC}
+                 -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_relaxes_to_base_mesh
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_relaxes_to_base_mesh.cmake)
+
+# The same lake-at-rest gates under CEED. Running the demonstration cases under
+# CEED would not do: they only report the water volume, so a wrong-but-finite
+# flux passes them. These assert that the surface stays flat to 1e-12, which a
+# wrong flux cannot do -- and the CEED operator scattered its fluxes to the
+# wrong cells on any adapted mesh above one rank until the offsets stopped
+# going through cells->local_to_owned.
+foreach(np 1 3)
+  add_test(amr_still_water_ramp_c_np_${np}_ceed ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} still_water_ramp.yaml -options_left
+           -dm_plex_gmsh_spacedim 3
+           -refine_still_water 1.5 -refine_box -5,5,-1,3 -refine_box_speed 10 -refine_allow_coarsening -refine_check_volume ${ceed_args})
+endforeach()
+
+# Gate: a lake at rest, the standard well-balancedness benchmark, must not be
+# refined by a criterion that measures the jump in the water surface. See the
+# script for what the relative VecTagger does with a uniform indicator.
+add_test(NAME amr_lake_at_rest_does_not_refine
+         COMMAND ${CMAKE_COMMAND}
+                 -DRDYCORE_AMR=$<TARGET_FILE:rdycore_amr>
+                 -DRAMP_YAML=${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
+                 -DWAVE_YAML=${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
+                 -DMESH_DIR=${MESH_DIR}
+                 -DMPIEXEC=${MPIEXEC}
+                 -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_lake_at_rest_does_not_refine
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_lake_at_rest_does_not_refine.cmake)
 
 # Gate: the adapt machinery with nothing marked leaves the answer untouched
 if (NOT H5DIFF)

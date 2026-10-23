@@ -1,0 +1,85 @@
+# A lake at rest on a sloping bed, adapted underneath.
+#
+# The 50 m x 2 m channel of channel_wave_amr.yaml, tilted: the bed rises 1 m
+# from end to end, so still water at elevation 1.5 m is 1.5 m deep at one end
+# and 0.5 m deep at the other. Nothing should ever move.
+#
+# That makes the case a gate on the solution transfer rather than on the
+# physics. Refinement gives a child cell its parent's water, but not its
+# parent's bed, so a transfer that carries the depth tilts the surface by the
+# bed's rise across the parent; one that carries the surface does not. The
+# driver's -refine_still_water reports the departure on either side of every
+# adapt, so a disturbance made by the time stepping is told apart from one
+# made by the adapt.
+#
+# The friction is zero and the scheme is well balanced (hydrostatic
+# reconstruction), so the only thing left that can move the water is the
+# transfer.
+physics:
+  flow:
+    mode: swe
+    well_balancing: hydrostatic_reconstruction
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 4
+  unit: seconds
+  time_step: 0.002
+  coupling_interval: 0.5
+
+output:
+  format: xdmf
+  output_interval: 2000
+
+grid:
+  file: ramp_100x4_tri.msh
+
+regions:
+  - name: left
+    grid_region_id: 1
+  - name: right
+    grid_region_id: 2
+
+surface_composition:
+  - region: left
+    material: frictionless
+  - region: right
+    material: frictionless
+
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+# the driver replaces these with h = eta - z; the values here only have to be
+# a valid lake at rest on the flat part of nothing, so they are never used
+initial_conditions:
+  - region: left
+    flow: still_ic
+  - region: right
+    flow: still_ic
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [boundary]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: still_ic
+    type: dirichlet
+    height: 1
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting

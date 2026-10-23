@@ -216,6 +216,33 @@ PetscErrorCode RDyAMRBuildInterpolationMatrices(DM dm, DM dmAdapt, const PetscIn
 
 static PetscErrorCode MatMatMultReplace(Mat *, Mat *, PetscBool);
 
+/// @brief Replaces the depth in a local solution vector with the free surface
+///        h + z, so that an interpolation between two meshes carries a quantity
+///        the bed does not enter. Component 0 of each cell block is the depth.
+static PetscErrorCode DepthToSurface(RDyMesh *mesh, const PetscInt ndof, Vec u_local) {
+  PetscFunctionBeginUser;
+  PetscScalar *u;
+  PetscCall(VecGetArray(u_local, &u));
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) u[ndof * c] += mesh->cells.centroids[c].X[2];
+  PetscCall(VecRestoreArray(u_local, &u));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief The inverse of DepthToSurface() on the mesh the solution has landed
+///        on. The clamp only bites where the transferred surface falls below
+///        the new bed, which is a dry cell; there it adds water, so a transfer
+///        that crosses a shoreline is not conservative.
+static PetscErrorCode SurfaceToDepth(RDyMesh *mesh, const PetscInt ndof, Vec u_local) {
+  PetscFunctionBeginUser;
+  PetscScalar *u;
+  PetscCall(VecGetArray(u_local, &u));
+  for (PetscInt c = 0; c < mesh->num_cells; ++c) {
+    u[ndof * c] = PetscMax(PetscRealPart(u[ndof * c]) - mesh->cells.centroids[c].X[2], 0.0);
+  }
+  PetscCall(VecRestoreArray(u_local, &u));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// @brief Updates each base cell's target refinement level from this adapt's
 ///        marks: a base cell with a marked descendant goes one level deeper,
 ///        one without comes one level back. One level per adapt in either
@@ -673,7 +700,6 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // conservative transfer; refinement alone can inject.
   PetscBool rebuilt          = rdy->amr.allow_coarsening;
   Mat       SolutionTransfer = NULL, CellAssign = NULL, old_base_to_current_1dof = NULL;
-  Vec       adapted_solution = NULL;  // the adaptor's transfer, when it did one
 
   // a rebuild has to know, before it adapts, what the mesh it is about to
   // replace maps to in the base mesh
@@ -799,6 +825,12 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // make a copy of the old solution
   PetscCall(DMGlobalToLocal(rdy->dm, rdy->u_global, INSERT_VALUES, U_coarse_local));
 
+  // The transfer carries the free surface, not the depth: a child cell's bed
+  // elevation is not its parent's, so injecting h tilts a lake at rest. Mass is
+  // still conserved exactly, because a triangle's bed is planar and refinement
+  // splits it at edge midpoints, so sum(z * area) is the same on both meshes.
+  PetscCall(DepthToSurface(&rdy->mesh, ndof_coarse, U_coarse_local));
+
   // destroy the coarse vectors
   PetscCall(RDyDestroyVectors(&rdy));
 
@@ -883,7 +915,10 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // initialize the solution on the new mesh from the old one: injection when
   // the mesh was refined from the current one, area-weighted averaging when it
   // was rebuilt and some of it coarsened
+  // Either way the free surface crosses and the depth is rebuilt against the
+  // new mesh's bed.
   PetscCall(MatMult(SolutionTransfer, U_coarse_local, rdy->u_local));
+  PetscCall(SurfaceToDepth(&rdy->mesh, ndof_coarse, rdy->u_local));
   PetscCall(DMLocalToGlobal(rdy->dm, rdy->u_local, INSERT_VALUES, rdy->u_global));
   if (rebuilt) {
     PetscCall(MatDestroy(&SolutionTransfer));
