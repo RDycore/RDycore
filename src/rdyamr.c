@@ -485,6 +485,14 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   // so the base areas are kept for as long as base_level is
   PetscCall(PetscCalloc1(rdy->amr.num_base_cells, &rdy->amr.base_cell_area));
   for (PetscInt c = 0; c < rdy->mesh.num_cells; ++c) rdy->amr.base_cell_area[c] = rdy->mesh.cells.areas[c];
+
+  // The mesh in hand is the base mesh, and it is held from here rather than
+  // from the end of the first adapt: a rebuild that repartitions replaces the
+  // base mesh, and the first adapt would then overwrite it with this one.
+  rdy->amr.dm_base      = rdy->dm;
+  rdy->amr.dm_1dof_base = rdy->dm_1dof;
+  PetscCall(PetscObjectReference((PetscObject)rdy->amr.dm_base));
+  PetscCall(PetscObjectReference((PetscObject)rdy->amr.dm_1dof_base));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -654,22 +662,13 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // destroy the coarse vectors
   PetscCall(RDyDestroyVectors(&rdy));
 
-  // keep a copy of base DMs, otherwise destroy the coarse DMs
-  if (!rdy->amr.num_refinements) {
-    rdy->amr.dm_base      = rdy->dm;
-    rdy->amr.dm_1dof_base = rdy->dm_1dof;
+  // the base DMs are held from RDyEnableAMR, so these are the last references
+  PetscCall(DMDestroy(&rdy->dm));
+  PetscCall(DMDestroy(&rdy->dm_1dof));
 
-    PetscCall(MatDuplicate(CoarseToFineMatNDof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMatNDof));
-    PetscCall(MatDuplicate(FineToCoarseMatNDof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMatNDof));
-    PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMat1Dof));
-    PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMat1Dof));
-
-  } else if (rebuilt) {
-    // the rebuild's matrices run from the base mesh already -- replace rather
-    // than compose
-    PetscCall(DMDestroy(&rdy->dm));
-    PetscCall(DMDestroy(&rdy->dm_1dof));
-
+  if (rebuilt || !rdy->amr.num_refinements) {
+    // the matrices run from the base mesh already -- replace rather than
+    // compose. On the first adapt there is nothing yet to replace.
     PetscCall(MatDestroy(&rdy->amr.BaseToCurrentMatNDof));
     PetscCall(MatDestroy(&rdy->amr.CurrentToBaseMatNDof));
     PetscCall(MatDestroy(&rdy->amr.BaseToCurrentMat1Dof));
@@ -679,10 +678,6 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(MatDuplicate(CoarseToFineMat1Dof, MAT_COPY_VALUES, &rdy->amr.BaseToCurrentMat1Dof));
     PetscCall(MatDuplicate(FineToCoarseMat1Dof, MAT_COPY_VALUES, &rdy->amr.CurrentToBaseMat1Dof));
   } else {
-    // destroy the coarse DM
-    PetscCall(DMDestroy(&rdy->dm));
-    PetscCall(DMDestroy(&rdy->dm_1dof));
-
     PetscCall(MatMatMultReplace(&CoarseToFineMatNDof, &rdy->amr.BaseToCurrentMatNDof, PETSC_TRUE));
     PetscCall(MatMatMultReplace(&rdy->amr.CurrentToBaseMatNDof, &FineToCoarseMatNDof, PETSC_FALSE));
     PetscCall(MatMatMultReplace(&CoarseToFineMat1Dof, &rdy->amr.BaseToCurrentMat1Dof, PETSC_TRUE));
