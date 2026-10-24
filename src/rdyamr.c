@@ -88,13 +88,15 @@ static PetscErrorCode CreateAdaptLabelFromMarkedCells(RDy rdy, DMLabel *adaptLab
 }
 
 /// @brief Creates matrices for the interpolation between coarse and fine meshes.
+/// @param odm          The coarse DM that was refined; it cannot be recovered
+///                     from the transform, whose base DM DMPlexSetTransform() clears
 /// @param dm           The fine DM
 /// @param CoarseToFine Matrix for interpolating local Vec from coarse to fine grid
 /// @param FineToCoarse Matrix for interpolating local Vec from fine to coarse grid
 /// @return PETSC_SUCESS on success
-static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFineMatNDof, Mat FineToCoarseMatNDof, Mat CoarseToFineMat1Dof, Mat FineToCoarseMat1Dof) {
+static PetscErrorCode ConstructRefineTree(DM odm, DM dm, Mat CoarseToFineMatNDof, Mat FineToCoarseMatNDof, Mat CoarseToFineMat1Dof,
+                                          Mat FineToCoarseMat1Dof) {
   DMPlexTransform tr;
-  DM              odm;
   PetscInt        cStart, cEnd, bs, Istart, Jstart, Istart_1Dof, Jstart_1Dof;
   PetscScalar     val = 1.0;
 
@@ -102,7 +104,6 @@ static PetscErrorCode ConstructRefineTree(DM dm, Mat CoarseToFineMatNDof, Mat Fi
   PetscCall(MatGetBlockSize(CoarseToFineMatNDof, &bs));
   PetscCall(DMPlexGetTransform(dm, &tr));
   if (!tr) PetscFunctionReturn(PETSC_SUCCESS);
-  PetscCall(DMPlexTransformGetDM(tr, &odm));
   PetscCall(DMPlexGetHeightStratum(odm, 0, &cStart, &cEnd));
 
   PetscCall(MatGetOwnershipRange(CoarseToFineMatNDof, &Istart, NULL));
@@ -182,9 +183,7 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   PetscCall(DMAdaptLabel(dm, adaptLabel, &dmAdapt));  // DMRefine
   PetscCall(DMLabelDestroy(&adaptLabel));
 
-  if (!dmAdapt) {
-    PetscCheck(PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
-  }
+  PetscCheck(dmAdapt, PETSC_COMM_WORLD, PETSC_ERR_USER, "Refinement failed.");
 
   PetscCall(PetscObjectSetName((PetscObject)dmAdapt, "Adapted Mesh"));
   PetscCall(PetscSNPrintf(opt, 128, "-adapt_dm_view"));
@@ -204,7 +203,7 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   PetscCall(MatSetBlockSize(*CoarseToFineMat1Dof, 1));
   PetscCall(MatSetBlockSize(*FineToCoarseMat1Dof, 1));
 
-  PetscCall(ConstructRefineTree(dmAdapt, *CoarseToFineMatNDof, *FineToCoarseMatNDof, *CoarseToFineMat1Dof, *FineToCoarseMat1Dof));
+  PetscCall(ConstructRefineTree(dm, dmAdapt, *CoarseToFineMatNDof, *FineToCoarseMatNDof, *CoarseToFineMat1Dof, *FineToCoarseMat1Dof));
 
   *dm_fine = dmAdapt;
 
