@@ -79,7 +79,8 @@ CEED_QFUNCTION_HELPER int TracerSourcesHydroRecon(void *ctx, CeedInt Q, const Ce
     sources[1][i] = riemannf[1][i] - tbx + ext_src[1][i];
     sources[2][i] = riemannf[2][i] - tby + ext_src[2][i];
     for (CeedInt j = 0; j < context->tracer_ndof; ++j) {
-      sources[flow_ndof + j][i] = riemannf[flow_ndof + j][i] + (e[j] - d[j]) + ext_src[flow_ndof + j][i];
+      const CeedScalar erosion_deposition = (j < context->num_sediment_classes) ? (e[j] - d[j]) : 0.0;
+      sources[flow_ndof + j][i]           = riemannf[flow_ndof + j][i] + erosion_deposition + ext_src[flow_ndof + j][i];
     }
 
     const CeedScalar h        = state.h;

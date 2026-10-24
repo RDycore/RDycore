@@ -5,6 +5,7 @@ build_opt/
 *.code-workspace
 compile_commands.json
 .cache/
+__pycache__/
 site/
 *.cgns
 .clangd
@@ -12,3 +13,4 @@ site/
 # These files must be generated in the source directory so CEED's JIT compiler can find them.
 src/swe/swe_ceed.h
 src/tracer/tracer_ceed.h
+src/heat/heat_ceed.h

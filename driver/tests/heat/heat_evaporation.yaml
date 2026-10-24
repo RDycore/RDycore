@@ -1,0 +1,82 @@
+physics:
+  flow:
+    mode: swe
+    # Raised well above the 1e-7 default so that the capped case can be set up with
+    # a depth that is still numerically comfortable: the test needs a cell whose
+    # available water (h - tiny_h) is far smaller than one step's evaporative demand.
+    tiny_h: 1.0e-3
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: none
+
+# Drives the evaporative mass and momentum sinks of the atmospheric heat source.
+#
+# test_heat_evaporation.c calls RDyHeatAdvance() directly rather than RDyAdvance(),
+# writing the state it wants beforehand, so the flow solve never runs and every
+# change in h, hu, and hv is attributable to the surface exchange alone. The time
+# section below therefore only has to be self-consistent; the test picks its own
+# step length.
+#
+# The forcing is deliberately extreme -- no radiation, very dry air, and a wind
+# speed that makes the bulk transfer velocity O(1 m/s) -- so that one second of
+# evaporation is resolvable against roundoff. It is not meant to be realistic.
+time:
+  time_step: 1.0
+  unit: seconds
+  stop: 1.0
+  coupling_interval: 1.0
+
+grid:
+  file: DamBreak_grid5x10.exo  # flat bed (z = 0)
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: flat_domain
+
+materials:
+  - name: flat_domain
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: domain
+    flow: moving_water
+    heat: initial_temperature
+
+sources:
+  - region: domain
+    flow: no_runoff
+    heat: dry_air
+
+flow_conditions:
+  - name: moving_water
+    type: dirichlet
+    height: 0.5
+    x_momentum: 0.25
+    y_momentum: 0.1
+  - name: no_runoff
+    type: runoff
+    value: 0.0
+
+heat_conditions:
+  - name: initial_temperature
+    type: dirichlet
+    water_temperature: 30.0
+  - name: dry_air
+    type: runoff
+    downwelling_shortwave: 0.0     # W/m^2
+    downwelling_longwave: 0.0      # W/m^2
+    wind_speed: 10.0               # m/s
+    air_temperature: 30.0          # degrees C
+    specific_humidity: 0.001       # kg/kg -- far below saturation at 30 C

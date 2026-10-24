@@ -1,0 +1,83 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+# Method of Manufactured Solutions, Case 1: source-free moving transport.
+#
+# The flow is uniform (h = H, u = U, v = V) over a flat bed with n = 0, so every
+# manufactured SWE source vanishes and the discrete flow state must be preserved
+# to roundoff. The temperature is a wave that translates with the water,
+#
+#   T = R + A sin(K (x - U t)) sin(K (y - V t)),
+#
+# which satisfies T_t + U T_x + V T_y = 0 and hence (hT)_t + div(huT, hvT) = 0.
+# The manufactured heat source is therefore zero to roundoff -- check the
+# Max-|Q_mms|-inf diagnostic -- so the source vector field B is identically zero,
+# its commutator with the transport field vanishes, and there is no splitting
+# error. Every bit of heat error is attributable to passive transport,
+# reconstruction, boundary fluxes, and the transport time integrator.
+#
+# n = 0 is required, not cosmetic: the friction term is discretized
+# semi-implicitly against the partially updated momentum, so it does not cancel
+# the analytic Cd u|u| that RDyMMSComputeSourceTerms installs. Both are
+# identically zero only when n = 0.
+mms:
+  constants:
+    H: 0.1      # constant water depth (m)
+    U: 0.2      # constant x velocity (m/s)
+    V: 0.1      # constant y velocity (m/s)
+    A: 5.0      # temperature amplitude (deg C)
+    R: 20.0     # reference temperature (deg C)
+    K: 0.6283185307179586  # wave number (pi/5)
+
+  swe:
+    h:    H
+    dhdx: 0
+    dhdy: 0
+    dhdt: 0
+    u:    U
+    dudx: 0
+    dudy: 0
+    dudt: 0
+    v:    V
+    dvdx: 0
+    dvdy: 0
+    dvdt: 0
+    z:    0
+    dzdx: 0
+    dzdy: 0
+    n:    0
+
+  temperature:
+    T:    R + A * sin(K*(x - U*t)) * sin(K*(y - V*t))
+    dTdx: A * K * cos(K*(x - U*t)) * sin(K*(y - V*t))
+    dTdy: A * K * sin(K*(x - U*t)) * cos(K*(y - V*t))
+    dTdt: -A * K * (U * cos(K*(x - U*t)) * sin(K*(y - V*t)) + V * sin(K*(x - U*t)) * cos(K*(y - V*t)))
+
+logging:
+  level: none
+
+# (|u| + sqrt(g h)) dt / dx = (0.224 + 0.990) * 0.05 / 0.5 = 0.12 at the base
+# refinement, and the convergence inputs hold that ratio fixed as the mesh refines.
+time:
+  time_step: 0.05
+  unit: seconds
+  stop: 2.0
+  coupling_interval: 0.05
+
+grid:
+  file: mms_triangles_dx1.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+boundaries:
+  - name: domain_boundary
+    grid_boundary_id: 1

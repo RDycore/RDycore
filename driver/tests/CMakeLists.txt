@@ -25,5 +25,8 @@ add_subdirectory(swe_roe)
 # sediment dynamics
 add_subdirectory(sediment)
 
+# heat equation MMS tests
+add_subdirectory(heat)
+
 # regression tests for bad input
 add_subdirectory(bad_input)

@@ -1,0 +1,123 @@
+physics:
+  flow:
+    mode: swe
+  heat: true
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+# Method of Manufactured Solutions for spatially varying SWE + heat (Case 3).
+#
+# The transport TSSolve receives the manufactured h, hu, and hv sources; the
+# heat component of its external source vector stays zero. The second heat
+# TSSolve then applies direct_source = Q_mms, the complete conservative heat
+# residual rho*c*[(hT)_t + div(huT, hvT)] computed per cell from the
+# manufactured derivatives -- so d(hT)/dt is counted once across the Lie split,
+# not once in each solve.
+#
+# Errors are reported for the conservative variable hT that the solver advances
+# and for the derived temperature T = hT/h, which is the physically meaningful
+# quantity and converges slightly more slowly because it combines the h and hT
+# errors. Both the tracer discretization and the transport integrator are first
+# order, so the study below reports a JOINT space-time rate of about 1 rather
+# than an isolated spatial rate.
+mms:
+  constants:
+    H: 0.005   # water height scale factor
+    W: 20.0    # time scale for SWE (s)
+    U: 0.025   # x-velocity scale factor
+    V: 0.025   # y-velocity scale factor
+    N: 0.01    # Manning coefficient scale factor
+    Z: 0.0025  # elevation scale factor
+    A: 5.0     # temperature scale factor (deg C)
+    T: 20.0    # temperature time scale (s)
+    K: 0.6283185307179586  # wave number (pi/5)
+
+  swe:
+    h:    H * (1 + sin(K*x)*sin(K*y)) * exp(t/W)
+    dhdx: H * K * sin(K*y) * cos(K*x) * exp(t/W)
+    dhdy: H * K * sin(K*x) * cos(K*y) * exp(t/W)
+    dhdt: H / W * (1 + sin(K*x)*sin(K*y)) * exp(t/W)
+    u:     U * cos(K*x) * sin(K*y) * exp(t/W)
+    dudx: -U * K * sin(K*x) * sin(K*y) * exp(t/W)
+    dudy:  U * K * cos(K*x) * cos(K*y) * exp(t/W)
+    dudt:  U / W * cos(K*x) * sin(K*y) * exp(t/W)
+    v:     V * sin(K*x) * cos(K*y) * exp(t/W)
+    dvdx:  K * V * cos(K*x) * cos(K*y) * exp(t/W)
+    dvdy: -K * V * sin(K*x) * sin(K*y) * exp(t/W)
+    dvdt:  V / W * sin(K*x) * cos(K*y) * exp(t/W)
+    z:     Z * sin(K*x) * sin(K*y)
+    dzdx:  Z * K * cos(K*x) * sin(K*y)
+    dzdy:  Z * K * sin(K*x) * cos(K*y)
+    n:     N * (1 + sin(K*x) * sin(K*y))
+
+  temperature:
+    T:    A * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+    dTdx: A * K * sin(K*y) * cos(K*x) * exp(t/T)
+    dTdy: A * K * sin(K*x) * cos(K*y) * exp(t/T)
+    dTdt: A / T * (1 + sin(K*x)*sin(K*y)) * exp(t/T)
+
+  convergence:
+    num_refinements: 3
+    base_refinement: 1
+    # Halve dt with dx so temporal and Lie-splitting error cannot come to
+    # dominate the finest meshes. This makes the reported rate a JOINT
+    # space-time rate, not an isolated spatial one: the tracer discretization
+    # and the forward-Euler transport integrator are both first order, so
+    # E ~ Cx dx + Ct dt collapses to (Cx + K Ct) dx under dt ~ dx.
+    timestep_refinement_exponent: 1
+    # Measured rates under the dt ~ dx schedule above are h 0.936/0.940/0.933,
+    # hu and hv 0.943/0.954/0.792, hT 0.954/0.940/0.943, and T 0.923/0.903/0.740;
+    # the thresholds below sit a few percent under those.
+    expected_rates:
+      h:
+        L1: 0.91
+        L2: 0.92
+        Linf: 0.91
+      hu:
+        L1: 0.92
+        L2: 0.93
+        Linf: 0.77
+      hv:
+        L1: 0.92
+        L2: 0.93
+        Linf: 0.77
+      # Thresholds for the conservative variable the solver actually advances.
+      # This study was originally tuned against these norms, under a label that
+      # said "T"; they keep their meaning here.
+      hT:
+        L1: 0.93
+        L2: 0.92
+        Linf: 0.92
+      # The derived temperature T = hT/h combines the h and hT errors and
+      # converges a little more slowly than either, so it carries its own
+      # thresholds rather than reusing the hT ones.
+      T:
+        L1: 0.90
+        L2: 0.88
+        Linf: 0.72
+
+logging:
+  level: none
+
+# The timestep applies to the base refinement level; the convergence driver
+# halves it (and doubles stop_n) at each level. (|u| + sqrt(g h)) dt / dx is
+# about 0.06 and is held fixed across levels.
+time:
+  time_step: 0.04
+  unit: seconds
+  stop: 5.0
+  coupling_interval: 0.04
+
+grid:
+  file: mms_triangles_dx1.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+boundaries:
+  - name: domain_boundary
+    grid_boundary_id: 1
