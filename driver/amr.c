@@ -42,9 +42,12 @@ static const char *help_str =
     "  -refine_still_water_tol <t>   fail if that departure exceeds t * eta\n"
     "\n"
     "  the jump criterion is tuned with\n"
-    "  -rdy_amr_refine_vec_tagger_type <relative|cdf|absolute> and\n"
-    "  -rdy_amr_refine_vec_tagger_box <lo,hi>, plus -rdy_amr_buffer_layers <n>\n"
-    "  and -rdy_amr_max_levels <n>\n"
+    "  -rdy_amr_refine_vec_tagger_type <relative|cdf|absolute>,\n"
+    "  -rdy_amr_refine_vec_tagger_box <lo,hi>,\n"
+    "  -rdy_amr_coarsen_vec_tagger_type <relative|cdf|absolute>,\n"
+    "  -rdy_amr_coarsen_vec_tagger_box <lo,hi>,\n"
+    "  -rdy_amr_min_jump <h>, -rdy_amr_buffer_layers <n>,\n"
+    "  -rdy_amr_max_levels <n>, and -rdy_amr_error_vec_view\n"
     "\n"
     "  the mesh must be simplicial; the adapt refines it by bisection\n";
 
@@ -79,14 +82,19 @@ PetscErrorCode ParseRefinementDataOptions(RefinementDataset *refinement_dataset)
   refinement_dataset->is_defined = PETSC_FALSE;
 
   // parse command line options
-  PetscInt date[NUM_DATE_VALUES];
-  PetscInt ndate = NUM_DATE_VALUES;
+  PetscInt date[NUM_DATE_VALUES] = {0};
+  PetscInt ndate                 = NUM_DATE_VALUES;
 
-  PetscBool refine_flag;
-  PetscCall(PetscOptionsGetIntArray(NULL, NULL, "-refine_data_start_date", date, &ndate, &refine_flag));
-
-  PetscBool dir_flag;
-  PetscCall(PetscOptionsGetString(NULL, NULL, "-refine_data_dir", refinement_dataset->dir, sizeof(refinement_dataset->dir), &dir_flag));
+  PetscBool refine_flag      = PETSC_FALSE;
+  PetscBool dir_flag         = PETSC_FALSE;
+  refinement_dataset->dir[0] = '\0';
+  PetscOptionsBegin(PETSC_COMM_WORLD, NULL, "AMR dataset refinement options", "");
+  {
+    PetscCall(PetscOptionsIntArray("-refine_data_start_date", "Start date Y,M,D,h,m for marker-file refinement", "", date, &ndate, &refine_flag));
+    PetscCall(PetscOptionsString("-refine_data_dir", "Directory containing marker files for refinement", "", refinement_dataset->dir,
+                                 refinement_dataset->dir, sizeof(refinement_dataset->dir), &dir_flag));
+  }
+  PetscOptionsEnd();
 
   if (refine_flag) {
     PetscCheck(dir_flag == PETSC_TRUE, PETSC_COMM_WORLD, PETSC_ERR_USER,
@@ -380,9 +388,57 @@ int main(int argc, char *argv[]) {
     // enable refinement. -refine_criterion jump marks cells by the water-surface
     // jump of the solution instead of the box of MarkOwnedCellsForRefinement, so
     // the mesh follows the solution; it has to be known before RDyEnableAMR.
-    char      criterion[32] = "box";
+    //
+    // sum(h * area) is what the transfer promises to preserve: the area-weighted
+    // average reproduces it exactly and only the summation order changes, so the
+    // departure is machine precision (measured: at most 1.4e-14 relative over
+    // every case in this suite). Reporting it is not a check -- the number has to
+    // be held to something, or a transfer that loses mass passes on exit status.
+    //
+    // the lake-at-rest gate: still water on a bed that is not flat must survive
+    // every adapt, because the transfer carries the free surface and not the
+    // depth. Reported on either side of each adapt so that a departure made by
+    // the time stepping is distinguishable from one made by the adapt.
+    char      criterion[32]     = "box";
+    PetscBool refine_at_start   = PETSC_FALSE;
+    PetscBool allow_coarsening  = PETSC_FALSE;
+    PetscBool check_volume      = PETSC_FALSE;
+    PetscReal volume_tol        = 1e-11;
+    PetscReal box[4]            = {0.0, 1.0, 3.0, 4.0};
+    PetscInt  nbox              = 4;
+    PetscBool box_set           = PETSC_FALSE;
+    PetscReal box_speed         = 0.0;
+    PetscReal still_water       = 0.0;
+    PetscReal still_water_tol   = 1e-12;
+    PetscBool check_still_water = PETSC_FALSE;
+    PetscBool check_max_level   = PETSC_FALSE;
+    PetscBool report_balance    = PETSC_FALSE;
+    PetscOptionsBegin(comm, NULL, "AMR driver options", "");
+    {
+      PetscCall(PetscOptionsString("-refine_criterion", "Refinement criterion (box or jump)", "", criterion, criterion, sizeof(criterion), NULL));
+      PetscCall(PetscOptionsBool("-refine_at_start", "Adapt to the initial condition before stepping (-refine_criterion jump only)", "",
+                                 refine_at_start, &refine_at_start, NULL));
+      PetscCall(PetscOptionsBool("-refine_allow_coarsening", "Rebuild the mesh from the base mesh at every adapt to allow coarsening", "",
+                                 allow_coarsening, &allow_coarsening, NULL));
+      PetscCall(
+          PetscOptionsBool("-refine_check_volume", "Check water volume conservation across every adapt", "", check_volume, &check_volume, NULL));
+      PetscCall(
+          PetscOptionsReal("-refine_check_volume_tol", "Relative tolerance for water volume conservation check", "", volume_tol, &volume_tol, NULL));
+      PetscCall(PetscOptionsRealArray("-refine_box", "Box region x0,x1,y0,y1 marked by the box criterion", "", box, &nbox, &box_set));
+      PetscCall(PetscOptionsReal("-refine_box_speed", "Speed (m/s) to translate the refinement box along x", "", box_speed, &box_speed, NULL));
+      PetscCall(PetscOptionsReal("-refine_still_water", "Start from a lake at rest at elevation eta and check surface departure across adapts", "",
+                                 still_water, &still_water, &check_still_water));
+      PetscCall(PetscOptionsReal("-refine_still_water_tol", "Relative tolerance for lake-at-rest surface departure check", "", still_water_tol,
+                                 &still_water_tol, NULL));
+      PetscCall(PetscOptionsBool("-refine_check_max_level", "Report refinement depth after every adapt and fail past -rdy_amr_max_levels + 1", "",
+                                 check_max_level, &check_max_level, NULL));
+      PetscCall(PetscOptionsBool("-refine_report_balance", "Report max and mean owned cells across ranks before and after every adapt", "",
+                                 report_balance, &report_balance, NULL));
+    }
+    PetscOptionsEnd();
+    PetscCheck(!box_set || nbox == 4, comm, PETSC_ERR_USER, "-refine_box takes four values x0,x1,y0,y1, got %" PetscInt_FMT, nbox);
+
     PetscBool by_jump;
-    PetscCall(PetscOptionsGetString(NULL, NULL, "-refine_criterion", criterion, sizeof(criterion), NULL));
     PetscCall(PetscStrcmp(criterion, "jump", &by_jump));
     if (!by_jump) {
       PetscBool by_box;
@@ -398,33 +454,6 @@ int main(int argc, char *argv[]) {
     RefinementDataset refinement_dataset;
     PetscCall(ParseRefinementDataOptions(&refinement_dataset));
 
-    PetscBool check_volume = PETSC_FALSE, refine_at_start = PETSC_FALSE;
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_volume", &check_volume, NULL));
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_at_start", &refine_at_start, NULL));
-
-    // sum(h * area) is what the transfer promises to preserve: the area-weighted
-    // average reproduces it exactly and only the summation order changes, so the
-    // departure is machine precision (measured: at most 1.4e-14 relative over
-    // every case in this suite). Reporting it is not a check -- the number has to
-    // be held to something, or a transfer that loses mass passes on exit status.
-    PetscReal volume_tol = 1e-11;
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_check_volume_tol", &volume_tol, NULL));
-
-    PetscReal box[4] = {0.0, 1.0, 3.0, 4.0}, box_speed = 0.0;
-    PetscInt  nbox = 4;
-    PetscBool box_set;
-    PetscCall(PetscOptionsGetRealArray(NULL, NULL, "-refine_box", box, &nbox, &box_set));
-    PetscCheck(!box_set || nbox == 4, comm, PETSC_ERR_USER, "-refine_box takes four values x0,x1,y0,y1, got %" PetscInt_FMT, nbox);
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_box_speed", &box_speed, NULL));
-
-    // the lake-at-rest gate: still water on a bed that is not flat must survive
-    // every adapt, because the transfer carries the free surface and not the
-    // depth. Reported on either side of each adapt so that a departure made by
-    // the time stepping is distinguishable from one made by the adapt.
-    PetscReal still_water = 0.0, still_water_tol = 0.0;
-    PetscBool check_still_water = PETSC_FALSE;
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_still_water", &still_water, &check_still_water));
-    PetscCall(PetscOptionsGetReal(NULL, NULL, "-refine_still_water_tol", &still_water_tol, NULL));
     if (check_still_water) {
       PetscCall(SetStillWater(rdy, still_water));
       if (still_water_tol == 0.0) still_water_tol = 1e-12;
@@ -432,15 +461,8 @@ int main(int argc, char *argv[]) {
 
     // the refinement-limit gate: no cell may end up more than max_levels
     // bisections below the base cell it descends from
-    PetscBool check_max_level = PETSC_FALSE;
-    PetscInt  max_levels      = 0;
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_check_max_level", &check_max_level, NULL));
+    PetscInt max_levels = 0;
     if (check_max_level) PetscCall(RDyGetAMRMaxLevels(rdy, &max_levels));
-
-    // how unevenly the adapted mesh is spread over the ranks, reported on
-    // either side of each adapt
-    PetscBool report_balance = PETSC_FALSE;
-    PetscCall(PetscOptionsGetBool(NULL, NULL, "-refine_report_balance", &report_balance, NULL));
 
     RDyTimeUnit time_unit;
     PetscReal   time, prev_time;

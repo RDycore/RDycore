@@ -470,9 +470,23 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
   // refinement of the mesh in hand never touches the base mesh, so there is
   // nothing to repartition. -rdy_amr_balance 0 turns it off, which is what
   // the gate that compares a balanced run against an unbalanced one uses.
-  PetscBool balance_set;
-  rdy->amr.balance = PETSC_TRUE;
-  PetscCall(PetscOptionsGetBool(NULL, "rdy_amr_", "-balance", &rdy->amr.balance, &balance_set));
+  PetscBool balance_set  = PETSC_FALSE;
+  rdy->amr.balance       = PETSC_TRUE;
+  rdy->amr.max_levels    = 3;
+  rdy->amr.min_jump      = rdy->config.physics.flow.tiny_h;
+  rdy->amr.buffer_layers = 2;
+  PetscOptionsBegin(rdy->comm, "rdy_amr_", "RDycore AMR options", "");
+  {
+    PetscCall(
+        PetscOptionsBool("-balance", "Repartition the base mesh at each rebuild", "RDyEnableAMR", rdy->amr.balance, &rdy->amr.balance, &balance_set));
+    PetscCall(PetscOptionsInt("-max_levels", "Deepest refinement level a cell may be marked at against its base cell", "RDyEnableAMR",
+                              rdy->amr.max_levels, &rdy->amr.max_levels, NULL));
+    PetscCall(PetscOptionsReal("-min_jump", "Minimum water-surface jump to mark a cell for refinement (m)", "RDyEnableAMR", rdy->amr.min_jump,
+                               &rdy->amr.min_jump, NULL));
+    PetscCall(PetscOptionsInt("-buffer_layers", "Cell layers to dilate the refinement indicator before tagging", "RDyEnableAMR",
+                              rdy->amr.buffer_layers, &rdy->amr.buffer_layers, NULL));
+  }
+  PetscOptionsEnd();
   if (rdy->amr.balance && !rdy->amr.allow_coarsening) {
     // say so rather than quietly doing nothing: balancing rides on the rebuild
     if (balance_set) {
@@ -480,8 +494,6 @@ PetscErrorCode RDyEnableAMR(RDy rdy) {
     }
     rdy->amr.balance = PETSC_FALSE;
   }
-  rdy->amr.max_levels = 3;
-  PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-max_levels", &rdy->amr.max_levels, NULL));
   rdy->amr.num_base_cells = rdy->mesh.num_cells;
   PetscCall(PetscCalloc1(rdy->amr.num_base_cells, &rdy->amr.base_level));
 

@@ -109,6 +109,11 @@ typedef struct {
   // can land at max_levels + 1.
   PetscInt max_levels;
 
+  // surface-jump indicator floor (m) and dilation layers, from
+  // -rdy_amr_min_jump and -rdy_amr_buffer_layers
+  PetscReal min_jump;
+  PetscInt  buffer_layers;
+
   // when set, each adapt rebuilds the mesh from dm_base instead of refining
   // the current one, so regions the indicator no longer marks come back coarse
   PetscBool allow_coarsening;

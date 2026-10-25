@@ -143,16 +143,12 @@ static PetscErrorCode ComputeSurfaceJumpIndicator(RDy rdy, Vec errVec) {
   // half the mesh. A lake at rest is exactly that case, and it is the standard
   // well-balancedness benchmark. The default is the depth the scheme already
   // calls dry, seven orders below the jump across a dam and nine above roundoff.
-  PetscReal min_jump = rdy->config.physics.flow.tiny_h;
-  PetscCall(PetscOptionsGetReal(NULL, "rdy_amr_", "-min_jump", &min_jump, NULL));
   for (PetscInt o = 0; o < mesh->num_owned_cells; ++o) {
-    if (PetscRealPart(ind[o]) < min_jump) ind[o] = 0.0;
+    if (PetscRealPart(ind[o]) < rdy->amr.min_jump) ind[o] = 0.0;
   }
 
   // a front crosses several cells between adapts, so refine a band ahead of it
-  PetscInt buffer_layers = 2;
-  PetscCall(PetscOptionsGetInt(NULL, "rdy_amr_", "-buffer_layers", &buffer_layers, NULL));
-  PetscCall(DilateIndicator(rdy, ind, buffer_layers));
+  PetscCall(DilateIndicator(rdy, ind, rdy->amr.buffer_layers));
 
   // cells already at the finest allowed level cannot be refined further, so
   // zero their indicator before the taggers see it: a relative or CDF box
