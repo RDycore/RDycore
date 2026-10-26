@@ -12,3 +12,13 @@ site/
 # These files must be generated in the source directory so CEED's JIT compiler can find them.
 src/swe/swe_ceed.h
 src/tracer/tracer_ceed.h
+<<<<<<< Updated upstream
+=======
+__pycache__/
+
+# Claude Code: share the review skills, keep personal settings out
+.claude/settings.json
+.claude/settings.local.json
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock
+>>>>>>> Stashed changes
