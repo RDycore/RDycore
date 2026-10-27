@@ -242,7 +242,7 @@ static PetscErrorCode ApplyTracerInteriorFlux(void *context, PetscOperatorFields
         CourantNumberDiagnostics *courant_num_diags = &interior_flux_op->diagnostics->courant_number;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
           if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[left_local_cell_id];
           else courant_num_diags->global_cell_id = cells->global_ids[right_local_cell_id];
         }
@@ -505,7 +505,7 @@ static PetscErrorCode ApplyTracerBoundaryFlux(void *context, PetscOperatorFields
         PetscReal cnum = data_edge->amax[e] * edge_len / cell_area * dt;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
           courant_num_diags->global_cell_id  = cells->global_ids[local_cell_id];
         }
 
@@ -685,7 +685,7 @@ static PetscErrorCode ApplyTracerSourceSemiImplicit(void *context, PetscOperator
         PetscReal v = hv / h;
 
         // Manning's coefficient
-        PetscReal N_mannings = mannings_ptr[c];
+        PetscReal N_mannings = mannings_ptr[owned_cell_id];
 
         // Cd = g n^2 h^{-1/3}, where n is Manning's coefficient
         PetscReal Cd = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
@@ -942,7 +942,7 @@ static PetscErrorCode ApplyTracerInteriorFluxHR(void *context, PetscOperatorFiel
         CourantNumberDiagnostics *courant_num_diags = &op->diagnostics->courant_number;
         if (cnum > courant_num_diags->max_courant_num) {
           courant_num_diags->max_courant_num = cnum;
-          courant_num_diags->global_edge_id  = edges->global_ids[e];
+          courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
           if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[l];
           else courant_num_diags->global_cell_id = cells->global_ids[r];
         }
@@ -1120,7 +1120,7 @@ static PetscErrorCode ApplyTracerSourceHRSemiImplicit(void *context, PetscOperat
         PetscReal u = hu / h;
         PetscReal v = hv / h;
 
-        PetscReal N_mannings = mannings_ptr[c];
+        PetscReal N_mannings = mannings_ptr[owned_cell_id];
         PetscReal Cd         = GRAVITY * Square(N_mannings) * PetscPowReal(h, -1.0 / 3.0);
         PetscReal velocity   = PetscSqrtReal(Square(u) + Square(v));
         PetscReal tb         = Cd * velocity / h;
