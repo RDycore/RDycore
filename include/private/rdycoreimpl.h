@@ -279,6 +279,12 @@ PETSC_INTERN PetscErrorCode ReadMMSConfigFile(RDy);  // for MMS driver only!
 PETSC_INTERN PetscErrorCode InitBoundaries(RDy);
 PETSC_INTERN PetscErrorCode InitRegions(RDy);
 PETSC_INTERN PetscErrorCode InitBoundaryConditions(RDy);
+
+// The two halves of setup that an adapt has to repeat, split where the
+// solution lands: RDySetup fills it from the initial conditions, an adapt
+// transfers it from the old mesh. Anything added to these reaches both.
+PETSC_INTERN PetscErrorCode RDySetupMeshObjects(RDy);
+PETSC_INTERN PetscErrorCode RDySetupSolverObjects(RDy);
 PETSC_INTERN PetscErrorCode OverrideCellElevation(RDy);
 PETSC_INTERN PetscErrorCode OverrideParameters(RDy);
 PETSC_INTERN PetscErrorCode PrintConfig(RDy);

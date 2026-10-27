@@ -257,7 +257,7 @@ static PetscErrorCode SurfaceToDepth(RDyMesh *mesh, const PetscInt ndof, Vec u_l
 ///        bed belongs to the base mesh, so the values are injected along the
 ///        base-to-current interpolation instead, which gives every descendant
 ///        of a base cell its elevation.
-static PetscErrorCode OverrideCellElevationFromBase(RDy rdy) {
+PetscErrorCode RDyAMROverrideCellElevationFromBase(RDy rdy) {
   PetscFunctionBeginUser;
 
   Vec global_base, local_base, local_current;
@@ -430,12 +430,6 @@ static PetscErrorCode AdaptMesh(RDy rdy, const PetscInt bs, DM *dm_fine, Mat *Co
   PetscCall(RDyAMRRefineByLabel(rdy->dm, adaptLabel, bs, dm_fine, CoarseToFineMatNDof, CoarseToFineMat1Dof));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-
-extern PetscErrorCode InitOperator(RDy rdy);
-extern PetscErrorCode InitMaterialProperties(RDy rdy);
-extern PetscErrorCode InitSolver(RDy rdy);
-extern PetscErrorCode InitDirichletBoundaryConditions(RDy rdy);
-extern PetscErrorCode InitSourceConditions(RDy rdy);
 
 /// @brief Computes A * B and replaces B with it, destroying what was there.
 /// @param A left factor
@@ -695,12 +689,8 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
     PetscCall(DepthToSurface(&rdy->mesh, ndof_coarse, U_coarse_local));
   }
 
-  // destroy the coarse vectors
-  PetscCall(RDyDestroyVectors(&rdy));
-
-  // the base DMs are held from RDyEnableAMR, so these are the last references
+  // the base DMs are held from RDyEnableAMR, so this is the last reference
   PetscCall(DMDestroy(&rdy->dm));
-  PetscCall(DMDestroy(&rdy->dm_1dof));
 
   if (rebuilt || !rdy->amr.num_refinements) {
     // the matrices run from the base mesh already -- replace rather than
@@ -715,42 +705,16 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   }
 
   // set the DM to be the refined DM
-  rdy->dm      = dm_fine;
-  rdy->flow_dm = rdy->dm;
-
-  // create the auxiliary DM
-  PetscCall(CreateAuxiliaryDMs(rdy));
-
-  // create new refined vectors
-  PetscCall(CreateVectors(rdy));
+  rdy->dm = dm_fine;
 
   // mark the mesh was refined
   rdy->amr.mesh_was_refined = PETSC_TRUE;
   rdy->amr.num_refinements++;
 
-  // build the new mesh beside the old one: a rebuilt mesh is a different
-  // triangulation of the same domain, and the conservative transfer between
-  // them needs the geometry of both
-  RDyMesh new_mesh;
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &new_mesh));
-  PetscCall(RDyMeshDestroy(rdy->mesh));
-  rdy->mesh = new_mesh;
-  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
-    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
-  }
-  if (rdy->config.grid.cell_elevation.file[0]) {
-    PetscCall(OverrideCellElevationFromBase(rdy));
-  }
-
-  // the adapted mesh carries the "Cell Sets" label the regions are defined by,
-  // so the regions are read off it exactly as they were at setup. Tracking
-  // each new cell back to a cell of the old mesh would give the same answer
-  // only while the two meshes are on the same partition.
-  for (PetscInt i = 0; i < rdy->num_regions; ++i) PetscCall(DestroyRegion(&rdy->regions[i]));
-  if (rdy->regions) PetscCall(PetscFree(rdy->regions));
-  rdy->regions     = NULL;
-  rdy->num_regions = 0;
-  PetscCall(InitRegions(rdy));
+  // Everything derived from the mesh comes back here, from the same list
+  // RDySetup uses. The adapted mesh carries the "Cell Sets" label the regions
+  // are defined by, so they are read off it exactly as they were at setup.
+  PetscCall(RDySetupMeshObjects(rdy));
 
   // initialize the solution on the new mesh from the old one: injection when
   // the mesh was refined from the current one, area-weighted averaging of the
@@ -771,57 +735,10 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   PetscCall(MatDestroy(&CoarseToFineMat1Dof));
   PetscCall(VecDestroy(&U_coarse_local));
 
-  // the operator, the boundaries, the regions and the TS all go and come back
+  // the operator, the boundaries and the TS all go and come back, from the
+  // same list RDySetup uses; the TS keeps the run's clock across the rebuild
   PetscCall(PetscLogEventBegin(RDY_AMR_Rewire, 0, 0, 0, 0));
-  PetscCall(DestroyOperator(&rdy->operator));
-
-  // destroy the boundaries and reallocate memory. The conditions are indexed
-  // by boundary, so they are rebuilt with them: which boundaries a rank holds
-  // changes when the mesh is repartitioned.
-  PetscCall(RDyDestroyBoundaries(&rdy));
-  PetscCall(InitBoundaries(rdy));
-  PetscCall(InitBoundaryConditions(rdy));
-
-  // reinitialize the operator
-  PetscCall(InitOperator(rdy));
-
-  // Re-wire OutputVar references since the operator was destroyed and recreated.
-  {
-    Operator *op                      = rdy->operator;
-    rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
-    rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
-    rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
-    rdy->prim_vars_output.ceed_accum  = op->ceed.primitive_variables_accum;
-    rdy->src_output.petsc_inst        = op->src_inst;
-    rdy->src_output.petsc_accum       = op->src_accum;
-    rdy->src_output.ceed_inst         = op->ceed.ceed_src_inst;
-    rdy->src_output.ceed_accum        = op->ceed.ceed_src_accum;
-  }
-
-  // reinitialize material properties
-  PetscCall(InitMaterialProperties(rdy));
-
-  // save time and timestep from TS
-  PetscReal time, dt;
-  PetscInt  nstep;
-  PetscCall(TSGetTime(rdy->ts, &time));
-  PetscCall(TSGetTimeStep(rdy->ts, &dt));
-  PetscCall(TSGetStepNumber(rdy->ts, &nstep));
-
-  // destroy the TS and re-create it
-  PetscCall(TSDestroy(&rdy->ts));
-  PetscCall(InitSolver(rdy));
-
-  // set the time and timstep in TS
-  PetscCall(TSSetStepNumber(rdy->ts, nstep));
-  PetscCall(TSSetTime(rdy->ts, time));
-  PetscCall(TSSetTimeStep(rdy->ts, dt));
-
-  // make sure any Dirichlet boundary conditions are properly specified
-  PetscCall(InitDirichletBoundaryConditions(rdy));
-
-  // initialize the source terms
-  PetscCall(InitSourceConditions(rdy));
+  PetscCall(RDySetupSolverObjects(rdy));
   PetscCall(PetscLogEventEnd(RDY_AMR_Rewire, 0, 0, 0, 0));
 
   PetscCall(PetscLogEventEnd(RDY_AMR_Adapt, 0, 0, 0, 0));

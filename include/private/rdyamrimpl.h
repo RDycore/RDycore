@@ -27,6 +27,10 @@ PETSC_INTERN PetscErrorCode RDyAMRRebuildMeshFromBase(RDy, const PetscInt, Petsc
 // the base cell a local cell of the current mesh descends from, or -1
 PETSC_INTERN PetscErrorCode RDyAMRBaseCellOfLocalCell(RDy, PetscInt, PetscInt *);
 
+// reads a per-base-cell elevation file onto the base mesh and injects it onto
+// the mesh in hand; the setup path calls this once there is a base mesh
+PETSC_INTERN PetscErrorCode RDyAMROverrideCellElevationFromBase(RDy);
+
 // repartitions the base mesh by the cells each base cell is about to carry,
 // bringing base_level, the base areas and the packed solution with it
 // (src/rdyamr_balance.c)

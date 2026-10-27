@@ -2,6 +2,7 @@
 #include <petscdmceed.h>
 #include <petscdmplex.h>
 #include <petscsys.h>
+#include <private/rdyamrimpl.h>
 #include <private/rdycoreimpl.h>
 #include <private/rdydmimpl.h>
 #include <private/rdyoperatorimpl.h>
@@ -1380,6 +1381,130 @@ static PetscErrorCode OutputPartitionStatistics(RDy rdy) {
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// @brief Creates everything derived from the mesh that has to exist before the
+///        solution does: the auxiliary DMs, the vectors, the FV mesh, the
+///        regions, and the per-region conditions indexed by them.
+///
+/// Safe to call again on a different DM, which is what an adapt does: each
+/// object is destroyed before it is remade. Callers must fill the solution
+/// afterwards -- RDySetup from the initial conditions, RDyPerformAMR by
+/// transferring it from the old mesh -- and then call RDySetupSolverObjects().
+PetscErrorCode RDySetupMeshObjects(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(DMDestroy(&rdy->dm_1dof));
+  PetscCall(CreateAuxiliaryDMs(rdy));
+
+  if (rdy->config.physics.sediment.num_classes) {
+    PetscCall(DMDestroy(&rdy->flow_dm));
+    PetscCall(DMDestroy(&rdy->tracer_dm));
+    PetscCall(CreateFlowDM(rdy));
+    PetscCall(CreateTracerDM(rdy));
+  } else {
+    // not owned here: these alias the solution DM and its fields
+    rdy->flow_fields = rdy->soln_fields;
+    rdy->flow_dm     = rdy->dm;
+  }
+
+  PetscCall(RDyDestroyVectors(&rdy));
+  PetscCall(CreateVectors(rdy));
+
+  RDyLogDebug(rdy, "Creating FV mesh...");
+  // built beside the old one: an adapt reads the old mesh's geometry while the
+  // new one is created, so the old cannot go first
+  RDyMesh new_mesh;
+  PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &new_mesh));
+  if (rdy->mesh.num_cells) PetscCall(RDyMeshDestroy(rdy->mesh));
+  rdy->mesh = new_mesh;
+  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
+  }
+  if (rdy->config.grid.cell_elevation.file[0]) {
+    // the file holds one value per base cell, so once there is a base mesh to
+    // inject from, it is read onto that instead of onto the mesh in hand
+    if (rdy->amr.BaseToCurrentMat1Dof) PetscCall(RDyAMROverrideCellElevationFromBase(rdy));
+    else PetscCall(OverrideCellElevation(rdy));
+  }
+
+  RDyLogDebug(rdy, "Initializing regions...");
+  // the regions are read off the mesh's own "Cell Sets" label, so they are
+  // rebuilt with the mesh -- and everything sized by num_regions with them.
+  // Which regions a rank holds changes when the base mesh is repartitioned.
+  for (PetscInt i = 0; i < rdy->num_regions; ++i) PetscCall(DestroyRegion(&rdy->regions[i]));
+  PetscCall(PetscFree(rdy->regions));
+  rdy->num_regions = 0;
+  PetscCall(InitRegions(rdy));
+
+  RDyLogDebug(rdy, "Initializing initial conditions and sources...");
+  PetscCall(PetscFree(rdy->initial_conditions));
+  PetscCall(InitInitialConditions(rdy));
+  PetscCall(PetscFree(rdy->sources));
+  PetscCall(InitSources(rdy));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// @brief Creates everything built against the mesh and the solution together:
+///        the boundaries and their conditions, the operator, the material
+///        properties and the solver.
+///
+/// Safe to call again; a TS that already exists is carrying the run's clock, so
+/// it is rebuilt around its step number, time and step size.
+PetscErrorCode RDySetupSolverObjects(RDy rdy) {
+  PetscFunctionBegin;
+
+  RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
+  // the conditions are indexed by boundary, so they are rebuilt with them
+  PetscCall(RDyDestroyBoundaries(&rdy));
+  PetscCall(InitBoundaries(rdy));
+  PetscCall(InitBoundaryConditions(rdy));
+
+  RDyLogDebug(rdy, "Initializing operator...");
+  if (rdy->operator) PetscCall(DestroyOperator(&rdy->operator));
+  PetscCall(InitOperator(rdy));
+
+  // the output vars hold non-owning references into the operator's vectors, so
+  // they are rewired whenever it is remade
+  {
+    Operator *op                      = rdy->operator;
+    rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
+    rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
+    rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
+    rdy->prim_vars_output.ceed_accum  = op->ceed.primitive_variables_accum;
+    rdy->src_output.petsc_inst        = op->src_inst;
+    rdy->src_output.petsc_accum       = op->src_accum;
+    rdy->src_output.ceed_inst         = op->ceed.ceed_src_inst;
+    rdy->src_output.ceed_accum        = op->ceed.ceed_src_accum;
+  }
+
+  RDyLogDebug(rdy, "Initializing material properties...");
+  PetscCall(InitMaterialProperties(rdy));
+
+  RDyLogDebug(rdy, "Initializing solver...");
+  PetscReal ts_time = 0.0, ts_dt = 0.0;
+  PetscInt  ts_step = -1;
+  if (rdy->ts) {
+    PetscCall(TSGetTime(rdy->ts, &ts_time));
+    PetscCall(TSGetTimeStep(rdy->ts, &ts_dt));
+    PetscCall(TSGetStepNumber(rdy->ts, &ts_step));
+    PetscCall(TSDestroy(&rdy->ts));
+  }
+  PetscCall(InitSolver(rdy));
+  if (ts_step >= 0) {
+    PetscCall(TSSetStepNumber(rdy->ts, ts_step));
+    PetscCall(TSSetTime(rdy->ts, ts_time));
+    PetscCall(TSSetTimeStep(rdy->ts, ts_dt));
+  }
+
+  // make sure any Dirichlet boundary conditions are properly specified
+  PetscCall(InitDirichletBoundaryConditions(rdy));
+
+  // initialize the source terms
+  PetscCall(InitSourceConditions(rdy));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Performs any setup needed by RDy, reading from the specified configuration
 /// file and overwriting options with command-line arguments.
 /// @param [inout] rdy the RDycore simulator
@@ -1499,73 +1624,17 @@ PetscErrorCode RDySetup(RDy rdy) {
       .field_names          = {"Parameter"},
   };
 
-  PetscCall(CreateAuxiliaryDMs(rdy));
+  PetscCall(RDySetupMeshObjects(rdy));
 
   rdy->amr.dm_base      = rdy->dm;
   rdy->amr.dm_1dof_base = rdy->dm_1dof;
 
-  if (rdy->config.physics.sediment.num_classes) {
-    PetscCall(CreateFlowDM(rdy));
-    PetscCall(CreateTracerDM(rdy));
-  } else {
-    rdy->flow_fields = rdy->soln_fields;
-    rdy->flow_dm     = rdy->dm;
-  }
-
-  // create global and local vectors
-  PetscCall(CreateVectors(rdy));
-
-  RDyLogDebug(rdy, "Creating FV mesh...");
-  PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
-  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
-    PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
-  }
-  if (rdy->config.grid.cell_elevation.file[0]) {
-    PetscCall(OverrideCellElevation(rdy));
-  }
   PetscCall(OutputPartitionStatistics(rdy));
-
-  RDyLogDebug(rdy, "Initializing regions...");
-  PetscCall(InitRegions(rdy));
-
-  RDyLogDebug(rdy, "Initializing initial conditions and sources...");
-  PetscCall(InitInitialConditions(rdy));
-  PetscCall(InitSources(rdy));
-
-  RDyLogDebug(rdy, "Initializing boundaries and boundary conditions...");
-  PetscCall(InitBoundaries(rdy));
-  PetscCall(InitBoundaryConditions(rdy));
 
   RDyLogDebug(rdy, "Initializing solution data...");
   PetscCall(InitSolution(rdy));
 
-  RDyLogDebug(rdy, "Initializing operator...");
-  PetscCall(InitOperator(rdy));
-
-  // Wire OutputVar references to Operator-owned vectors (must happen after InitOperator).
-  {
-    Operator *op                      = rdy->operator;
-    rdy->prim_vars_output.petsc_inst  = op->primitive_variables;
-    rdy->prim_vars_output.petsc_accum = op->primitive_variables_accum;
-    rdy->prim_vars_output.ceed_inst   = op->ceed.primitive_variables;
-    rdy->prim_vars_output.ceed_accum  = op->ceed.primitive_variables_accum;
-    rdy->src_output.petsc_inst        = op->src_inst;
-    rdy->src_output.petsc_accum       = op->src_accum;
-    rdy->src_output.ceed_inst         = op->ceed.ceed_src_inst;
-    rdy->src_output.ceed_accum        = op->ceed.ceed_src_accum;
-  }
-
-  RDyLogDebug(rdy, "Initializing material properties...");
-  PetscCall(InitMaterialProperties(rdy));
-
-  RDyLogDebug(rdy, "Initializing solver...");
-  PetscCall(InitSolver(rdy));
-
-  // make sure any Dirichlet boundary conditions are properly specified
-  PetscCall(InitDirichletBoundaryConditions(rdy));
-
-  // initialize the source terms
-  PetscCall(InitSourceConditions(rdy));
+  PetscCall(RDySetupSolverObjects(rdy));
 
   RDyLogDebug(rdy, "Initializing checkpoints...");
   PetscCall(InitCheckpoints(rdy));
