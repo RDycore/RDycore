@@ -23,8 +23,13 @@
 # run repeats the second; it costs a second and keeps the two modes alike.)
 #
 # Invoked by ctest as:
-#   cmake -DRDYCORE_AMR=... -DYAML=... -DMESH=... -DWORK=... -DMPIEXEC=...
+#   cmake -DRDYCORE_AMR=... -DYAML=... -DMESH=... -DWORK=... -DMPIEXEC=... -DMPIEXEC_FLAGS=...
 #         [-DEXTRA=...] -P amr_same_on_any_ranks.cmake
+
+# PETSc hands us the launcher and its arguments split apart, so put them back
+# together: without the flags a runner that needs --oversubscribe or a Cray srun
+# launches the wrong layout, or not at all.
+separate_arguments(mpiexec_flags UNIX_COMMAND "${MPIEXEC_FLAGS}")
 
 file(REMOVE_RECURSE ${WORK})
 file(MAKE_DIRECTORY ${WORK})
@@ -45,7 +50,7 @@ foreach(i RANGE 2)
   separate_arguments(balance_arg UNIX_COMMAND "${balance_arg}")
 
   execute_process(
-    COMMAND ${MPIEXEC} -n ${np} ${RDYCORE_AMR} ${yaml_name}
+    COMMAND ${MPIEXEC} ${mpiexec_flags} -n ${np} ${RDYCORE_AMR} ${yaml_name}
             -refine_criterion jump -refine_at_start ${extra_args} ${balance_arg}
     WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if (NOT rc EQUAL 0)

@@ -25,8 +25,13 @@
 # between adapts, and that is the object the chain closes on.
 #
 # Invoked by ctest as:
-#   cmake -DRDYCORE_AMR=... -DYAML=... -DMESH_DIR=... -DWORK=... -DMPIEXEC=...
+#   cmake -DRDYCORE_AMR=... -DYAML=... -DMESH_DIR=... -DWORK=... -DMPIEXEC=... -DMPIEXEC_FLAGS=...
 #         -P amr_relaxes_to_base_mesh.cmake
+
+# PETSc hands us the launcher and its arguments split apart, so put them back
+# together: without the flags a runner that needs --oversubscribe or a Cray srun
+# launches the wrong layout, or not at all.
+separate_arguments(mpiexec_flags UNIX_COMMAND "${MPIEXEC_FLAGS}")
 
 file(REMOVE_RECURSE ${WORK})
 file(MAKE_DIRECTORY ${WORK})
@@ -41,7 +46,7 @@ foreach(np 1 3)
   # t = 1.1 s, which leaves the rest of the run to coarsen back; at the 10 m/s
   # the other ramp cases sweep at, the box is still inside the domain at t = 4.
   execute_process(
-    COMMAND ${MPIEXEC} -n ${np} ${RDYCORE_AMR} ${yaml_name}
+    COMMAND ${MPIEXEC} ${mpiexec_flags} -n ${np} ${RDYCORE_AMR} ${yaml_name}
             -dm_plex_gmsh_spacedim 3 -refine_still_water 1.5
             -refine_box -5,5,-1,3 -refine_box_speed 50
             -refine_allow_coarsening -refine_check_volume

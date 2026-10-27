@@ -100,6 +100,7 @@ foreach(mode refine coarsen)
                      -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
                      -DMESH=${MESH_DIR}/channel_100x4_tri.msh
                      -DMPIEXEC=${MPIEXEC}
+                     "-DMPIEXEC_FLAGS=${MPIEXEC_FLAGS}"
                      "-DEXTRA=${${mode}_extra} ${${backend}_ceed}"
                      -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_same_on_any_ranks_${mode}${suffix}
                      -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_same_on_any_ranks.cmake)
@@ -131,6 +132,7 @@ add_test(NAME amr_relaxes_to_base_mesh
                  -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
                  -DMESH_DIR=${MESH_DIR}
                  -DMPIEXEC=${MPIEXEC}
+                 "-DMPIEXEC_FLAGS=${MPIEXEC_FLAGS}"
                  -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_relaxes_to_base_mesh
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_relaxes_to_base_mesh.cmake)
 
@@ -185,6 +187,7 @@ add_test(NAME amr_balance_improves
                  -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/dam_break_amr.yaml
                  -DMESH=${MESH_DIR}/planar_dam_20x10_tri.msh
                  -DMPIEXEC=${MPIEXEC}
+                 "-DMPIEXEC_FLAGS=${MPIEXEC_FLAGS}"
                  -DNP=3
                  -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_balance_improves
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_balance_improves.cmake)
@@ -199,6 +202,7 @@ add_test(NAME amr_lake_at_rest_does_not_refine
                  -DWAVE_YAML=${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
                  -DMESH_DIR=${MESH_DIR}
                  -DMPIEXEC=${MPIEXEC}
+                 "-DMPIEXEC_FLAGS=${MPIEXEC_FLAGS}"
                  -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_lake_at_rest_does_not_refine
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_lake_at_rest_does_not_refine.cmake)
 
@@ -213,6 +217,8 @@ add_test(NAME amr_off_is_bitwise
                  -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/channel_wave_amr.yaml
                  -DMESH=${MESH_DIR}/channel_100x4_tri.msh
                  -DH5DIFF=${H5DIFF}
+                 -DMPIEXEC=${MPIEXEC}
+                 "-DMPIEXEC_FLAGS=${MPIEXEC_FLAGS}"
                  -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_off_is_bitwise
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_off_is_bitwise.cmake)
 endif()

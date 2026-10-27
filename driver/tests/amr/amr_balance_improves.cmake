@@ -21,11 +21,16 @@
 # with it, 1.24, 1.38, 1.23, 1.12 (1792 against the same mean).
 #
 # Invoked by ctest as:
-#   cmake -DRDYCORE_AMR=... -DYAML=... -DMESH=... -DWORK=... -DMPIEXEC=...
+#   cmake -DRDYCORE_AMR=... -DYAML=... -DMESH=... -DWORK=... -DMPIEXEC=... -DMPIEXEC_FLAGS=...
 #         -DNP=... -P amr_balance_improves.cmake
 
 set(BALANCED_MAX 1.5)
 set(UNBALANCED_MIN 2.0)
+
+# PETSc hands us the launcher and its arguments split apart, so put them back
+# together: without the flags a runner that needs --oversubscribe or a Cray srun
+# launches the wrong layout, or not at all.
+separate_arguments(mpiexec_flags UNIX_COMMAND "${MPIEXEC_FLAGS}")
 
 file(REMOVE_RECURSE ${WORK})
 file(MAKE_DIRECTORY ${WORK})
@@ -34,7 +39,7 @@ get_filename_component(yaml_name ${YAML} NAME)
 
 foreach(balance 0 1)
   execute_process(
-    COMMAND ${MPIEXEC} -n ${NP} ${RDYCORE_AMR} ${yaml_name}
+    COMMAND ${MPIEXEC} ${mpiexec_flags} -n ${NP} ${RDYCORE_AMR} ${yaml_name}
             -refine_criterion box -refine_box 0,2,0,1 -refine_allow_coarsening
             -rdy_amr_max_levels 4 -refine_report_balance -rdy_amr_balance ${balance}
     WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)

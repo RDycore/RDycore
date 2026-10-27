@@ -14,6 +14,11 @@
 #   cmake -DRDYCORE=... -DRDYCORE_AMR=... -DYAML=... -DMESH=... -DH5DIFF=...
 #         -DWORK=... -P amr_off_is_bitwise.cmake
 
+# PETSc hands us the launcher and its arguments split apart, so put them back
+# together: without the flags a runner that needs --oversubscribe or a Cray srun
+# launches the wrong layout, or not at all.
+separate_arguments(mpiexec_flags UNIX_COMMAND "${MPIEXEC_FLAGS}")
+
 file(REMOVE_RECURSE ${WORK})
 file(MAKE_DIRECTORY ${WORK})
 file(COPY ${MESH} DESTINATION ${WORK})
@@ -25,13 +30,17 @@ string(REPLACE "output_interval: 50" "output_interval: 2000" config "${config}")
 file(WRITE ${WORK}/plain.yaml "${config}")
 file(WRITE ${WORK}/amr_off.yaml "${config}")
 
-execute_process(COMMAND ${RDYCORE} plain.yaml WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_QUIET)
+# Both runs go through the launcher, and must go through the same one: a
+# platform where even -n 1 has to be launched would otherwise compare a run that
+# started against one that did not.
+execute_process(COMMAND ${MPIEXEC} ${mpiexec_flags} -n 1 ${RDYCORE} plain.yaml
+                WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_QUIET)
 if (NOT rc EQUAL 0)
   message(FATAL_ERROR "the plain driver failed (${rc})")
 endif()
 
 execute_process(
-  COMMAND ${RDYCORE_AMR} amr_off.yaml
+  COMMAND ${MPIEXEC} ${mpiexec_flags} -n 1 ${RDYCORE_AMR} amr_off.yaml
           -refine_criterion jump
           -rdy_amr_refine_vec_tagger_type absolute -rdy_amr_refine_vec_tagger_box 1e30,1e31
           -options_left

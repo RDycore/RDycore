@@ -23,7 +23,12 @@
 #
 # Invoked by ctest as:
 #   cmake -DRDYCORE_AMR=... -DRAMP_YAML=... -DWAVE_YAML=... -DMESH_DIR=...
-#         -DWORK=... -DMPIEXEC=... -P amr_lake_at_rest_does_not_refine.cmake
+#         -DWORK=... -DMPIEXEC=... -DMPIEXEC_FLAGS=... -P amr_lake_at_rest_does_not_refine.cmake
+
+# PETSc hands us the launcher and its arguments split apart, so put them back
+# together: without the flags a runner that needs --oversubscribe or a Cray srun
+# launches the wrong layout, or not at all.
+separate_arguments(mpiexec_flags UNIX_COMMAND "${MPIEXEC_FLAGS}")
 
 file(REMOVE_RECURSE ${WORK})
 file(MAKE_DIRECTORY ${WORK})
@@ -36,7 +41,7 @@ get_filename_component(wave_name ${WAVE_YAML} NAME)
 # -refine_still_water also asserts the water really is at rest, so the gate
 # cannot pass because the lake drained and stopped looking flat.
 execute_process(
-  COMMAND ${MPIEXEC} -n 1 ${RDYCORE_AMR} ${ramp_name}
+  COMMAND ${MPIEXEC} ${mpiexec_flags} -n 1 ${RDYCORE_AMR} ${ramp_name}
           -dm_plex_gmsh_spacedim 3 -refine_still_water 1.5
           -refine_criterion jump -refine_at_start
   WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
@@ -64,7 +69,7 @@ endforeach()
 
 # ---- arm 2: the same criterion must still refine something ----
 execute_process(
-  COMMAND ${MPIEXEC} -n 1 ${RDYCORE_AMR} ${wave_name}
+  COMMAND ${MPIEXEC} ${mpiexec_flags} -n 1 ${RDYCORE_AMR} ${wave_name}
           -refine_criterion jump -refine_at_start -refine_check_volume
   WORKING_DIRECTORY ${WORK} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
 if (NOT rc EQUAL 0)
