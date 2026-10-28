@@ -79,6 +79,7 @@ PETSC_EXTERN PetscErrorCode RDyGetOwnedCellXCentroids(RDy rdy, const PetscInt si
 PETSC_EXTERN PetscErrorCode RDyGetOwnedCellYCentroids(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDyGetOwnedCellZCentroids(RDy rdy, const PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDyGetOwnedCellAreas(RDy rdy, const PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDyGetTotalWaterVolume(RDy rdy, PetscReal *volume);
 PETSC_EXTERN PetscErrorCode RDyGetOwnedCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values);
 
 PETSC_EXTERN PetscErrorCode RDyGetBoundaryEdgeXCentroids(RDy rdy, const PetscInt boundary_index, const PetscInt size, PetscReal *values);

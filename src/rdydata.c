@@ -409,6 +409,28 @@ PetscErrorCode RDyGetOwnedCellAreas(RDy rdy, const PetscInt size, PetscReal *val
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Returns the water the domain holds, sum(h * area) over owned cells, reduced
+/// over every rank. A closed domain's volume moves only by what its sources add
+/// and what crosses its boundaries, which is what makes this worth asserting on.
+/// @param [in]  rdy    the RDycore simulator
+/// @param [out] volume the global water volume (m^3), valid on every rank
+PetscErrorCode RDyGetTotalWaterVolume(RDy rdy, PetscReal *volume) {
+  PetscFunctionBegin;
+
+  PetscInt   n = rdy->mesh.num_owned_cells;
+  PetscReal *h, *area;
+  PetscCall(PetscCalloc2(n, &h, n, &area));
+  PetscCall(RDyMeshGetOwnedCellAreas(&rdy->mesh, n, area));
+  PetscCall(RDyGetOwnedCellHeights(rdy, n, h));
+
+  PetscReal local = 0.0;
+  for (PetscInt c = 0; c < n; ++c) local += h[c] * area[c];
+  PetscCall(PetscFree2(h, area));
+  PetscCallMPI(MPI_Allreduce(&local, volume, 1, MPIU_REAL, MPI_SUM, rdy->comm));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode RDyGetOwnedCellNaturalIDs(RDy rdy, const PetscInt size, PetscInt *values) {
   PetscFunctionBegin;
 
