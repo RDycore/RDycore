@@ -101,14 +101,19 @@ PETSC_EXTERN PetscErrorCode RDySetSalinityDirichletBoundaryValues(RDy rdy, const
 PETSC_EXTERN PetscErrorCode RDySetTemperatureDirichletBoundaryValues(RDy rdy, const PetscInt boundary_index, const PetscInt num_edges,
                                                                      PetscReal *values);
 
-PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscInt size, PetscReal *values);
-PETSC_EXTERN PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_idx, PetscInt class_idx, PetscInt size, PetscReal *values);
+// These take a region's ID -- the cell-set tag the grid gives it, which is
+// what a config file's grid_region_id names -- and not an index into the
+// regions a rank happens to hold. The two are different numbers: the index
+// depends on the order the mesh's labels come back in and on the partition.
+// RDySetRegionalManningsN below is the exception, and takes an index.
+PETSC_EXTERN PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values);
+PETSC_EXTERN PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_id, PetscInt class_idx, PetscInt size, PetscReal *values);
 
-PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_idx, PetscReal value);
-PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalXMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);
-PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalYMomentumSource(RDy rdy, const PetscInt region_idx, PetscReal value);
+PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscReal value);
+PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalXMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value);
+PETSC_EXTERN PetscErrorCode RDySetHomogeneousRegionalYMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value);
 
 PETSC_EXTERN PetscErrorCode RDySetDomainWaterSource(RDy rdy, PetscInt size, PetscReal *values);
 PETSC_EXTERN PetscErrorCode RDySetDomainXMomentumSource(RDy rdy, PetscInt size, PetscReal *values);

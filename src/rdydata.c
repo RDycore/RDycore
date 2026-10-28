@@ -247,7 +247,7 @@ static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external water source term on the region with the given index to
+/// Sets the external water source term on the region with the given ID to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
 PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
@@ -256,7 +256,7 @@ PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_id, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external x-momentum term on the region with the given index to
+/// Sets the external x-momentum term on the region with the given ID to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
 PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
@@ -265,7 +265,7 @@ PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_id, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external y-momentum term on the region with the given index to
+/// Sets the external y-momentum term on the region with the given ID to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
 PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
@@ -300,7 +300,7 @@ static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external water source term on the region with the given index to
+/// Sets the external water source term on the region with the given ID to
 /// the single (homogeneous) value.
 PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
@@ -308,7 +308,7 @@ PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt regi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external x-momentum source term on the region with the given index
+/// Sets the external x-momentum source term on the region with the given ID
 /// to the single (homogeneous) value.
 PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
@@ -316,7 +316,7 @@ PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_i
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external y-momentum source term on the region with the given index
+/// Sets the external y-momentum source term on the region with the given ID
 /// to the single (homogeneous) value.
 PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
