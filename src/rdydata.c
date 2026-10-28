@@ -205,6 +205,23 @@ PetscErrorCode RDyGetOwnedCellYMomenta(RDy rdy, const PetscInt size, PetscReal *
 }
 
 // given a region ID, find its index in the array storing information about regions
+/// @brief Fails if no region in the configuration carries this ID.
+///
+/// A rank holds only some of the domain's regions, so the lookup below is
+/// allowed to come back empty and the caller skips. An ID that no region
+/// anywhere declares is a different thing: it means the caller passed
+/// something that is not a region ID at all, and used to be indistinguishable
+/// from "not on this rank" -- silence, and no source term.
+static PetscErrorCode CheckRegionIDIsDeclared(RDy rdy, PetscInt region_id) {
+  PetscFunctionBegin;
+  for (PetscInt r = 0; r < rdy->config.num_regions; ++r) {
+    if (rdy->config.regions[r].grid_region_id == region_id) PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  SETERRQ(rdy->comm, PETSC_ERR_ARG_OUTOFRANGE,
+          "No region has ID %" PetscInt_FMT ". Regional sources are addressed by a region's grid_region_id, not by its position in any list.",
+          region_id);
+}
+
 static PetscErrorCode GetRegionIndexFromID(RDy rdy, PetscInt region_id, PetscInt *region_idx) {
   PetscFunctionBegin;
 
@@ -225,6 +242,7 @@ static PetscErrorCode GetRegionIndexFromID(RDy rdy, PetscInt region_id, PetscInt
 static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_id, PetscInt component, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
 
+  PetscCall(CheckRegionIDIsDeclared(rdy, region_id));
   PetscInt region_idx;
   PetscCall(GetRegionIndexFromID(rdy, region_id, &region_idx));
 
@@ -282,6 +300,8 @@ PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_id, P
 
 static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const PetscInt region_id, PetscInt component, PetscReal value) {
   PetscFunctionBegin;
+  PetscCall(CheckRegionIDIsDeclared(rdy, region_id));
+
   PetscInt region_idx;
   PetscCall(GetRegionIndexFromID(rdy, region_id, &region_idx));
 
