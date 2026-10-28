@@ -164,34 +164,6 @@ static PetscErrorCode MarkOwnedCellsForRefinementBasedOnDataset(RDy rdy, Vec glo
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Reports the water volume the mesh holds, sum(h * area) over owned
-///        cells. Refinement and the interpolation that follows it should not
-///        change this: comparing the value across an adapt is the conservation
-///        check for the AMR path.
-/// @param [in] rdy    the dycore
-/// @param [out] total the global water volume (m^3), valid on every rank
-static PetscErrorCode ComputeWaterVolume(RDy rdy, PetscReal *total) {
-  PetscFunctionBegin;
-
-  PetscInt ncells_local;
-  PetscCall(RDyGetNumOwnedCells(rdy, &ncells_local));
-
-  PetscReal *h, *area;
-  PetscCall(PetscCalloc1(ncells_local, &h));
-  PetscCall(PetscCalloc1(ncells_local, &area));
-  PetscCall(RDyGetOwnedCellHeights(rdy, ncells_local, h));
-  PetscCall(RDyGetOwnedCellAreas(rdy, ncells_local, area));
-
-  PetscReal local = 0.0;
-  for (PetscInt icell = 0; icell < ncells_local; icell++) local += h[icell] * area[icell];
-  PetscCallMPI(MPI_Allreduce(&local, total, 1, MPIU_REAL, MPI_SUM, PETSC_COMM_WORLD));
-
-  PetscCall(PetscFree(h));
-  PetscCall(PetscFree(area));
-
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
 /// @brief Reports, and fails on, the deepest any owned cell has been refined
 ///        below the base cell it descends from. A bisection halves a cell
 ///        exactly, so a cell `level` below its base cell has 2^-level of its
@@ -530,7 +502,7 @@ int main(int argc, char *argv[]) {
       }
 
       PetscReal volume_before = 0.0, volume_after = 0.0;
-      if (check_volume) PetscCall(ComputeWaterVolume(rdy, &volume_before));
+      if (check_volume) PetscCall(RDyGetTotalWaterVolume(rdy, &volume_before));
 
       PetscReal departure_before = 0.0, departure_after = 0.0;
       if (check_still_water) PetscCall(StillWaterDeparture(rdy, still_water, &departure_before));
@@ -564,7 +536,7 @@ int main(int argc, char *argv[]) {
       if (check_max_level) PetscCall(CheckRefinementLimit(rdy, max_levels));
 
       if (check_volume) {
-        PetscCall(ComputeWaterVolume(rdy, &volume_after));
+        PetscCall(RDyGetTotalWaterVolume(rdy, &volume_after));
         PetscReal rel = (volume_before != 0.0) ? PetscAbsReal(volume_after - volume_before) / volume_before : 0.0;
         if (!myrank) printf("AMR: water volume %.15g -> %.15g m^3, relative change %.3e\n", (double)volume_before, (double)volume_after, (double)rel);
         PetscCheck(volume_before > 0.0, comm, PETSC_ERR_NOT_CONVERGED,
@@ -582,7 +554,7 @@ int main(int argc, char *argv[]) {
     // figure be required of every rank count.
     if (check_expected_volume) {
       PetscReal volume;
-      PetscCall(ComputeWaterVolume(rdy, &volume));
+      PetscCall(RDyGetTotalWaterVolume(rdy, &volume));
       PetscReal rel = PetscAbsReal(volume - expected_volume) / expected_volume;
       if (!myrank) printf("AMR: water volume %.15g m^3 at the end, expected %.15g\n", (double)volume, (double)expected_volume);
       PetscCheck(rel <= expected_volume_tol, comm, PETSC_ERR_NOT_CONVERGED, "the run ended holding %g m^3 against the %g it should: %g > %g relative",
