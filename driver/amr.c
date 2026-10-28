@@ -21,6 +21,9 @@ static const char *help_str =
     "  -refine_check_volume_tol <t>  that tolerance\n"
     "  -refine_report_balance        report max/mean owned cells over the ranks\n"
     "                                on either side of every adapt\n"
+    "  -refine_expect_water_volume <v>  fail unless the run ends holding v m^3,\n"
+    "                                within -refine_expect_water_volume_tol\n"
+    "                                (default 1e-9) relative\n"
     "  -rdy_amr_balance 0            do not repartition the base mesh at each\n"
     "                                rebuild (on by default, and only a rebuild,\n"
     "                                so -refine_allow_coarsening, can balance)\n"
@@ -413,6 +416,12 @@ int main(int argc, char *argv[]) {
     PetscBool check_still_water = PETSC_FALSE;
     PetscBool check_max_level   = PETSC_FALSE;
     PetscBool report_balance    = PETSC_FALSE;
+    // the water a closed domain ends up holding is its initial water plus what
+    // its regional sources add, which a case can work out on paper -- so the
+    // same figure can be required of every rank count
+    PetscReal expected_volume       = 0.0;
+    PetscReal expected_volume_tol   = 1e-9;
+    PetscBool check_expected_volume = PETSC_FALSE;
     PetscOptionsBegin(comm, NULL, "AMR driver options", "");
     {
       PetscCall(PetscOptionsString("-refine_criterion", "Refinement criterion (box or jump)", "", criterion, criterion, sizeof(criterion), NULL));
@@ -434,6 +443,10 @@ int main(int argc, char *argv[]) {
                                  check_max_level, &check_max_level, NULL));
       PetscCall(PetscOptionsBool("-refine_report_balance", "Report max and mean owned cells across ranks before and after every adapt", "",
                                  report_balance, &report_balance, NULL));
+      PetscCall(PetscOptionsReal("-refine_expect_water_volume", "Water volume (m^3) the run must end holding", "", expected_volume, &expected_volume,
+                                 &check_expected_volume));
+      PetscCall(PetscOptionsReal("-refine_expect_water_volume_tol", "Relative tolerance for the final water volume", "", expected_volume_tol,
+                                 &expected_volume_tol, NULL));
     }
     PetscOptionsEnd();
     PetscCheck(!box_set || nbox == 4, comm, PETSC_ERR_USER, "-refine_box takes four values x0,x1,y0,y1, got %" PetscInt_FMT, nbox);
@@ -561,6 +574,19 @@ int main(int argc, char *argv[]) {
       }
 
       PetscCall(RDyAdvance(rdy));
+    }
+
+    // What the domain should be holding when the run ends, on a closed domain
+    // whose only inflow is its regional sources. Asserting a number the case
+    // derives on paper, rather than comparing two runs, is what lets the same
+    // figure be required of every rank count.
+    if (check_expected_volume) {
+      PetscReal volume;
+      PetscCall(ComputeWaterVolume(rdy, &volume));
+      PetscReal rel = PetscAbsReal(volume - expected_volume) / expected_volume;
+      if (!myrank) printf("AMR: water volume %.15g m^3 at the end, expected %.15g\n", (double)volume, (double)expected_volume);
+      PetscCheck(rel <= expected_volume_tol, comm, PETSC_ERR_NOT_CONVERGED, "the run ended holding %g m^3 against the %g it should: %g > %g relative",
+                 (double)volume, (double)expected_volume, (double)rel, (double)expected_volume_tol);
     }
 
     PetscCall(RDyDestroy(&rdy));

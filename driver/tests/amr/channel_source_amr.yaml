@@ -1,0 +1,106 @@
+# The channel dam break again, on a mesh whose third cell set is four cells.
+#
+# Everything indexed by region -- the runoff sources here, the initial
+# conditions, the per-region material -- is allocated once, sized by the number
+# of regions the rank holds. Every other mesh in this directory has cell sets
+# spanning the whole domain, so every rank holds part of each and that number
+# never moves. This one has a region small enough to sit inside one rank's
+# share: measured on three ranks, rank 1 holds two regions at setup and three
+# after the first adapt, because the load balance hands it the patch.
+#
+# The source is on the patch alone, so the water it adds is proportional to
+# four cells' area. A source read through a stale per-region array lands on a
+# different region -- 396 or 400 cells -- and the volume moves by orders of
+# magnitude, which is what the gate watches.
+physics:
+  flow:
+    mode: swe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: detail
+
+time:
+  stop: 4
+  unit: seconds
+  time_step: 0.002
+  coupling_interval: 0.5
+
+output:
+  format: xdmf
+  output_interval: 50
+
+grid:
+  file: patch_100x4_tri.msh
+
+regions:
+  - name: left
+    grid_region_id: 1
+  - name: right
+    grid_region_id: 2
+  - name: patch
+    grid_region_id: 3
+
+surface_composition:
+  - region: left
+    material: frictionless
+  - region: right
+    material: frictionless
+  - region: patch
+    material: frictionless
+
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: left
+    flow: deep_ic
+  - region: right
+    flow: shallow_ic
+  - region: patch
+    flow: deep_ic
+
+# runoff on the patch only; the other two regions carry an explicit zero so
+# that a source landing on one of them by mistake is a change, not a no-op
+sources:
+  - region: left
+    flow: no_runoff
+  - region: right
+    flow: no_runoff
+  - region: patch
+    flow: patch_runoff
+
+boundaries:
+  - name: boundary
+    grid_boundary_id: 1
+
+boundary_conditions:
+  - boundaries: [boundary]
+    flow: reflecting_bc
+
+flow_conditions:
+  - name: deep_ic
+    type: dirichlet
+    height: 2
+    x_momentum: 0
+    y_momentum: 0
+  - name: shallow_ic
+    type: dirichlet
+    height: 1
+    x_momentum: 0
+    y_momentum: 0
+  - name: reflecting_bc
+    type: reflecting
+  - name: patch_runoff
+    type: runoff
+    value: 0.01
+  - name: no_runoff
+    type: runoff
+    value: 0.0

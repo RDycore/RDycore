@@ -40,6 +40,8 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/still_water_ramp.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/still_water_dem.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/graded_wave_amr.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/channel_source_amr.yaml
+     ${MESH_DIR}/patch_100x4_tri.msh
      ${MESH_DIR}/channel_100x4_tri.msh
      ${MESH_DIR}/planar_dam_20x10_tri.msh
      ${MESH_DIR}/ramp_100x4_tri.msh
@@ -222,3 +224,22 @@ add_test(NAME amr_off_is_bitwise
                  -DWORK=${CMAKE_CURRENT_BINARY_DIR}/amr_off_is_bitwise
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/amr_off_is_bitwise.cmake)
 endif()
+
+# Gate: a source declared on a region survives an adapt that moves that region
+# to another rank. Every other mesh here has cell sets spanning the domain, so
+# every rank holds part of each and the number of regions a rank sees never
+# moves; state indexed by region was therefore never exercised across a
+# repartition. patch_100x4_tri.msh has a region of four cells: on three ranks,
+# rank 1 holds two regions at setup and three after the first adapt.
+#
+# The expected volume is worked out from the case, not recorded from a run:
+# 800 cells over 50 m x 2 m is 0.125 m^2 each, so the domain starts with
+# 49.5 m^2 x 2 m + 50 m^2 x 1 m + 0.5 m^2 x 2 m = 150 m^3, the walls are
+# reflecting, and the only inflow is 0.01 m/s over the patch's 0.5 m^2 for
+# 4 s. Requiring the same figure on one rank and on three is what makes this
+# a statement about the region and not about the partition.
+foreach(np 1 3)
+  add_test(amr_source_follows_its_region_c_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${amr_c_driver} channel_source_amr.yaml -options_left
+           ${amr_jump_args} -refine_allow_coarsening -refine_check_volume
+           -refine_expect_water_volume 150.02)
+endforeach()

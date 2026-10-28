@@ -67,10 +67,16 @@ DAM_WX = 2.0  # dam thickness in x
 DAM_LTOP = 1.0  # dam length from the top wall
 DAM_LBOT = 2.0  # dam length from the bottom wall
 
+# patch: a box small enough to sit inside one rank's share of the base mesh.
+# Placed where the rank boundary sweeps past it as the wave refines, so that a
+# rank which did not hold the region at setup holds it after an adapt.
+PATCH_BOX = (24.0, 25.0, 0.0, 0.6)
+
 PHYSICAL_NAMES = {
     "channel": [(2, 1, "left"), (2, 2, "right"), (1, 1, "boundary")],
     "ramp": [(2, 1, "left"), (2, 2, "right"), (1, 1, "boundary")],
     "graded": [(2, 1, "left"), (2, 2, "right"), (1, 1, "boundary")],
+    "patch": [(2, 1, "left"), (2, 2, "right"), (2, 3, "patch"), (1, 1, "boundary")],
     "dam": [(2, 1, "upstream"), (2, 2, "downstream"), (1, 1, "boundary"), (1, 2, "top_wall"), (1, 3, "bottom_wall")],
 }
 
@@ -167,7 +173,26 @@ class Dam:
                 raise SystemExit(f"{nx} cells along x does not resolve the {what}; try a multiple of 10")
 
 
-SHAPES = {"channel": Channel, "ramp": Ramp, "graded": Graded, "dam": Dam}
+class Patch(Channel):
+    """The channel again, with a third cell set on a handful of cells.
+
+    Every other mesh here has cell sets spanning the whole domain, so every
+    rank holds part of each and the number of regions a rank sees never moves.
+    That is what kept state indexed by region from ever being exercised across
+    a repartition. A region small enough to sit inside one rank's share does
+    exercise it: measured on three ranks, rank 1 holds two regions at setup and
+    three after the first adapt, because the load balance hands it the patch.
+    """
+
+    @staticmethod
+    def cell_set(xc, yc):
+        x0, x1, y0, y1 = PATCH_BOX
+        if x0 <= xc <= x1 and y0 <= yc <= y1:
+            return 3
+        return 1 if xc < 0.5 * CHANNEL_L else 2
+
+
+SHAPES = {"channel": Channel, "ramp": Ramp, "graded": Graded, "patch": Patch, "dam": Dam}
 
 
 def generate(shape, nx):
