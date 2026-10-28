@@ -1263,7 +1263,9 @@ PetscErrorCode InitSourceConditions(RDy rdy) {
 
       RDyFlowCondition *flow_src = src.flow;
       if (flow_src) {
-        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, r, mupEval(flow_src->value)));
+        // by the region's ID, which is what the setter looks up: r is this
+        // rank's index for the region, and the two are not the same number
+        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, rdy->regions[r].id, mupEval(flow_src->value)));
       }
     }
   }

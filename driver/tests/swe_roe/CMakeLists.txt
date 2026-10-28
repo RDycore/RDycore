@@ -263,3 +263,16 @@ foreach(np 2)
     endforeach()
   endforeach()
 endforeach()
+
+# Gate: a regional source puts its water in the region that declares it. See
+# the script for what the two callers used to pass and what it cost.
+add_test(NAME regional_source_lands_on_its_region
+         COMMAND ${CMAKE_COMMAND}
+                 -DRDYCORE=$<TARGET_FILE:rdycore_exe>
+                 -DYAML=${CMAKE_CURRENT_SOURCE_DIR}/regional_source.yaml
+                 -DMESH=${MESH_DIR}/planar_dam_10x5.msh
+                 -DNP=1
+                 -DMPIEXEC=${MPIEXEC}
+                 "-DMPIEXEC_FLAGS=${MPIEXEC_FLAGS}"
+                 -DWORK=${CMAKE_CURRENT_BINARY_DIR}/regional_source_lands_on_its_region
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/regional_source_lands_on_its_region.cmake)

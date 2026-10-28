@@ -3,7 +3,10 @@
 
 static const char *help_str =
     "rdycore - a standalone driver for RDycore\n"
-    "usage: rdycore [options] <filename>\n";
+    "usage: rdycore [options] <filename>\n"
+    "\n"
+    "  -report_water_volume   print sum(h * area) over the domain after every\n"
+    "                         coupling interval\n";
 
 static void usage(const char *exe_name) {
   fprintf(stderr, "%s: usage:\n", exe_name);
@@ -35,6 +38,12 @@ int main(int argc, char *argv[]) {
 
     PetscInt n;
     PetscCall(RDyGetNumOwnedCells(rdy, &n));
+
+    // the water a region's source adds is proportional to that region's area,
+    // so this is what tells apart a source applied to the region that declares
+    // it from one applied to a region of a different size
+    PetscBool report_water_volume = PETSC_FALSE;
+    PetscCall(PetscOptionsGetBool(NULL, NULL, "-report_water_volume", &report_water_volume, NULL));
 
     // allocate arrays for inspecting simulation data
     PetscReal *h, *hu, *hv;
@@ -82,6 +91,12 @@ int main(int argc, char *argv[]) {
       PetscCall(RDyGetOwnedCellHeights(rdy, n, h));
       PetscCall(RDyGetOwnedCellXMomenta(rdy, n, hu));
       PetscCall(RDyGetOwnedCellYMomenta(rdy, n, hv));
+
+      if (report_water_volume) {
+        PetscReal volume;
+        PetscCall(RDyGetTotalWaterVolume(rdy, &volume));
+        PetscCall(PetscPrintf(comm, "water volume %.15g m^3 at t = %g\n", (double)volume, (double)time));
+      }
     }
 
     // clean up

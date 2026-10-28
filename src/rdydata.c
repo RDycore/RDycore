@@ -205,6 +205,23 @@ PetscErrorCode RDyGetOwnedCellYMomenta(RDy rdy, const PetscInt size, PetscReal *
 }
 
 // given a region ID, find its index in the array storing information about regions
+/// @brief Fails if no region in the configuration carries this ID.
+///
+/// A rank holds only some of the domain's regions, so the lookup below is
+/// allowed to come back empty and the caller skips. An ID that no region
+/// anywhere declares is a different thing: it means the caller passed
+/// something that is not a region ID at all, and used to be indistinguishable
+/// from "not on this rank" -- silence, and no source term.
+static PetscErrorCode CheckRegionIDIsDeclared(RDy rdy, PetscInt region_id) {
+  PetscFunctionBegin;
+  for (PetscInt r = 0; r < rdy->config.num_regions; ++r) {
+    if (rdy->config.regions[r].grid_region_id == region_id) PetscFunctionReturn(PETSC_SUCCESS);
+  }
+  SETERRQ(rdy->comm, PETSC_ERR_ARG_OUTOFRANGE,
+          "No region has ID %" PetscInt_FMT ". Regional sources are addressed by a region's grid_region_id, not by its position in any list.",
+          region_id);
+}
+
 static PetscErrorCode GetRegionIndexFromID(RDy rdy, PetscInt region_id, PetscInt *region_idx) {
   PetscFunctionBegin;
 
@@ -225,6 +242,7 @@ static PetscErrorCode GetRegionIndexFromID(RDy rdy, PetscInt region_id, PetscInt
 static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_id, PetscInt component, PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
 
+  PetscCall(CheckRegionIDIsDeclared(rdy, region_id));
   PetscInt region_idx;
   PetscCall(GetRegionIndexFromID(rdy, region_id, &region_idx));
 
@@ -247,7 +265,7 @@ static PetscErrorCode SetRegionalSourceComponent(RDy rdy, const PetscInt region_
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external water source term on the region with the given index to
+/// Sets the external water source term on the region with the given ID to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
 PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
@@ -256,7 +274,7 @@ PetscErrorCode RDySetRegionalWaterSource(RDy rdy, const PetscInt region_id, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external x-momentum term on the region with the given index to
+/// Sets the external x-momentum term on the region with the given ID to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
 PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
@@ -265,7 +283,7 @@ PetscErrorCode RDySetRegionalXMomentumSource(RDy rdy, const PetscInt region_id, 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external y-momentum term on the region with the given index to
+/// Sets the external y-momentum term on the region with the given ID to
 /// the values in the given array (whose length is equal to the number of owned
 /// cells in that region).
 PetscErrorCode RDySetRegionalYMomentumSource(RDy rdy, const PetscInt region_id, PetscInt size, PetscReal *values) {
@@ -282,6 +300,8 @@ PetscErrorCode RDySetRegionalSedimentSource(RDy rdy, const PetscInt region_id, P
 
 static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const PetscInt region_id, PetscInt component, PetscReal value) {
   PetscFunctionBegin;
+  PetscCall(CheckRegionIDIsDeclared(rdy, region_id));
+
   PetscInt region_idx;
   PetscCall(GetRegionIndexFromID(rdy, region_id, &region_idx));
 
@@ -300,7 +320,7 @@ static PetscErrorCode SetHomogeneousRegionalSourceComponent(RDy rdy, const Petsc
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external water source term on the region with the given index to
+/// Sets the external water source term on the region with the given ID to
 /// the single (homogeneous) value.
 PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
@@ -308,17 +328,17 @@ PetscErrorCode RDySetHomogeneousRegionalWaterSource(RDy rdy, const PetscInt regi
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external x-momentum source term on the region with the given index
+/// Sets the external x-momentum source term on the region with the given ID
 /// to the single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousXMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
+PetscErrorCode RDySetHomogeneousRegionalXMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
   PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_id, 1, value));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Sets the external y-momentum source term on the region with the given index
+/// Sets the external y-momentum source term on the region with the given ID
 /// to the single (homogeneous) value.
-PetscErrorCode RDySetHomogeneousYMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
+PetscErrorCode RDySetHomogeneousRegionalYMomentumSource(RDy rdy, const PetscInt region_id, PetscReal value) {
   PetscFunctionBegin;
   PetscCall(SetHomogeneousRegionalSourceComponent(rdy, region_id, 2, value));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -386,6 +406,28 @@ PetscErrorCode RDyGetOwnedCellZCentroids(RDy rdy, const PetscInt size, PetscReal
 PetscErrorCode RDyGetOwnedCellAreas(RDy rdy, const PetscInt size, PetscReal *values) {
   PetscFunctionBegin;
   PetscCall(RDyMeshGetOwnedCellAreas(&rdy->mesh, size, values));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Returns the water the domain holds, sum(h * area) over owned cells, reduced
+/// over every rank. A closed domain's volume moves only by what its sources add
+/// and what crosses its boundaries, which is what makes this worth asserting on.
+/// @param [in]  rdy    the RDycore simulator
+/// @param [out] volume the global water volume (m^3), valid on every rank
+PetscErrorCode RDyGetTotalWaterVolume(RDy rdy, PetscReal *volume) {
+  PetscFunctionBegin;
+
+  PetscInt   n = rdy->mesh.num_owned_cells;
+  PetscReal *h, *area;
+  PetscCall(PetscCalloc2(n, &h, n, &area));
+  PetscCall(RDyMeshGetOwnedCellAreas(&rdy->mesh, n, area));
+  PetscCall(RDyGetOwnedCellHeights(rdy, n, h));
+
+  PetscReal local = 0.0;
+  for (PetscInt c = 0; c < n; ++c) local += h[c] * area[c];
+  PetscCall(PetscFree2(h, area));
+  PetscCallMPI(MPI_Allreduce(&local, volume, 1, MPIU_REAL, MPI_SUM, rdy->comm));
+
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

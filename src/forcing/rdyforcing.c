@@ -721,7 +721,7 @@ PetscErrorCode RDyApplyForcing(RDy rdy, RDyForcing forcing, PetscReal time) {
         PetscInt  size = 1;
         PetscReal data;
         PetscCall(RDyForcingSetHomogeneousData(&forcing->source.multihomogeneous.data[idata], time, size, &data));
-        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, forcing->source.multihomogeneous.region_ids[idata] - 1, data));
+        PetscCall(RDySetHomogeneousRegionalWaterSource(rdy, forcing->source.multihomogeneous.region_ids[idata], data));
       }
       break;
   }
