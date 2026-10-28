@@ -208,7 +208,7 @@ static PetscErrorCode CreateOperatorSubOperators(Operator *op) {
         PetscCall(CreatePetscSourceOperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
         break;
       case WELL_BALANCING_HR:
-        PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+        PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, comm, op->num_boundaries, op->boundaries, op->boundary_conditions,
                                             op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
                                             &op->petsc.flux));
         PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
@@ -356,6 +356,17 @@ PetscErrorCode CreateOperator(RDyConfig *config, DM domain_dm, RDyMesh *domain_m
   PetscBool use_slope_reconstruction = config->numerics.second_order;
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-second_order", &use_slope_reconstruction, NULL));
   config->numerics.second_order = use_slope_reconstruction;
+  // MUSCL reconstruction with forward Euler is linearly unstable: the growth rate
+  // scales with CFL, so it can look fine on a coarse mesh and then blow up on
+  // refinement. Warn rather than fail, since existing configs rely on the default.
+  PetscBool hr_muscl_on = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-hr_muscl", &hr_muscl_on, NULL));
+  if ((use_slope_reconstruction || hr_muscl_on) && config->numerics.temporal == TEMPORAL_EULER) {
+    PetscCall(PetscPrintf(comm,
+                          "WARNING: second-order reconstruction with 'temporal: euler' is linearly unstable; "
+                          "use 'temporal: rk4' (or another SSP integrator) for a stable MUSCL scheme\n"));
+  }
+
   if (use_slope_reconstruction) {
     PetscBool has_tracers = (config->physics.sediment.num_classes > 0 || config->physics.salinity || config->physics.heat);
     PetscCheck(!has_tracers, comm, PETSC_ERR_USER,

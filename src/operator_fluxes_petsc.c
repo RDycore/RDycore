@@ -56,7 +56,7 @@ PetscErrorCode CreatePetscFluxOperator(RDyConfig *config, RDyMesh *mesh, MPI_Com
 /// Interior edges use HR reconstruction + pressure correction; boundary edges
 /// reuse the standard boundary flux operator (HR is a no-op on boundaries since
 /// zc_L == zc_R for boundary cells).
-PetscErrorCode CreatePetscFluxHROperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
+PetscErrorCode CreatePetscFluxHROperator(RDyConfig *config, RDyMesh *mesh, MPI_Comm comm, PetscInt num_boundaries, RDyBoundary *boundaries,
                                          RDyCondition *boundary_conditions, Vec *boundary_values, Vec *boundary_fluxes, Vec *boundary_fluxes_accum,
                                          OperatorDiagnostics *diagnostics, PetscOperator *flux_op) {
   PetscFunctionBegin;
@@ -67,10 +67,19 @@ PetscErrorCode CreatePetscFluxHROperator(RDyConfig *config, RDyMesh *mesh, Petsc
     PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
   }
 
+  // Opt-in second-order MUSCL reconstruction on top of HR (well-balanced,
+  // positivity-preserving). Activated by the -hr_muscl flag; PETSc/CPU only.
+  PetscBool hr_muscl = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-hr_muscl", &hr_muscl, NULL));
+
   // flux suboperator 0: HR interior fluxes
   PetscOperator interior_flux_op;
   if (config->physics.sediment.num_classes > 0) {
+    PetscCheck(!hr_muscl, comm, PETSC_ERR_SUP, "-hr_muscl is not supported with sediment transport");
     PetscCall(CreatePetscTracerInteriorFluxHROperator(mesh, *config, diagnostics, &interior_flux_op));
+  } else if (hr_muscl) {
+    PetscCheck(!CeedEnabled(), comm, PETSC_ERR_SUP, "-hr_muscl is only supported on the PETSc/CPU backend");
+    PetscCall(CreatePetscSWEInteriorFluxHR2ROperator(mesh, comm, *config, diagnostics, &interior_flux_op));
   } else {
     PetscCall(CreatePetscSWEInteriorFluxHROperator(mesh, *config, diagnostics, &interior_flux_op));
   }

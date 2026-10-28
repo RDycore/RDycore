@@ -919,20 +919,49 @@ PetscErrorCode PrecomputeLSGradCoeffs(MPI_Comm comm, RDyMesh *mesh, PetscReal *l
   PetscReal *inv_m;
   PetscCall(PetscCalloc1(num_cells * 4, &inv_m));
 
-  PetscInt degenerate_count = 0;
+  // The stencil quality that matters is the CONDITION NUMBER of M, not |det|.
+  // |det| is dimensional (~length^2), so an absolute 1e-15 threshold is mesh-scale
+  // dependent and essentially never fires: measured on the meshes where the
+  // second-order schemes blow up it flags 2 cells while the median kappa is 29-58,
+  // and those cells pass through producing unbounded transverse gradients. Cap kappa
+  // instead, by Tikhonov-shifting both eigenvalues -- this preserves the
+  // well-determined direction and damps only the unreliable one, where zeroing threw
+  // away both (and only for cells that were already hopeless).
+  PetscReal kappa_max = 10.0;
+  PetscCall(PetscOptionsGetReal(NULL, NULL, "-ls_grad_kappa_max", &kappa_max, NULL));
+  if (kappa_max < 1.0) kappa_max = 1.0;
+
+  PetscInt degenerate_count = 0, regularized_count = 0;
   for (PetscInt c = 0; c < num_cells; c++) {
     PetscReal m00 = M[c * 3 + 0];
     PetscReal m01 = M[c * 3 + 1];
     PetscReal m11 = M[c * 3 + 2];
-    PetscReal det = m00 * m11 - m01 * m01;
-    if (PetscAbsReal(det) < 1e-15) {
-      // Degenerate (e.g. 1-D cell or isolated cell) - zero gradient
+
+    // symmetric 2x2 eigenvalues
+    PetscReal half_tr = 0.5 * (m00 + m11);
+    PetscReal half_df = 0.5 * (m00 - m11);
+    PetscReal radius  = PetscSqrtReal(half_df * half_df + m01 * m01);
+    PetscReal lmax    = half_tr + radius;
+    PetscReal lmin    = half_tr - radius;
+
+    if (lmax <= 0.0) {
+      // no usable stencil at all (isolated cell) - zero gradient
       degenerate_count++;
       inv_m[c * 4 + 0] = 0.0;
       inv_m[c * 4 + 1] = 0.0;
       inv_m[c * 4 + 2] = 0.0;
       inv_m[c * 4 + 3] = 0.0;
-    } else {
+      continue;
+    }
+    PetscReal lfloor = lmax / kappa_max;
+    if (lmin < lfloor) {
+      PetscReal shift = lfloor - lmin;  // shifts BOTH eigenvalues, so kappa -> kappa_max
+      m00 += shift;
+      m11 += shift;
+      regularized_count++;
+    }
+    PetscReal det = m00 * m11 - m01 * m01;
+    {
       PetscReal inv_det = 1.0 / det;
       inv_m[c * 4 + 0]  = m11 * inv_det;   // [0,0]
       inv_m[c * 4 + 1]  = -m01 * inv_det;  // [0,1]
@@ -941,11 +970,16 @@ PetscErrorCode PrecomputeLSGradCoeffs(MPI_Comm comm, RDyMesh *mesh, PetscReal *l
     }
   }
 
-  PetscInt global_degenerate_count;
+  PetscInt global_degenerate_count, global_regularized_count;
   MPI_Allreduce(&degenerate_count, &global_degenerate_count, 1, MPIU_INT, MPI_SUM, comm);
+  MPI_Allreduce(&regularized_count, &global_regularized_count, 1, MPIU_INT, MPI_SUM, comm);
   if (global_degenerate_count > 0) {
-    PetscCall(PetscPrintf(comm, "WARNING [PrecomputeLSGradCoeffs]: %" PetscInt_FMT " degenerate cells (det~0) — gradients zeroed\n",
+    PetscCall(PetscPrintf(comm, "WARNING [PrecomputeLSGradCoeffs]: %" PetscInt_FMT " cells with no usable stencil — gradients zeroed\n",
                           global_degenerate_count));
+  }
+  if (global_regularized_count > 0) {
+    PetscCall(PetscPrintf(comm, "INFO [PrecomputeLSGradCoeffs]: %" PetscInt_FMT " cells regularized to kappa <= %g (poorly shaped stencils)\n",
+                          global_regularized_count, (double)kappa_max));
   }
 
   // M is no longer needed once inv_m is computed; free it now so it is not

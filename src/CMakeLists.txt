@@ -20,6 +20,7 @@ set(RDYCORE_C_SOURCE_FILES
   petsc_operator.c
   swe/swe_ceed.c
   swe/swe_petsc.c
+  swe/swe_hr_muscl_petsc.c
   tracer/tracer_ceed.c
   tracer/tracer_petsc.c
   forcing/rdyforcing.c
