@@ -152,8 +152,8 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
       CeedInt r              = edges->cell_ids[2 * iedge + 1];
       q_offset_l[owned_edge] = l * num_comp;
       q_offset_r[owned_edge] = r * num_comp;
-      c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
-      c_offset_r[owned_edge] = cells->local_to_owned[r] * num_comp;
+      c_offset_l[owned_edge] = l * num_comp;
+      c_offset_r[owned_edge] = r * num_comp;
       owned_edge++;
     }
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,

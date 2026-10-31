@@ -218,8 +218,8 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperator(const RDyConfig config, 
       CeedInt r              = edges->cell_ids[2 * iedge + 1];
       q_offset_l[owned_edge] = l * num_comp;
       q_offset_r[owned_edge] = r * num_comp;
-      c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
-      c_offset_r[owned_edge] = cells->local_to_owned[r] * num_comp;
+      c_offset_l[owned_edge] = l * num_comp;
+      c_offset_r[owned_edge] = r * num_comp;
 
       CeedInt vid_beg            = edges->vertex_ids[2 * iedge];
       CeedInt vid_end            = edges->vertex_ids[2 * iedge + 1];
@@ -515,7 +515,7 @@ PetscErrorCode CreateCeedBoundaryFluxSuboperator(const RDyConfig config, RDyMesh
       if (!edges->is_owned[iedge]) continue;
       CeedInt l              = edges->cell_ids[2 * iedge];
       q_offset_l[owned_edge] = l * num_comp;
-      c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
+      c_offset_l[owned_edge] = l * num_comp;
       if (offset_dirichlet) {  // Dirichlet boundary values
         offset_dirichlet[owned_edge] = e * num_comp;
       }
@@ -1324,8 +1324,8 @@ static PetscErrorCode CreateCeedInteriorFluxSuboperatorReconstructed(const RDyCo
       if (!edges->is_owned[e]) continue;
       CeedInt l      = edges->cell_ids[2 * e];
       CeedInt r      = edges->cell_ids[2 * e + 1];
-      c_offset_l[oe] = cells->local_to_owned[l] * num_comp;
-      c_offset_r[oe] = cells->local_to_owned[r] * num_comp;
+      c_offset_l[oe] = l * num_comp;
+      c_offset_r[oe] = r * num_comp;
       oe++;
     }
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, c_offset_l,
