@@ -101,13 +101,21 @@ there), and friction remains a cell source term, integrated as configured by
   guarded.
 
 Without the time-step reduction and the subcritical clamp, positivity at moving
-shorelines relies on the wet/dry treatment alone. Since $\beta_B$ scales with
-the depth of the deeper cell, an edge can drain more water than a thin
-shoreline cell holds, independently of the Courant number: a frictionless
-Thacker parabolic bowl loses positivity and diverges even at a Courant number
-of about 0.1. With friction the same case remains stable, but shows spurious
-velocities in thin films at the shoreline. Cases with moving shorelines should
-be checked for negative depths.
+shorelines relies on the wet/dry treatment alone, and that treatment applies
+only when the cell receiving a negative intermediate depth is dry
+($h \le$ `tiny_h`). Consider a thin film just above a step whose lower
+neighbour's water surface lies below the film's bed. The clipped $\beta_B$ is
+then the deep water's hydrostatic push $g h_{\text{deep}}^2/(4\tilde{c})$,
+and $\tilde{c}$ comes from the mean depth, so the film-side intermediate depth
+$h^*_3$ can be negative and hundreds of times larger in magnitude than the
+film. Since the film is not dry, the regular split still sends the wave into
+it. Its depth stays non-negative only for an edge Courant number below about
+$h_{\text{film}}/|h^*_3|$, which tends to zero as the shoreline recedes. A
+frictionless Thacker parabolic bowl at a fixed Courant number of about 0.09
+therefore loses positivity (a $7.7\times10^{-6}$ m film lost 117% of its water
+in one step) and diverges. With friction the same case remains stable, but
+shows spurious velocities in thin films at the shoreline. Cases with moving
+shorelines should be checked for negative depths.
 
 ## Limitations
 
