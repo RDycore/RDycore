@@ -164,13 +164,16 @@ static void ComputeSWEAugmentedRoeFluctuationsPointwise(const PetscReal gravity,
 /// The mass components are identical (flux_r[0] is set to flux_l[0]), so mass
 /// is conserved exactly; a mass flux below round-off is zeroed so that
 /// round-off velocities next to a wall or shoreline don't drain dry cells.
-/// Negative (round-off) depths are treated as zero. At least one of hl, hr
-/// must be positive.
+/// Depths at or below tol (including negative round-off depths) are treated
+/// as exactly dry, consistent with their velocities being zero; otherwise a
+/// film thinner than tol could still trigger the entropy fix and receive
+/// momentum through it on a wet/dry edge. At least one of hl, hr must exceed
+/// tol.
 static void ComputeSWEAugmentedRoeFluxPointwise(const PetscReal gravity, const PetscReal tol, const PetscReal hl_in, const PetscReal ul,
                                                 const PetscReal vl, const PetscReal zl, const PetscReal hr_in, const PetscReal ur, const PetscReal vr,
                                                 const PetscReal zr, const PetscReal sn, const PetscReal cn, PetscReal flux_l[3], PetscReal flux_r[3],
                                                 PetscReal *amax) {
-  const PetscReal hl = PetscMax(hl_in, 0.0), hr = PetscMax(hr_in, 0.0);
+  const PetscReal hl = (hl_in > tol) ? hl_in : 0.0, hr = (hr_in > tol) ? hr_in : 0.0;
 
   PetscReal dm[3], dp[3];
   ComputeSWEAugmentedRoeFluctuationsPointwise(gravity, tol, hl, ul, vl, zl, hr, ur, vr, zr, sn, cn, dm, dp, amax);
