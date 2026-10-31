@@ -29,6 +29,7 @@ nav:
     - 'Overview': 'theory/index.md'
     - 'Shallow Water Equations': 'theory/swe.md'
     - 'Second-Order MUSCL Reconstruction': 'theory/muscl.md'
+    - 'Augmented Roe Solver': 'theory/augmented_roe.md'
     - 'Sediment Transport': 'theory/sediment.md'
     - 'Heat Transport and Atmospheric Coupling': 'theory/heat.md'
 

@@ -518,6 +518,21 @@ parameters in this subsection are:
   approach implemented in the ANUGA hydrodynamic model. e.g., the velocity in x-dir from the
   momentum in x-dir is computed as `u = (hu) * h / (h^2 + h_anuga_regular^2)`. The
   default value is `0.0`.
+* `well_balancing`: the treatment of the bed-slope source term. Options are
+    * `none`: the bed slope is a cell source term (default value)
+    * `bradford_sanders_2002`: the well-balancing method of Bradford and Sanders
+      (2002), using water surface elevations at vertices (CEED backend, no
+      sediment)
+    * `hydrostatic_reconstruction`: hydrostatic reconstruction of the states on
+      either side of each edge, with the bed slope moved into the edge fluxes
+    * `augmented_roe`: an augmented Roe solver (as in SERGHEI) whose edge
+      fluctuations include the bed-slope source; see the
+      [theory guide](../theory/augmented_roe.md). Currently first order only,
+      without tracers (sediment, salinity, heat), and with `riemann: roe` and a
+      temporal method other than ARK-IMEX.
+
+  `hydrostatic_reconstruction` and `augmented_roe` preserve a lake at rest
+  exactly, including at stationary shorelines, on any mesh.
 * `source`: this subsection controls parameters governing how the flow source
   term is integrated in time. Parameters are:
   * `method`: the method for integrating the flow source term. Options are
