@@ -990,7 +990,7 @@ typedef struct {
   RDyMesh             *mesh;
   PetscReal            tiny_h;
   PetscReal            h_anuga_regular;
-  PetscReal           *zc;            // vertex-averaged bed elevation per cell (local indexing)
+  PetscReal           *zc;            // bed elevation per cell (local indexing)
   RiemannStateData     left_states;   // reconstructed "left" states on interior edges
   RiemannStateData     right_states;  // reconstructed "right" states on interior edges
   RiemannEdgeData      edges;
@@ -1205,23 +1205,9 @@ PetscErrorCode CreatePetscSWEInteriorFluxHROperator(RDyMesh *mesh, const RDyConf
     }
   }
 
-  // compute vertex-averaged bed elevation for each cell
-  RDyCells    *cells    = &mesh->cells;
-  RDyVertices *vertices = &mesh->vertices;
+  // compute bed elevation for each cell
   PetscCall(PetscCalloc1(mesh->num_cells, &op->zc));
-  for (PetscInt c = 0; c < mesh->num_cells; c++) {
-    if (config.grid.cell_elevation.file[0]) {
-      // if cell elevation is provided via the file
-      op->zc[c] = cells->centroids[c].X[2];
-    } else {
-      // otherwise, compute vertex-averaged bed elevation
-      PetscReal z_sum = 0.0;
-      for (PetscInt v = cells->vertex_offsets[c]; v < cells->vertex_offsets[c + 1]; v++) {
-        z_sum += vertices->points[cells->vertex_ids[v]].X[2];
-      }
-      op->zc[c] = z_sum / (PetscReal)cells->num_vertices[c];
-    }
-  }
+  PetscCall(RDyMeshGetCellBedElevations(mesh, config.grid.cell_elevation.file[0] ? PETSC_TRUE : PETSC_FALSE, op->zc));
 
   PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxHR, DestroyInteriorFluxHR, petsc_op));
 

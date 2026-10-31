@@ -77,9 +77,8 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
   CeedInt num_tracers   = NumTracers(config);
   CeedInt num_comp      = num_flow_comp + num_tracers;
 
-  RDyCells    *cells    = &mesh->cells;
-  RDyEdges    *edges    = &mesh->edges;
-  RDyVertices *vertices = &mesh->vertices;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
 
   CeedQFunction qf;
   PetscCall(CreateHRInteriorFluxQFunction(ceed, config, &qf));
@@ -106,6 +105,10 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, g_strides, &restrict_geom));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
     PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+    PetscReal *zc;
+    PetscCall(PetscCalloc1(mesh->num_cells, &zc));
+    PetscCall(RDyMeshGetCellBedElevations(mesh, config.grid.cell_elevation.file[0] ? PETSC_TRUE : PETSC_FALSE, zc));
+
     CeedScalar(*g)[HR_NUM_COMP_INTERIOR_GEOM];
     PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
     for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
@@ -118,35 +121,13 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
       g[owned_edge][HR_INTERIOR_NEG_L_OVER_AL] = -edges->lengths[iedge] / cells->areas[l];
       g[owned_edge][HR_INTERIOR_L_OVER_AR]     = edges->lengths[iedge] / cells->areas[r];
 
-      if (config.grid.cell_elevation.file[0]) {
-        // use cell-centered z from file if provided
-        g[owned_edge][HR_INTERIOR_ZC_LEFT]  = cells->centroids[l].X[2];
-        g[owned_edge][HR_INTERIOR_ZC_RIGHT] = cells->centroids[r].X[2];
-
-      } else {
-        // Use vertex-averaged z for cell bed elevation.  DMPlex's centroid z
-        // (from DMPlexComputeCellGeometryFVM) differs from the vertex average
-        // for non-planar quads, which breaks lake-at-rest consistency with ICs
-        // computed as h = eta - mean(vertex_z).
-        CeedScalar zc_l = 0.0;
-        for (CeedInt v = cells->vertex_offsets[l]; v < cells->vertex_offsets[l + 1]; v++) {
-          zc_l += vertices->points[cells->vertex_ids[v]].X[2];
-        }
-        zc_l /= (CeedScalar)cells->num_vertices[l];
-
-        CeedScalar zc_r = 0.0;
-        for (CeedInt v = cells->vertex_offsets[r]; v < cells->vertex_offsets[r + 1]; v++) {
-          zc_r += vertices->points[cells->vertex_ids[v]].X[2];
-        }
-        zc_r /= (CeedScalar)cells->num_vertices[r];
-
-        g[owned_edge][HR_INTERIOR_ZC_LEFT]  = zc_l;
-        g[owned_edge][HR_INTERIOR_ZC_RIGHT] = zc_r;
-      }
+      g[owned_edge][HR_INTERIOR_ZC_LEFT]  = zc[l];
+      g[owned_edge][HR_INTERIOR_ZC_RIGHT] = zc[r];
 
       owned_edge++;
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+    PetscCall(PetscFree(zc));
 
     // create a vector to store inter-cell fluxes
     CeedInt f_strides[] = {num_comp, 1, num_comp};
