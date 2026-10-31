@@ -1,6 +1,7 @@
 #ifndef TRACER_FLUXES_HYDRO_RECON_CEED_H
 #define TRACER_FLUXES_HYDRO_RECON_CEED_H
 
+#include "../swe/swe_interior_geom_ceed.h"
 #include "tracer_types_ceed.h"
 
 #ifndef Square
@@ -39,7 +40,8 @@
 // Output fields:
 //   out[0]: cell_left[num_interior_edges][num_comp]
 //   out[1]: cell_right[num_interior_edges][num_comp]
-//   out[2]: courant_number[num_interior_edges][2]
+//   out[2]: flux[num_interior_edges][num_comp]
+//   out[3]: courant_number[num_interior_edges][2]
 CEED_QFUNCTION_HELPER int TracerFlux_HydroRecon(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
                                                 RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];
@@ -47,7 +49,8 @@ CEED_QFUNCTION_HELPER int TracerFlux_HydroRecon(void *ctx, CeedInt Q, const Ceed
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*flux_out)[CEED_Q_VLA]    = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const TracerContext context          = (TracerContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -119,8 +122,9 @@ CEED_QFUNCTION_HELPER int TracerFlux_HydroRecon(void *ctx, CeedInt Q, const Ceed
       }
 
       for (CeedInt j = 0; j < tot_ndof; j++) {
-        cell_L[j][i] = flux[j] * geom[HR_INTERIOR_NEG_L_OVER_AL][i];
-        cell_R[j][i] = flux[j] * geom[HR_INTERIOR_L_OVER_AR][i];
+        cell_L[j][i]   = flux[j] * geom[HR_INTERIOR_NEG_L_OVER_AL][i];
+        cell_R[j][i]   = flux[j] * geom[HR_INTERIOR_L_OVER_AR][i];
+        flux_out[j][i] = flux[j];
       }
 
       // hydrostatic pressure correction applied separately to momentum
@@ -137,8 +141,9 @@ CEED_QFUNCTION_HELPER int TracerFlux_HydroRecon(void *ctx, CeedInt Q, const Ceed
       courant_num[1][i] = amax * geom[HR_INTERIOR_L_OVER_AR][i] * dt;
     } else {
       for (CeedInt j = 0; j < tot_ndof; j++) {
-        cell_L[j][i] = 0.0;
-        cell_R[j][i] = 0.0;
+        cell_L[j][i]   = 0.0;
+        cell_R[j][i]   = 0.0;
+        flux_out[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
       courant_num[1][i] = 0.0;

@@ -1,0 +1,64 @@
+# Lake at rest (water surface elevation 0.5) over the smooth bump
+# z = 0.8 exp(-5 (x - 1)^2 - 50 (y - 0.5)^2) on [0, 2] x [0, 1]
+# (mixed mesh, emerged island with a stationary shoreline).
+# The augmented Roe solver must preserve this state to round-off.
+# Mesh and initial conditions: tools/preprocessing/lake-at-rest/generate_lake_at_rest.py
+
+physics:
+  flow:
+    mode: swe
+    well_balancing: augmented_roe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  stop: 1.0
+  unit: seconds
+  stop_n: 200
+
+output:
+  format: xdmf
+  output_interval: 200
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+
+grid:
+  file: lake_at_rest_mixed.exo
+
+regions:
+  - name: domain_quad
+    grid_region_id: 1
+  - name: domain_tri
+    grid_region_id: 2
+
+surface_composition:
+  - region: domain_quad
+    material: smooth
+  - region: domain_tri
+    material: smooth
+
+materials:
+  - name: smooth
+    properties:
+      manning:
+        value: 0.033
+
+initial_conditions:
+  - region: domain_quad
+    flow: lake_at_rest
+  - region: domain_tri
+    flow: lake_at_rest
+
+flow_conditions:
+  - name: lake_at_rest
+    type: dirichlet
+    file: lake_at_rest_mixed_island.ic.${PETSC_ID_TYPE}.bin
+    format: binary

@@ -97,3 +97,32 @@ PetscErrorCode CreatePetscFluxHROperator(RDyConfig* config, RDyMesh* mesh, Petsc
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// Creates a PETSc flux operator for the augmented Roe well-balancing method:
+/// an interior sub-operator whose fluctuations include the bed-slope source,
+/// and the standard boundary sub-operators (the bed source vanishes on
+/// boundary edges since z_L == z_R there).
+PetscErrorCode CreatePetscFluxAugRoeOperator(RDyConfig* config, RDyMesh* mesh, PetscInt num_boundaries, RDyBoundary* boundaries,
+                                             RDyCondition* boundary_conditions, Vec* boundary_values, Vec* boundary_fluxes,
+                                             Vec* boundary_fluxes_accum, OperatorDiagnostics* diagnostics, PetscOperator* flux_op) {
+  PetscFunctionBegin;
+
+  PetscCheck(config->physics.flow.mode == FLOW_SWE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SWE is the only supported flow model!");
+  PetscCheck(!HasTracers(config), PETSC_COMM_WORLD, PETSC_ERR_SUP, "The augmented_roe method is not yet implemented with tracers");
+
+  PetscCall(PetscOperatorCreateComposite(flux_op));
+
+  // flux suboperator 0: augmented Roe interior fluxes
+  PetscOperator interior_flux_op;
+  PetscCall(CreatePetscSWEInteriorFluxAugRoeOperator(mesh, *config, diagnostics, &interior_flux_op));
+  PetscCall(PetscOperatorCompositeAddSub(*flux_op, interior_flux_op));
+
+  // flux suboperators 1..num_boundaries: standard boundary fluxes
+  for (PetscInt b = 0; b < num_boundaries; ++b) {
+    PetscOperator boundary_flux_op;
+    PetscCall(CreatePetscSWEBoundaryFluxOperator(mesh, *config, boundaries[b], boundary_conditions[b], boundary_values[b], boundary_fluxes[b],
+                                                 boundary_fluxes_accum[b], diagnostics, &boundary_flux_op));
+    PetscCall(PetscOperatorCompositeAddSub(*flux_op, boundary_flux_op));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

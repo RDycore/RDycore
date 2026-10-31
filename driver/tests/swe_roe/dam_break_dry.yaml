@@ -1,0 +1,55 @@
+# 1D dam break with the augmented Roe solver: h = 1 for x < 50 and a dry bed
+# for x > 50, frictionless; checked by check_dam_break.py (Ritter).
+
+physics:
+  flow:
+    mode: swe
+    well_balancing: augmented_roe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  stop: 6.0
+  unit: seconds
+  stop_n: 300
+
+output:
+  format: xdmf
+  output_interval: 300
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+
+grid:
+  file: dam_break_strip.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+surface_composition:
+  - region: domain
+    material: frictionless
+
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: domain
+    flow: dam
+
+flow_conditions:
+  - name: dam
+    type: dirichlet
+    file: dam_break_strip_dry.ic.${PETSC_ID_TYPE}.bin
+    format: binary

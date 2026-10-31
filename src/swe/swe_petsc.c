@@ -2,6 +2,7 @@
 #include <private/rdyoperatorimpl.h>
 #include <private/rdysweimpl.h>
 
+#include "swe_augmented_roe_flux_petsc.h"
 #include "swe_roe_flux_petsc.h"
 
 static PetscErrorCode CreateRiemannStateData(PetscInt num_states, RiemannStateData *data) {
@@ -990,7 +991,7 @@ typedef struct {
   RDyMesh             *mesh;
   PetscReal            tiny_h;
   PetscReal            h_anuga_regular;
-  PetscReal           *zc;            // vertex-averaged bed elevation per cell (local indexing)
+  PetscReal           *zc;            // bed elevation per cell (local indexing)
   RiemannStateData     left_states;   // reconstructed "left" states on interior edges
   RiemannStateData     right_states;  // reconstructed "right" states on interior edges
   RiemannEdgeData      edges;
@@ -1205,25 +1206,193 @@ PetscErrorCode CreatePetscSWEInteriorFluxHROperator(RDyMesh *mesh, const RDyConf
     }
   }
 
-  // compute vertex-averaged bed elevation for each cell
-  RDyCells    *cells    = &mesh->cells;
-  RDyVertices *vertices = &mesh->vertices;
+  // compute bed elevation for each cell
   PetscCall(PetscCalloc1(mesh->num_cells, &op->zc));
-  for (PetscInt c = 0; c < mesh->num_cells; c++) {
-    if (config.grid.cell_elevation.file[0]) {
-      // if cell elevation is provided via the file
-      op->zc[c] = cells->centroids[c].X[2];
-    } else {
-      // otherwise, compute vertex-averaged bed elevation
-      PetscReal z_sum = 0.0;
-      for (PetscInt v = cells->vertex_offsets[c]; v < cells->vertex_offsets[c + 1]; v++) {
-        z_sum += vertices->points[cells->vertex_ids[v]].X[2];
+  PetscCall(RDyMeshGetCellBedElevations(mesh, config.grid.cell_elevation.file[0] ? PETSC_TRUE : PETSC_FALSE, op->zc));
+
+  PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxHR, DestroyInteriorFluxHR, petsc_op));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//=====================================================================
+// Augmented Roe Operators
+//=====================================================================
+
+//--------------------------------------
+// Augmented Roe Interior Flux Operator
+//--------------------------------------
+
+typedef struct {
+  RDyMesh             *mesh;
+  PetscReal            tiny_h;
+  PetscReal            h_anuga_regular;
+  PetscReal           *zl, *zr;       // bed elevations of the left/right cells of each interior edge
+  RiemannStateData     left_states;   // "left" states on interior edges
+  RiemannStateData     right_states;  // "right" states on interior edges
+  RiemannEdgeData      edges;         // edge geometry, fluxes seen by left cells, and wave speeds
+  PetscReal           *fluxes_r;      // fluxes seen by right cells
+  OperatorDiagnostics *diagnostics;
+} InteriorFluxAugRoeOperator;
+
+static PetscErrorCode ApplyInteriorFluxAugRoe(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBegin;
+
+  MPI_Comm comm;
+  PetscCall(PetscObjectGetComm((PetscObject)u_local, &comm));
+
+  InteriorFluxAugRoeOperator *op = context;
+
+  RDyMesh  *mesh  = op->mesh;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
+
+  PetscScalar *u_ptr, *f_ptr;
+  PetscCall(VecGetArray(u_local, &u_ptr));
+  PetscCall(VecGetArray(f_global, &f_ptr));
+
+  PetscInt n_dof;
+  PetscCall(VecGetBlockSize(u_local, &n_dof));
+  PetscCheck(n_dof == 3, comm, PETSC_ERR_USER, "Number of dof in local vector must be 3!");
+
+  RiemannStateData *datal     = &op->left_states;
+  RiemannStateData *datar     = &op->right_states;
+  RiemannEdgeData  *data_edge = &op->edges;
+  PetscReal        *fluxes_l  = data_edge->fluxes;
+  PetscReal        *fluxes_r  = op->fluxes_r;
+  PetscReal        *amax      = data_edge->amax;
+
+  const PetscReal tiny_h  = op->tiny_h;
+  const PetscReal h_anuga = op->h_anuga_regular;
+
+  // gather left and right states (h, u, v) on each internal edge
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l       = edges->cell_ids[2 * edge_id];
+    PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+
+    if (r == -1) continue;
+
+    PetscReal h_L = u_ptr[n_dof * l + 0];
+    PetscReal h_R = u_ptr[n_dof * r + 0];
+
+    // velocities with ANUGA regularization
+    PetscReal denom_L = Square(h_L) + Square(h_anuga);
+    PetscReal denom_R = Square(h_R) + Square(h_anuga);
+
+    datal->h[e] = h_L;
+    datal->u[e] = (h_L > tiny_h) ? u_ptr[n_dof * l + 1] * h_L / denom_L : 0.0;
+    datal->v[e] = (h_L > tiny_h) ? u_ptr[n_dof * l + 2] * h_L / denom_L : 0.0;
+    datar->h[e] = h_R;
+    datar->u[e] = (h_R > tiny_h) ? u_ptr[n_dof * r + 1] * h_R / denom_R : 0.0;
+    datar->v[e] = (h_R > tiny_h) ? u_ptr[n_dof * r + 2] * h_R / denom_R : 0.0;
+  }
+
+  // compute the left and right fluxes (zero on edges between dry cells)
+  PetscCall(ComputeSWEAugmentedRoeFlux(datal, datar, op->zl, op->zr, data_edge->sn, data_edge->cn, tiny_h, fluxes_l, fluxes_r, amax));
+
+  // accumulate fluxes into the left and right cells
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id = edges->internal_edge_ids[e];
+    PetscInt l       = edges->cell_ids[2 * edge_id];
+    PetscInt r       = edges->cell_ids[2 * edge_id + 1];
+
+    if (r == -1) continue;
+
+    PetscReal h_L = u_ptr[n_dof * l + 0];
+    PetscReal h_R = u_ptr[n_dof * r + 0];
+
+    if (h_L > tiny_h || h_R > tiny_h) {
+      PetscReal edge_len = edges->lengths[edge_id];
+      PetscReal areal    = cells->areas[l];
+      PetscReal arear    = cells->areas[r];
+
+      // Courant number diagnostic
+      PetscReal                 cnum              = amax[e] * edge_len / fmin(areal, arear) * dt;
+      CourantNumberDiagnostics *courant_num_diags = &op->diagnostics->courant_number;
+      if (cnum > courant_num_diags->max_courant_num) {
+        courant_num_diags->max_courant_num = cnum;
+        courant_num_diags->global_edge_id  = edges->global_ids[edge_id];
+        if (areal < arear) courant_num_diags->global_cell_id = cells->global_ids[l];
+        else courant_num_diags->global_cell_id = cells->global_ids[r];
       }
-      op->zc[c] = z_sum / (PetscReal)cells->num_vertices[c];
+
+      for (PetscInt i_dof = 0; i_dof < n_dof; i_dof++) {
+        if (cells->is_owned[l]) {
+          PetscInt lo = cells->local_to_owned[l];
+          f_ptr[n_dof * lo + i_dof] -= fluxes_l[n_dof * e + i_dof] * edge_len / areal;
+        }
+        if (cells->is_owned[r]) {
+          PetscInt ro = cells->local_to_owned[r];
+          f_ptr[n_dof * ro + i_dof] += fluxes_r[n_dof * e + i_dof] * edge_len / arear;
+        }
+      }
     }
   }
 
-  PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxHR, DestroyInteriorFluxHR, petsc_op));
+  PetscCall(VecRestoreArray(u_local, &u_ptr));
+  PetscCall(VecRestoreArray(f_global, &f_ptr));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode DestroyInteriorFluxAugRoe(void *context) {
+  PetscFunctionBegin;
+  InteriorFluxAugRoeOperator *op = context;
+  PetscCall(DestroyRiemannStateData(op->left_states));
+  PetscCall(DestroyRiemannStateData(op->right_states));
+  PetscCall(DestroyRiemannEdgeData(op->edges));
+  PetscCall(PetscFree(op->fluxes_r));
+  PetscCall(PetscFree2(op->zl, op->zr));
+  PetscCall(PetscFree(op));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a PetscOperator that computes interior fluxes with the augmented
+/// Roe solver, which includes the bed-slope source in the edge fluctuations.
+PetscErrorCode CreatePetscSWEInteriorFluxAugRoeOperator(RDyMesh *mesh, const RDyConfig config, OperatorDiagnostics *diagnostics,
+                                                        PetscOperator *petsc_op) {
+  PetscFunctionBegin;
+
+  const PetscInt num_comp = 3;
+
+  InteriorFluxAugRoeOperator *op;
+  PetscCall(PetscCalloc1(1, &op));
+  *op = (InteriorFluxAugRoeOperator){
+      .mesh            = mesh,
+      .diagnostics     = diagnostics,
+      .tiny_h          = config.physics.flow.tiny_h,
+      .h_anuga_regular = config.physics.flow.h_anuga_regular,
+  };
+
+  // allocate Riemann data structures
+  PetscCall(CreateRiemannStateData(mesh->num_internal_edges, &op->left_states));
+  PetscCall(CreateRiemannStateData(mesh->num_internal_edges, &op->right_states));
+  PetscCall(CreateRiemannEdgeData(mesh->num_internal_edges, num_comp, &op->edges));
+  PetscCall(PetscCalloc1(num_comp * mesh->num_internal_edges, &op->fluxes_r));
+
+  // compute the bed elevation of each cell
+  PetscReal *zc;
+  PetscCall(PetscCalloc1(mesh->num_cells, &zc));
+  PetscCall(RDyMeshGetCellBedElevations(mesh, config.grid.cell_elevation.file[0] ? PETSC_TRUE : PETSC_FALSE, zc));
+
+  // copy edge geometry and bed elevations of the cells on either side
+  RDyEdges *edges = &mesh->edges;
+  PetscCall(PetscCalloc2(mesh->num_internal_edges, &op->zl, mesh->num_internal_edges, &op->zr));
+  for (PetscInt e = 0; e < mesh->num_internal_edges; e++) {
+    PetscInt edge_id       = edges->internal_edge_ids[e];
+    PetscInt left_cell_id  = edges->cell_ids[2 * edge_id];
+    PetscInt right_cell_id = edges->cell_ids[2 * edge_id + 1];
+    if (right_cell_id != -1) {
+      op->edges.cn[e] = edges->cn[edge_id];
+      op->edges.sn[e] = edges->sn[edge_id];
+      op->zl[e]       = zc[left_cell_id];
+      op->zr[e]       = zc[right_cell_id];
+    }
+  }
+  PetscCall(PetscFree(zc));
+
+  PetscCall(PetscOperatorCreate(op, ApplyInteriorFluxAugRoe, DestroyInteriorFluxAugRoe, petsc_op));
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

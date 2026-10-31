@@ -888,7 +888,6 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
             }
           }
           PetscCall(VecRestoreArray(local, &local_ptr));
-          PetscCall(VecDestroy(&local));
         } else {
           // FIXME: this assumes the shallow water equations!
           for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
@@ -900,6 +899,7 @@ static PetscErrorCode InitFlowSolution(RDy rdy) {
         }
       }
     }
+    PetscCall(VecDestroy(&local));
   }
 
   PetscCall(VecRestoreArray(rdy->flow_global_vec, &u_ptr));
@@ -1007,7 +1007,6 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
                 }
               }
               PetscCall(VecRestoreArray(local, &local_ptr));
-              PetscCall(VecDestroy(&local));
             } else {
               for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
                 PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
@@ -1016,6 +1015,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
             }
           }
         }
+        PetscCall(VecDestroy(&local));
       }
     }
   }
@@ -1046,7 +1046,6 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
               }
             }
             PetscCall(VecRestoreArray(local, &local_ptr));
-            PetscCall(VecDestroy(&local));
           } else {
             for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
               PetscInt owned_cell_id             = region.owned_cell_global_ids[c];
@@ -1056,6 +1055,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
           }
         }
       }
+      PetscCall(VecDestroy(&local));
     }
   }
 
@@ -1086,7 +1086,6 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
               }
             }
             PetscCall(VecRestoreArray(local, &local_ptr));
-            PetscCall(VecDestroy(&local));
           } else {
             for (PetscInt c = 0; c < region.num_owned_cells; ++c) {
               PetscInt  owned_cell_id            = region.owned_cell_global_ids[c];
@@ -1097,6 +1096,7 @@ static PetscErrorCode InitTracerSolution(RDy rdy) {
           }
         }
       }
+      PetscCall(VecDestroy(&local));
     }
   }
 
@@ -1597,7 +1597,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
-  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+  if (UsesEdgeBedSource(&rdy->config)) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
   if (rdy->config.grid.cell_elevation.file[0]) {

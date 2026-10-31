@@ -5,6 +5,7 @@
 #include <private/rdysweimpl.h>
 #include <private/rdytracerimpl.h>
 
+#include "swe/swe_fluxes_augmented_roe_ceed.h"
 #include "swe/swe_fluxes_hydro_recon_ceed.h"
 #include "tracer/tracer_fluxes_hydro_recon_ceed.h"
 
@@ -19,6 +20,10 @@
 // Unlike the standard well-balancing paths, the HR operator does NOT require
 // eta_vertices. Instead, the geom field carries cell-centered bed elevations
 // (zc) for the left and right cells.
+//
+// The augmented Roe operator has the same structure and geom layout; only its
+// interior Q-function differs (it places the bed source in the fluctuations
+// instead of reconstructing the states).
 
 // CEED uses C99 VLA features for shaping multidimensional
 // arrays, which don't have the same drawbacks as VLA allocations.
@@ -38,7 +43,11 @@ static PetscErrorCode CreateHRInteriorFluxQFunction(Ceed ceed, const RDyConfig c
   CeedInt num_tracers = NumTracers(config);
 
   CeedQFunctionContext qf_context;
-  if (num_tracers == 0) {  // flow only
+  if (config.physics.flow.well_balancing == WELL_BALANCING_AUGMENTED_ROE) {
+    PetscCheck(num_tracers == 0, PETSC_COMM_WORLD, PETSC_ERR_SUP, "The augmented_roe method is not yet implemented with tracers");
+    PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_AugmentedRoe, SWEFlux_AugmentedRoe_loc, qf));
+    PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+  } else if (num_tracers == 0) {  // flow only
     PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWEFlux_HydroRecon_Roe, SWEFlux_HydroRecon_Roe_loc, qf));
     PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
   } else {  // flow + tracers
@@ -51,7 +60,8 @@ static PetscErrorCode CreateHRInteriorFluxQFunction(Ceed ceed, const RDyConfig c
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// @brief Creates a CEED operator for HR fluxes on interior edges.
+/// @brief Creates a CEED operator for HR (or augmented Roe) fluxes on interior
+/// edges, selecting the interior Q-function from config.physics.flow.well_balancing.
 ///
 /// Active input fields:
 ///    * `q_left[num_interior_edges][3]`
@@ -77,9 +87,8 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
   CeedInt num_tracers   = NumTracers(config);
   CeedInt num_comp      = num_flow_comp + num_tracers;
 
-  RDyCells    *cells    = &mesh->cells;
-  RDyEdges    *edges    = &mesh->edges;
-  RDyVertices *vertices = &mesh->vertices;
+  RDyCells *cells = &mesh->cells;
+  RDyEdges *edges = &mesh->edges;
 
   CeedQFunction qf;
   PetscCall(CreateHRInteriorFluxQFunction(ceed, config, &qf));
@@ -106,6 +115,10 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
     PetscCallCEED(CeedElemRestrictionCreateStrided(ceed, num_edges, 1, num_comp_geom, num_edges * num_comp_geom, g_strides, &restrict_geom));
     PetscCallCEED(CeedElemRestrictionCreateVector(restrict_geom, &geom, NULL));
     PetscCallCEED(CeedVectorSetValue(geom, 0.0));
+    PetscReal *zc;
+    PetscCall(PetscCalloc1(mesh->num_cells, &zc));
+    PetscCall(RDyMeshGetCellBedElevations(mesh, config.grid.cell_elevation.file[0] ? PETSC_TRUE : PETSC_FALSE, zc));
+
     CeedScalar(*g)[HR_NUM_COMP_INTERIOR_GEOM];
     PetscCallCEED(CeedVectorGetArray(geom, CEED_MEM_HOST, (CeedScalar **)&g));
     for (CeedInt e = 0, owned_edge = 0; e < mesh->num_internal_edges; e++) {
@@ -118,35 +131,13 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
       g[owned_edge][HR_INTERIOR_NEG_L_OVER_AL] = -edges->lengths[iedge] / cells->areas[l];
       g[owned_edge][HR_INTERIOR_L_OVER_AR]     = edges->lengths[iedge] / cells->areas[r];
 
-      if (config.grid.cell_elevation.file[0]) {
-        // use cell-centered z from file if provided
-        g[owned_edge][HR_INTERIOR_ZC_LEFT]  = cells->centroids[l].X[2];
-        g[owned_edge][HR_INTERIOR_ZC_RIGHT] = cells->centroids[r].X[2];
-
-      } else {
-        // Use vertex-averaged z for cell bed elevation.  DMPlex's centroid z
-        // (from DMPlexComputeCellGeometryFVM) differs from the vertex average
-        // for non-planar quads, which breaks lake-at-rest consistency with ICs
-        // computed as h = eta - mean(vertex_z).
-        CeedScalar zc_l = 0.0;
-        for (CeedInt v = cells->vertex_offsets[l]; v < cells->vertex_offsets[l + 1]; v++) {
-          zc_l += vertices->points[cells->vertex_ids[v]].X[2];
-        }
-        zc_l /= (CeedScalar)cells->num_vertices[l];
-
-        CeedScalar zc_r = 0.0;
-        for (CeedInt v = cells->vertex_offsets[r]; v < cells->vertex_offsets[r + 1]; v++) {
-          zc_r += vertices->points[cells->vertex_ids[v]].X[2];
-        }
-        zc_r /= (CeedScalar)cells->num_vertices[r];
-
-        g[owned_edge][HR_INTERIOR_ZC_LEFT]  = zc_l;
-        g[owned_edge][HR_INTERIOR_ZC_RIGHT] = zc_r;
-      }
+      g[owned_edge][HR_INTERIOR_ZC_LEFT]  = zc[l];
+      g[owned_edge][HR_INTERIOR_ZC_RIGHT] = zc[r];
 
       owned_edge++;
     }
     PetscCallCEED(CeedVectorRestoreArray(geom, (CeedScalar **)&g));
+    PetscCall(PetscFree(zc));
 
     // create a vector to store inter-cell fluxes
     CeedInt f_strides[] = {num_comp, 1, num_comp};
@@ -171,8 +162,8 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
       CeedInt r              = edges->cell_ids[2 * iedge + 1];
       q_offset_l[owned_edge] = l * num_comp;
       q_offset_r[owned_edge] = r * num_comp;
-      c_offset_l[owned_edge] = cells->local_to_owned[l] * num_comp;
-      c_offset_r[owned_edge] = cells->local_to_owned[r] * num_comp;
+      c_offset_l[owned_edge] = l * num_comp;
+      c_offset_r[owned_edge] = r * num_comp;
       owned_edge++;
     }
     PetscCallCEED(CeedElemRestrictionCreate(ceed, num_edges, 1, num_comp, 1, mesh->num_cells * num_comp, CEED_MEM_HOST, CEED_COPY_VALUES, q_offset_l,
@@ -213,7 +204,8 @@ static PetscErrorCode CreateCeedInteriorFluxHydroReconSuboperator(const RDyConfi
   PetscFunctionReturn(CEED_ERROR_SUCCESS);
 }
 
-/// Creates a CEED flux operator for hydrostatic reconstruction.
+/// Creates a CEED flux operator for hydrostatic reconstruction (or, with
+/// well_balancing = augmented_roe, for the augmented Roe solver).
 /// @param [in]    config              configuration defining physics and numerics
 /// @param [in]    mesh                mesh with geometric/topological data
 /// @param [in]    num_boundaries      the number of distinct boundaries
@@ -253,6 +245,25 @@ PetscErrorCode CreateCeedFluxHROperator(RDyConfig *config, RDyMesh *mesh, PetscI
     PetscCall(CeedOperatorDestroy(&boundary_flux_op));
   }
   PetscCallCEED(CeedVectorDestroy(&eta_vertices));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Creates a CEED flux operator for the augmented Roe solver. It shares the
+/// HR operator's structure: an interior sub-operator (with the augmented Roe
+/// Q-function) and the standard boundary sub-operators.
+/// @param [in]    config              configuration defining physics and numerics
+/// @param [in]    mesh                mesh with geometric/topological data
+/// @param [in]    num_boundaries      the number of distinct boundaries
+/// @param [in]    boundaries          array of boundaries
+/// @param [in]    boundary_conditions array of boundary conditions
+/// @param [out]   flux_op             the newly created composite operator
+/// @return 0 on success, or a non-zero error code on failure
+PetscErrorCode CreateCeedFluxAugRoeOperator(RDyConfig *config, RDyMesh *mesh, PetscInt num_boundaries, RDyBoundary *boundaries,
+                                            RDyCondition *boundary_conditions, CeedOperator *flux_op) {
+  PetscFunctionBegin;
+  PetscCheck(config->physics.flow.well_balancing == WELL_BALANCING_AUGMENTED_ROE, PETSC_COMM_WORLD, PETSC_ERR_ARG_WRONG,
+             "CreateCeedFluxAugRoeOperator requires well_balancing = augmented_roe");
+  PetscCall(CreateCeedFluxHROperator(config, mesh, num_boundaries, boundaries, boundary_conditions, flux_op));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

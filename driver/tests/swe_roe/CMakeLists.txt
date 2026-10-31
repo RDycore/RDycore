@@ -263,3 +263,129 @@ foreach(np 2)
     endforeach()
   endforeach()
 endforeach()
+
+# Augmented Roe solver: levee test (counterpart of the HR test above)
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/levee.aug.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 2)
+  foreach(config petsc ceed)
+    foreach(lang ${supported_languages})
+      add_test(swe_augroe_levee_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} levee.aug.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
+# Augmented Roe solver: lake at rest over a smooth bump (submerged, and
+# emerged as an island with a stationary shoreline) on quad, triangle, and
+# mixed meshes must be preserved to round-off. Each run gets its own copy of
+# the input with its own output directory so that runs don't clobber each other.
+foreach(mesh quads tris mixed)
+  foreach(case submerged island)
+    set(name lake_at_rest_${mesh}_${case})
+    file(COPY
+         ${MESH_DIR}/lake_at_rest_${mesh}.exo
+         ${CONDITION_DIR}/${name}.ic.${PETSC_ID_TYPE}.bin
+         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${name}.yaml yaml_contents)
+    foreach(np 1 2 4)
+      foreach(config petsc ceed)
+        foreach(lang ${supported_languages})
+          set(test_name swe_augroe_${name}_${lang}_np_${np}_${config})
+          set(output_dir output_${test_name})
+          string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${yaml_contents}")
+          file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+          add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ${test_name}.yaml ${${config}_args})
+          set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+          add_test(${test_name}_compare ${CMAKE_COMMAND} -DH5DIFF=${H5DIFF} -DTOL=1e-12
+                   -DINITIAL=${output_dir}/${test_name}-000.h5 -DFINAL=${output_dir}/${test_name}-200.h5
+                   "-DINITIAL_GROUP=/0 0.000000E+00 sec" "-DFINAL_GROUP=/200 1.000000E+00 sec"
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/compare_lake_at_rest.cmake)
+          set_tests_properties(${test_name}_compare PROPERTIES FIXTURES_REQUIRED ${test_name})
+        endforeach()
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
+
+# Augmented Roe solver: MMS convergence study (first order)
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_conv_study_augmented_roe.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config petsc ceed)
+    foreach(lang ${supported_languages})
+      add_test(swe_augroe_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver}
+               mms_conv_study_augmented_roe.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
+# Augmented Roe solver: 1D dam breaks over dry (Ritter) and wet (Stoker) beds,
+# checked against the analytic solutions (relative L1 depth error, h >= 0).
+# Mesh and initial conditions: tools/preprocessing/lake-at-rest/generate_dam_break.py
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_program(H5DUMP h5dump REQUIRED PATHS ${PETSC_DIR}/${PETSC_ARCH}/bin)
+file(COPY ${MESH_DIR}/dam_break_strip.exo DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(case dry wet)
+  if (case STREQUAL "dry")
+    set(h_right 0)
+  else()
+    set(h_right 0.1)
+  endif()
+  set(name dam_break_${case})
+  file(COPY ${CONDITION_DIR}/dam_break_strip_${case}.ic.${PETSC_ID_TYPE}.bin DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${name}.yaml yaml_contents)
+  foreach(np 1 2)
+    foreach(config petsc ceed)
+      foreach(lang ${supported_languages})
+        set(test_name swe_augroe_${name}_${lang}_np_${np}_${config})
+        set(output_dir output_${test_name})
+        string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${yaml_contents}")
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+        add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ${test_name}.yaml ${${config}_args})
+        set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+        add_test(NAME ${test_name}_check
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_dam_break.py ${H5DUMP} ${output_dir}/${test_name}-grid.h5
+                         ${output_dir}/${test_name}-300.h5 "/300 6.000000E+00 sec" 6 1 ${h_right} 50 0.015
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(${test_name}_check PROPERTIES FIXTURES_REQUIRED ${test_name})
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
+
+# Steady flow over a bump (Goutal and Maurel) with the augmented Roe solver,
+# checked against the analytic solution: relative L1 depth error and largest
+# relative deviation of the discharge.
+# Mesh and initial conditions: tools/preprocessing/lake-at-rest/generate_transcritical_bump.py
+file(COPY ${MESH_DIR}/bump_channel.exo DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(case subcritical transcritical shock)
+  if (case STREQUAL "subcritical")
+    set(thresholds 1e-4 1e-10)
+  elseif (case STREQUAL "transcritical")
+    set(thresholds 5e-3 2e-3)
+  else()
+    set(thresholds 5e-3 1e-2)
+  endif()
+  set(name transcritical_bump_${case})
+  file(COPY ${CONDITION_DIR}/bump_channel_${case}.ic.${PETSC_ID_TYPE}.bin DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${name}.yaml yaml_contents)
+  foreach(np 1 2)
+    foreach(config petsc ceed)
+      foreach(lang ${supported_languages})
+        set(test_name swe_augroe_${name}_${lang}_np_${np}_${config})
+        set(output_dir output_${test_name})
+        string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${yaml_contents}")
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+        add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ${test_name}.yaml ${${config}_args})
+        set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+        add_test(NAME ${test_name}_check
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_transcritical_bump.py ${H5DUMP} ${output_dir}/${test_name}-grid.h5
+                         ${output_dir}/${test_name}-20000.h5 "/20000 2.000000E+02 sec" ${case} 0.125 ${thresholds}
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(${test_name}_check PROPERTIES FIXTURES_REQUIRED ${test_name})
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()

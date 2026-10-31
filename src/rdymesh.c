@@ -1507,3 +1507,36 @@ PetscErrorCode RDyMeshOverride2DProjection(RDyMesh *mesh) {
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/// Computes the bed elevation of every local (owned and ghost) cell, as used by
+/// well-balancing methods that place the bed source on edges (hydrostatic
+/// reconstruction, augmented Roe). Lake-at-rest exactness requires that all such
+/// methods (and the initial conditions) use the same cell bed elevations.
+/// @param [in]  mesh           the mesh
+/// @param [in]  use_centroid_z if true, use the cell centroid z (set from a
+///                             cell-elevation file); otherwise use the average of
+///                             the cell's vertex z values
+/// @param [out] zc             array of length mesh->num_cells receiving the bed elevations
+PetscErrorCode RDyMeshGetCellBedElevations(RDyMesh *mesh, PetscBool use_centroid_z, PetscReal *zc) {
+  PetscFunctionBegin;
+
+  RDyCells    *cells    = &mesh->cells;
+  RDyVertices *vertices = &mesh->vertices;
+
+  for (PetscInt icell = 0; icell < mesh->num_cells; icell++) {
+    if (use_centroid_z) {
+      zc[icell] = cells->centroids[icell].X[2];
+    } else {
+      // DMPlex's centroid z (from DMPlexComputeCellGeometryFVM) differs from the
+      // vertex average for non-planar quads, which breaks lake-at-rest
+      // consistency with ICs computed as h = eta - mean(vertex_z).
+      PetscReal z_sum = 0.0;
+      for (PetscInt v = cells->vertex_offsets[icell]; v < cells->vertex_offsets[icell + 1]; v++) {
+        z_sum += vertices->points[cells->vertex_ids[v]].X[2];
+      }
+      zc[icell] = z_sum / (PetscReal)cells->num_vertices[icell];
+    }
+  }
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}

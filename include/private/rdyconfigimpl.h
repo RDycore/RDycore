@@ -56,9 +56,10 @@ typedef enum {
 } RDyFlowSourceMethod;
 
 typedef enum {
-  WELL_BALANCING_NONE = 0,  // no well-balancing
-  WELL_BALANCING_BS2002,    // Bradford and Sanders (2002) well-balancing
-  WELL_BALANCING_HR,        // hydrostatic reconstruction well-balancing
+  WELL_BALANCING_NONE = 0,       // no well-balancing
+  WELL_BALANCING_BS2002,         // Bradford and Sanders (2002) well-balancing
+  WELL_BALANCING_HR,             // hydrostatic reconstruction well-balancing
+  WELL_BALANCING_AUGMENTED_ROE,  // augmented Roe solver with edge-based bed source (SERGHEI-style)
 } RDyWellBalanceMethod;
 
 // MUSCL slope limiter for second-order reconstruction.
@@ -485,6 +486,16 @@ typedef struct {
   RDyMMSSection mms;
 
 } RDyConfig;
+
+// returns true if the configured well-balancing method places the bed-slope
+// source on edges (hydrostatic reconstruction, augmented Roe). Such methods
+// replace the cell bed-slope source and need 2D-projected edge lengths and
+// cell areas for lake-at-rest exactness.
+static inline PetscBool UsesEdgeBedSource(const RDyConfig* config) {
+  return (config->physics.flow.well_balancing == WELL_BALANCING_HR || config->physics.flow.well_balancing == WELL_BALANCING_AUGMENTED_ROE)
+           ? PETSC_TRUE
+           : PETSC_FALSE;
+}
 
 // ensemble member configuration (see ensemble.c)
 PETSC_INTERN PetscErrorCode ConfigureEnsembleMember(RDy);

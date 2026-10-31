@@ -1,6 +1,7 @@
 #ifndef SWE_FLUXES_HYDRO_RECON_CEED_H
 #define SWE_FLUXES_HYDRO_RECON_CEED_H
 
+#include "swe_interior_geom_ceed.h"
 #include "swe_types_ceed.h"
 
 #ifndef Square
@@ -35,20 +36,6 @@ typedef enum {
 } RiemannFluxType;
 #endif
 
-// geom component indices for interior edges (6 components)
-#ifndef HR_INTERIOR_GEOM_INDEX_DEFINED
-#define HR_INTERIOR_GEOM_INDEX_DEFINED
-typedef enum {
-  HR_INTERIOR_SN = 0,
-  HR_INTERIOR_CN,
-  HR_INTERIOR_NEG_L_OVER_AL,
-  HR_INTERIOR_L_OVER_AR,
-  HR_INTERIOR_ZC_LEFT,
-  HR_INTERIOR_ZC_RIGHT,
-  HR_NUM_COMP_INTERIOR_GEOM,
-} HRInteriorGeomIndex;
-#endif
-
 // SWE interior flux Q-function with hydrostatic reconstruction
 //
 // Input fields (order determines indexing):
@@ -60,14 +47,16 @@ typedef enum {
 // Output fields:
 //   out[0]: cell_left[num_interior_edges][3]
 //   out[1]: cell_right[num_interior_edges][3]
-//   out[2]: courant_number[num_interior_edges][2]
+//   out[2]: flux[num_interior_edges][3]
+//   out[3]: courant_number[num_interior_edges][2]
 CEED_QFUNCTION_HELPER int SWEFlux_HydroRecon(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], RiemannFluxType flux_type) {
   const CeedScalar(*geom)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[0];
   const CeedScalar(*q_L)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]   = (const CeedScalar(*)[CEED_Q_VLA])in[2];
   CeedScalar(*cell_L)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[0];
   CeedScalar(*cell_R)[CEED_Q_VLA]      = (CeedScalar(*)[CEED_Q_VLA])out[1];
-  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*flux_out)[CEED_Q_VLA]    = (CeedScalar(*)[CEED_Q_VLA])out[2];
+  CeedScalar(*courant_num)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[3];
   const SWEContext context             = (SWEContext)ctx;
 
   const CeedScalar dt      = context->dtime;
@@ -123,8 +112,9 @@ CEED_QFUNCTION_HELPER int SWEFlux_HydroRecon(void *ctx, CeedInt Q, const CeedSca
       }
 
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = flux[j] * geom[HR_INTERIOR_NEG_L_OVER_AL][i];
-        cell_R[j][i] = flux[j] * geom[HR_INTERIOR_L_OVER_AR][i];
+        cell_L[j][i]   = flux[j] * geom[HR_INTERIOR_NEG_L_OVER_AL][i];
+        cell_R[j][i]   = flux[j] * geom[HR_INTERIOR_L_OVER_AR][i];
+        flux_out[j][i] = flux[j];
       }
 
       // hydrostatic pressure correction applied separately to each cell:
@@ -140,8 +130,9 @@ CEED_QFUNCTION_HELPER int SWEFlux_HydroRecon(void *ctx, CeedInt Q, const CeedSca
       courant_num[1][i] = amax * geom[HR_INTERIOR_L_OVER_AR][i] * dt;
     } else {
       for (CeedInt j = 0; j < 3; j++) {
-        cell_L[j][i] = 0.0;
-        cell_R[j][i] = 0.0;
+        cell_L[j][i]   = 0.0;
+        cell_R[j][i]   = 0.0;
+        flux_out[j][i] = 0.0;
       }
       courant_num[0][i] = 0.0;
       courant_num[1][i] = 0.0;

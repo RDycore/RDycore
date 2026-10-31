@@ -208,5 +208,6 @@ PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellXCentroids(RDyMesh *, const Petsc
 PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellYCentroids(RDyMesh *, const PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellZCentroids(RDyMesh *, const PetscInt, PetscReal *);
 PETSC_INTERN PetscErrorCode RDyMeshGetOwnedCellAreas(RDyMesh *, const PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode RDyMeshGetCellBedElevations(RDyMesh *, PetscBool, PetscReal *);
 
 #endif

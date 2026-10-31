@@ -191,6 +191,12 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
         PetscCall(CreateCeedFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
         PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
         break;
+      case WELL_BALANCING_AUGMENTED_ROE:
+        PetscCall(CreateCeedFluxAugRoeOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
+        // the bed-slope source lives in the edge fluctuations, so reuse HR's
+        // source operator (friction only, no bed slope)
+        PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
+        break;
     }
   } else {
     switch (op->config->physics.flow.well_balancing) {
@@ -212,6 +218,14 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
         PetscCall(CreatePetscFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
                                             op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
                                             &op->petsc.flux));
+        PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+      case WELL_BALANCING_AUGMENTED_ROE:
+        PetscCall(CreatePetscFluxAugRoeOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum,
+                                                &op->diagnostics, &op->petsc.flux));
+        // the bed-slope source lives in the edge fluctuations, so reuse HR's
+        // source operator (friction only, no bed slope)
         PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
         break;
     }
@@ -388,6 +402,8 @@ PetscErrorCode CreateOperator(RDyConfig* config, DM domain_dm, RDyMesh* domain_m
   if (use_slope_reconstruction) {
     PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
                "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
+    PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_AUGMENTED_ROE, comm, PETSC_ERR_USER,
+               "-second_order cannot be used with well_balancing = augmented_roe simultaneously (not yet implemented)");
     if (CeedEnabled()) {
       // Limiter is ON by default when MUSCL is active.
       // Disable via YAML (numerics.no_limiter: true) or CLI (-no_limiter).
@@ -502,6 +518,33 @@ PetscErrorCode DestroyOperator(Operator** op) {
 
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
+// zeros the passive output vectors (e.g. "flux", "courant_number") of a
+// non-composite flux operator. libCEED adds into passive outputs on every
+// apply, so without this they accumulate across right-hand-side evaluations.
+static PetscErrorCode ZeroCeedPassiveOutputs(CeedOperator ceed_op) {
+  PetscFunctionBegin;
+  CeedInt            num_outputs;
+  CeedOperatorField* outputs;
+  PetscCallCEED(CeedOperatorGetFields(ceed_op, NULL, NULL, &num_outputs, &outputs));
+  for (CeedInt i = 0; i < num_outputs; ++i) {
+    CeedVector vec;
+    PetscCallCEED(CeedOperatorFieldGetVector(outputs[i], &vec));
+    if (vec != CEED_VECTOR_ACTIVE && vec != CEED_VECTOR_NONE) PetscCallCEED(CeedVectorSetValue(vec, 0.0));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// zeros the passive output vectors of every sub-operator of a composite operator
+static PetscErrorCode ZeroCeedCompositePassiveOutputs(CeedOperator composite_op) {
+  PetscFunctionBegin;
+  CeedInt       num_sub_ops;
+  CeedOperator* sub_ops;
+  PetscCallCEED(CeedOperatorCompositeGetNumSub(composite_op, &num_sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(composite_op, &sub_ops));
+  for (CeedInt i = 0; i < num_sub_ops; ++i) PetscCall(ZeroCeedPassiveOutputs(sub_ops[i]));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ApplyCeedOperator(Operator* op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
@@ -586,6 +629,8 @@ static PetscErrorCode ApplyCeedOperator(Operator* op, PetscReal dt, Vec u_local,
     // We use CeedOperatorApplyAdd for each operator so that their contributions
     // are summed rather than overwritten.
     PetscCallCEED(CeedVectorSetValue(op->ceed.rhs, 0.0));
+    if (op->ceed.use_slope_reconstruction) PetscCall(ZeroCeedPassiveOutputs(op->ceed.muscl_interior_flux));
+    PetscCall(ZeroCeedCompositePassiveOutputs(op->ceed.flux));
     if (op->ceed.use_slope_reconstruction) {
       // Interior: MUSCL sub-op applied standalone (all inputs are passive, reads from q_reconstructed)
       PetscCallCEED(CeedOperatorApplyAdd(op->ceed.muscl_interior_flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));

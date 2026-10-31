@@ -70,9 +70,10 @@ static const cyaml_schema_field_t source_fields_schema[] = {
 };
 
 static const cyaml_strval_t well_balancing_methods[] = {
-    {"none",                       WELL_BALANCING_NONE   },
-    {"bradford_sanders_2002",      WELL_BALANCING_BS2002 },
-    {"hydrostatic_reconstruction", WELL_BALANCING_HR    },
+    {"none",                       WELL_BALANCING_NONE          },
+    {"bradford_sanders_2002",      WELL_BALANCING_BS2002        },
+    {"hydrostatic_reconstruction", WELL_BALANCING_HR            },
+    {"augmented_roe",              WELL_BALANCING_AUGMENTED_ROE },
 };
 
 // mapping of physics.flow fields to members of RDyPhysicsFlow
@@ -971,6 +972,14 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
       PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
                  "The BS2002 well balancing method is not currently implemented for the PETSc version of the code.");
     }
+  }
+
+  if (config->physics.flow.well_balancing == WELL_BALANCING_AUGMENTED_ROE) {
+    PetscCheck(config->physics.sediment.num_classes == 0 && !config->physics.salinity && !config->physics.heat, comm, PETSC_ERR_USER,
+               "The augmented_roe well balancing method is only implemented for flow without tracers (no sediment, salinity, or heat)");
+    PetscCheck(config->numerics.temporal != TEMPORAL_ARK_IMEX, comm, PETSC_ERR_USER,
+               "The augmented_roe well balancing method is not implemented for the ARK-IMEX temporal discretization");
+    PetscCheck(config->numerics.riemann == RIEMANN_ROE, comm, PETSC_ERR_USER, "The augmented_roe well balancing method requires riemann: roe");
   }
 
   // check sediment dynamics settings
