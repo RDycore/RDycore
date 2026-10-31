@@ -218,7 +218,12 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
         PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
         break;
       case WELL_BALANCING_AUGMENTED_ROE:
-        PetscCheck(PETSC_FALSE, comm, PETSC_ERR_SUP, "The augmented_roe well balancing method is not yet implemented for the PETSc backend");
+        PetscCall(CreatePetscFluxAugRoeOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions,
+                                                op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum,
+                                                &op->diagnostics, &op->petsc.flux));
+        // the bed-slope source lives in the edge fluctuations, so reuse HR's
+        // source operator (friction only, no bed slope)
+        PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
         break;
     }
   }

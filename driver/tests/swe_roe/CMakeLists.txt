@@ -263,3 +263,47 @@ foreach(np 2)
     endforeach()
   endforeach()
 endforeach()
+
+# Augmented Roe solver: levee test (counterpart of the HR test above)
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/levee.aug.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 2)
+  foreach(config petsc)
+    foreach(lang ${supported_languages})
+      add_test(swe_augroe_levee_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} levee.aug.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
+
+# Augmented Roe solver: lake at rest over a smooth bump (submerged, and
+# emerged as an island with a stationary shoreline) on quad, triangle, and
+# mixed meshes must be preserved to round-off. Each run gets its own copy of
+# the input with its own output directory so that runs don't clobber each other.
+foreach(mesh quads tris mixed)
+  foreach(case submerged island)
+    set(name lake_at_rest_${mesh}_${case})
+    file(COPY
+         ${MESH_DIR}/lake_at_rest_${mesh}.exo
+         ${CONDITION_DIR}/${name}.ic.${PETSC_ID_TYPE}.bin
+         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${name}.yaml yaml_contents)
+    foreach(np 1 2 4)
+      foreach(config petsc)
+        foreach(lang ${supported_languages})
+          set(test_name swe_augroe_${name}_${lang}_np_${np}_${config})
+          set(output_dir output_${test_name})
+          string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${yaml_contents}")
+          file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+          add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ${test_name}.yaml ${${config}_args})
+          set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+          add_test(${test_name}_compare ${CMAKE_COMMAND} -DH5DIFF=${H5DIFF} -DTOL=1e-12
+                   -DINITIAL=${output_dir}/${test_name}-000.h5 -DFINAL=${output_dir}/${test_name}-200.h5
+                   "-DINITIAL_GROUP=/0 0.000000E+00 sec" "-DFINAL_GROUP=/200 1.000000E+00 sec"
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/compare_lake_at_rest.cmake)
+          set_tests_properties(${test_name}_compare PROPERTIES FIXTURES_REQUIRED ${test_name})
+        endforeach()
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
