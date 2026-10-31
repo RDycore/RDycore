@@ -192,7 +192,10 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
         PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
         break;
       case WELL_BALANCING_AUGMENTED_ROE:
-        PetscCheck(PETSC_FALSE, comm, PETSC_ERR_SUP, "The augmented_roe well balancing method is not yet implemented for the CEED backend");
+        PetscCall(CreateCeedFluxAugRoeOperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
+        // the bed-slope source lives in the edge fluctuations, so reuse HR's
+        // source operator (friction only, no bed slope)
+        PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
         break;
     }
   } else {

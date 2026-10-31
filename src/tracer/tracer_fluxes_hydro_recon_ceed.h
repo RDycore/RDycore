@@ -1,6 +1,7 @@
 #ifndef TRACER_FLUXES_HYDRO_RECON_CEED_H
 #define TRACER_FLUXES_HYDRO_RECON_CEED_H
 
+#include "../swe/swe_interior_geom_ceed.h"
 #include "tracer_types_ceed.h"
 
 #ifndef Square
