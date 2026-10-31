@@ -502,6 +502,33 @@ PetscErrorCode DestroyOperator(Operator** op) {
 
 static inline CeedMemType MemTypeP2C(PetscMemType mem_type) { return PetscMemTypeDevice(mem_type) ? CEED_MEM_DEVICE : CEED_MEM_HOST; }
 
+// zeros the passive output vectors (e.g. "flux", "courant_number") of a
+// non-composite flux operator. libCEED adds into passive outputs on every
+// apply, so without this they accumulate across right-hand-side evaluations.
+static PetscErrorCode ZeroCeedPassiveOutputs(CeedOperator ceed_op) {
+  PetscFunctionBegin;
+  CeedInt            num_outputs;
+  CeedOperatorField* outputs;
+  PetscCallCEED(CeedOperatorGetFields(ceed_op, NULL, NULL, &num_outputs, &outputs));
+  for (CeedInt i = 0; i < num_outputs; ++i) {
+    CeedVector vec;
+    PetscCallCEED(CeedOperatorFieldGetVector(outputs[i], &vec));
+    if (vec != CEED_VECTOR_ACTIVE && vec != CEED_VECTOR_NONE) PetscCallCEED(CeedVectorSetValue(vec, 0.0));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+// zeros the passive output vectors of every sub-operator of a composite operator
+static PetscErrorCode ZeroCeedCompositePassiveOutputs(CeedOperator composite_op) {
+  PetscFunctionBegin;
+  CeedInt       num_sub_ops;
+  CeedOperator* sub_ops;
+  PetscCallCEED(CeedOperatorCompositeGetNumSub(composite_op, &num_sub_ops));
+  PetscCallCEED(CeedOperatorCompositeGetSubList(composite_op, &sub_ops));
+  for (CeedInt i = 0; i < num_sub_ops; ++i) PetscCall(ZeroCeedPassiveOutputs(sub_ops[i]));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode ApplyCeedOperator(Operator* op, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBegin;
 
@@ -586,6 +613,8 @@ static PetscErrorCode ApplyCeedOperator(Operator* op, PetscReal dt, Vec u_local,
     // We use CeedOperatorApplyAdd for each operator so that their contributions
     // are summed rather than overwritten.
     PetscCallCEED(CeedVectorSetValue(op->ceed.rhs, 0.0));
+    if (op->ceed.use_slope_reconstruction) PetscCall(ZeroCeedPassiveOutputs(op->ceed.muscl_interior_flux));
+    PetscCall(ZeroCeedCompositePassiveOutputs(op->ceed.flux));
     if (op->ceed.use_slope_reconstruction) {
       // Interior: MUSCL sub-op applied standalone (all inputs are passive, reads from q_reconstructed)
       PetscCallCEED(CeedOperatorApplyAdd(op->ceed.muscl_interior_flux, op->ceed.u_local, op->ceed.rhs, CEED_REQUEST_IMMEDIATE));
