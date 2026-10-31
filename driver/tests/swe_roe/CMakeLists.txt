@@ -320,3 +320,37 @@ foreach(np 1 2)
     endforeach()
   endforeach()
 endforeach()
+
+# Augmented Roe solver: 1D dam breaks over dry (Ritter) and wet (Stoker) beds,
+# checked against the analytic solutions (relative L1 depth error, h >= 0).
+# Mesh and initial conditions: tools/preprocessing/lake-at-rest/generate_dam_break.py
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_program(H5DUMP h5dump REQUIRED PATHS ${PETSC_DIR}/${PETSC_ARCH}/bin)
+file(COPY ${MESH_DIR}/dam_break_strip.exo DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(case dry wet)
+  if (case STREQUAL "dry")
+    set(h_right 0)
+  else()
+    set(h_right 0.1)
+  endif()
+  set(name dam_break_${case})
+  file(COPY ${CONDITION_DIR}/dam_break_strip_${case}.ic.${PETSC_ID_TYPE}.bin DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${name}.yaml yaml_contents)
+  foreach(np 1 2)
+    foreach(config petsc ceed)
+      foreach(lang ${supported_languages})
+        set(test_name swe_augroe_${name}_${lang}_np_${np}_${config})
+        set(output_dir output_${test_name})
+        string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${yaml_contents}")
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+        add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ${test_name}.yaml ${${config}_args})
+        set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+        add_test(NAME ${test_name}_check
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_dam_break.py ${H5DUMP} ${output_dir}/${test_name}-grid.h5
+                         ${output_dir}/${test_name}-300.h5 "/300 6.000000E+00 sec" 6 1 ${h_right} 50 0.015
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(${test_name}_check PROPERTIES FIXTURES_REQUIRED ${test_name})
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
