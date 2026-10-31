@@ -165,14 +165,16 @@ CEED_QFUNCTION_HELPER void SWEAugmentedRoeFluctuations(const CeedScalar gravity,
 /// edge: flux_L = F_n(U_L) + D- and flux_R = F_n(U_R) - D+. A cell's update is
 /// -(L/A_L) flux_L for the left cell and +(L/A_R) flux_R for the right cell.
 /// The mass components are identical (flux_R[0] is set to flux_L[0]), so mass
-/// is conserved exactly. Velocities use the same ANUGA regularization as
+/// is conserved exactly; a mass flux below round-off is zeroed so that
+/// round-off velocities next to a wall or shoreline don't drain dry cells.
+/// Negative (round-off) depths are treated as zero. Velocities use the same ANUGA regularization as
 /// SWERiemannFlux_Roe, and the momenta h*u, h*v formed from them are used
 /// consistently in F_n and in the jumps. At least one of qL.h, qR.h must exceed
 /// tiny_h.
 CEED_QFUNCTION_HELPER void SWERiemannFlux_AugmentedRoe(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL,
                                                        SWEState qR, CeedScalar zL, CeedScalar zR, CeedScalar sn, CeedScalar cn, CeedScalar flux_L[3],
                                                        CeedScalar flux_R[3], CeedScalar *amax) {
-  const CeedScalar hl = qL.h, hr = qR.h;
+  const CeedScalar hl = fmax(qL.h, 0.0), hr = fmax(qR.h, 0.0);
 
   const CeedScalar denom_l = hl * hl + h_anuga * h_anuga;
   const CeedScalar denom_r = hr * hr + h_anuga * h_anuga;
@@ -189,6 +191,7 @@ CEED_QFUNCTION_HELPER void SWERiemannFlux_AugmentedRoe(const CeedScalar gravity,
   const CeedScalar unr = ur * cn + vr * sn;
 
   flux_L[0] = hl * unl + dm[0];
+  if (fabs(flux_L[0]) < AUGMENTED_ROE_ROUNDOFF_CEED) flux_L[0] = 0.0;
   flux_L[1] = hl * ul * unl + 0.5 * gravity * hl * hl * cn + dm[1];
   flux_L[2] = hl * vl * unl + 0.5 * gravity * hl * hl * sn + dm[2];
 

@@ -162,11 +162,16 @@ static void ComputeSWEAugmentedRoeFluctuationsPointwise(const PetscReal gravity,
 /// edge: flux_l = F_n(U_L) + D- and flux_r = F_n(U_R) - D+. A cell's update is
 /// -(L/A_L) flux_l for the left cell and +(L/A_R) flux_r for the right cell.
 /// The mass components are identical (flux_r[0] is set to flux_l[0]), so mass
-/// is conserved exactly. At least one of hl, hr must be positive.
-static void ComputeSWEAugmentedRoeFluxPointwise(const PetscReal gravity, const PetscReal tol, const PetscReal hl, const PetscReal ul,
-                                                const PetscReal vl, const PetscReal zl, const PetscReal hr, const PetscReal ur, const PetscReal vr,
+/// is conserved exactly; a mass flux below round-off is zeroed so that
+/// round-off velocities next to a wall or shoreline don't drain dry cells.
+/// Negative (round-off) depths are treated as zero. At least one of hl, hr
+/// must be positive.
+static void ComputeSWEAugmentedRoeFluxPointwise(const PetscReal gravity, const PetscReal tol, const PetscReal hl_in, const PetscReal ul,
+                                                const PetscReal vl, const PetscReal zl, const PetscReal hr_in, const PetscReal ur, const PetscReal vr,
                                                 const PetscReal zr, const PetscReal sn, const PetscReal cn, PetscReal flux_l[3], PetscReal flux_r[3],
                                                 PetscReal *amax) {
+  const PetscReal hl = PetscMax(hl_in, 0.0), hr = PetscMax(hr_in, 0.0);
+
   PetscReal dm[3], dp[3];
   ComputeSWEAugmentedRoeFluctuationsPointwise(gravity, tol, hl, ul, vl, zl, hr, ur, vr, zr, sn, cn, dm, dp, amax);
 
@@ -174,6 +179,7 @@ static void ComputeSWEAugmentedRoeFluxPointwise(const PetscReal gravity, const P
   const PetscReal unr = ur * cn + vr * sn;
 
   flux_l[0] = hl * unl + dm[0];
+  if (PetscAbsReal(flux_l[0]) < AUGMENTED_ROE_ROUNDOFF) flux_l[0] = 0.0;
   flux_l[1] = hl * ul * unl + 0.5 * gravity * hl * hl * cn + dm[1];
   flux_l[2] = hl * vl * unl + 0.5 * gravity * hl * hl * sn + dm[2];
 
