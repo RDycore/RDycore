@@ -307,3 +307,16 @@ foreach(mesh quads tris mixed)
     endforeach()
   endforeach()
 endforeach()
+
+# Augmented Roe solver: MMS convergence study (first order)
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_conv_study_augmented_roe.yaml
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config petsc ceed)
+    foreach(lang ${supported_languages})
+      add_test(swe_augroe_mms_conv_study_${lang}_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_${lang}_driver}
+               mms_conv_study_augmented_roe.yaml ${${config}_args})
+    endforeach()
+  endforeach()
+endforeach()
