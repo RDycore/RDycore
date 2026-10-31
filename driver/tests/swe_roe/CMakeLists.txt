@@ -354,3 +354,38 @@ foreach(case dry wet)
     endforeach()
   endforeach()
 endforeach()
+
+# Steady flow over a bump (Goutal and Maurel) with the augmented Roe solver,
+# checked against the analytic solution: relative L1 depth error and largest
+# relative deviation of the discharge.
+# Mesh and initial conditions: tools/preprocessing/lake-at-rest/generate_transcritical_bump.py
+file(COPY ${MESH_DIR}/bump_channel.exo DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(case subcritical transcritical shock)
+  if (case STREQUAL "subcritical")
+    set(thresholds 1e-4 1e-10)
+  elseif (case STREQUAL "transcritical")
+    set(thresholds 5e-3 2e-3)
+  else()
+    set(thresholds 5e-3 1e-2)
+  endif()
+  set(name transcritical_bump_${case})
+  file(COPY ${CONDITION_DIR}/bump_channel_${case}.ic.${PETSC_ID_TYPE}.bin DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${name}.yaml yaml_contents)
+  foreach(np 1 2)
+    foreach(config petsc ceed)
+      foreach(lang ${supported_languages})
+        set(test_name swe_augroe_${name}_${lang}_np_${np}_${config})
+        set(output_dir output_${test_name})
+        string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${yaml_contents}")
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+        add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_${lang}_driver} ${test_name}.yaml ${${config}_args})
+        set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+        add_test(NAME ${test_name}_check
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_transcritical_bump.py ${H5DUMP} ${output_dir}/${test_name}-grid.h5
+                         ${output_dir}/${test_name}-20000.h5 "/20000 2.000000E+02 sec" ${case} 0.125 ${thresholds}
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(${test_name}_check PROPERTIES FIXTURES_REQUIRED ${test_name})
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()

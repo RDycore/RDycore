@@ -74,16 +74,27 @@ def format_values(values, fmt):
     return ", ".join(fmt % v for v in values)
 
 
-def write_exodus(path, name, nodes, blocks):
+def write_exodus(path, name, nodes, blocks, side_sets=()):
+    """Writes an Exodus II file. Each side set is (id, [(element, side), ...])
+    with 0-based element indices (numbered across blocks) and 1-based Exodus
+    local side numbers (for QUAD4, side k joins vertices k and k+1)."""
     num_elem = sum(len(cells) for _, cells in blocks)
     lines = [f"netcdf {name} {{", "dimensions:", "\tnum_dim = 3 ;", f"\tnum_nodes = {len(nodes)} ;", f"\tnum_elem = {num_elem} ;",
              f"\tnum_el_blk = {len(blocks)} ;"]
+    if side_sets:
+        lines.append(f"\tnum_side_sets = {len(side_sets)} ;")
     for b, (_, cells) in enumerate(blocks, start=1):
         lines += [f"\tnum_el_in_blk{b} = {len(cells)} ;", f"\tnum_nod_per_el{b} = {len(cells[0])} ;"]
+    for s, (_, sides) in enumerate(side_sets, start=1):
+        lines.append(f"\tnum_side_ss{s} = {len(sides)} ;")
     lines += ["\ttime_step = UNLIMITED ;", "variables:", "\tint eb_prop1(num_el_blk) ;", '\t\teb_prop1:name = "ID" ;',
               "\tdouble coordx(num_nodes) ;", "\tdouble coordy(num_nodes) ;", "\tdouble coordz(num_nodes) ;"]
     for b, (elem_type, _) in enumerate(blocks, start=1):
         lines += [f"\tint connect{b}(num_el_in_blk{b}, num_nod_per_el{b}) ;", f'\t\tconnect{b}:elem_type = "{elem_type}" ;']
+    if side_sets:
+        lines += ["\tint ss_prop1(num_side_sets) ;", '\t\tss_prop1:name = "ID" ;']
+    for s, _ in enumerate(side_sets, start=1):
+        lines += [f"\tint elem_ss{s}(num_side_ss{s}) ;", f"\tint side_ss{s}(num_side_ss{s}) ;"]
     lines += ["", "// global attributes:", "\t\t:api_version = 4.93 ;", "\t\t:version = 4.93 ;", "\t\t:floating_point_word_size = 8. ;",
               "\t\t:file_size = 1. ;", "data:", ""]
     lines.append(" eb_prop1 = " + format_values(range(1, len(blocks) + 1), "%d") + " ;")
@@ -91,6 +102,11 @@ def write_exodus(path, name, nodes, blocks):
         lines.append(f" coord{coord} = " + format_values([n[d] for n in nodes], "%.17g") + " ;")
     for b, (_, cells) in enumerate(blocks, start=1):
         lines.append(f" connect{b} = " + format_values([v + 1 for c in cells for v in c], "%d") + " ;")
+    if side_sets:
+        lines.append(" ss_prop1 = " + format_values([ss_id for ss_id, _ in side_sets], "%d") + " ;")
+    for s, (_, sides) in enumerate(side_sets, start=1):
+        lines.append(f" elem_ss{s} = " + format_values([e + 1 for e, _ in sides], "%d") + " ;")
+        lines.append(f" side_ss{s} = " + format_values([k for _, k in sides], "%d") + " ;")
     lines.append("}")
     with tempfile.NamedTemporaryFile("w", suffix=".cdl", delete=False) as f:
         f.write("\n".join(lines) + "\n")

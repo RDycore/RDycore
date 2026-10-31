@@ -1,0 +1,81 @@
+# Steady frictionless flow over a bump (Goutal and Maurel, 1997) with the
+# augmented Roe solver: q = 0.18 and h = 0.33 at the outflow, critical at the
+# crest with a hydraulic jump at x = 11.67.
+# Starts from still water; the inflow and outflow are Dirichlet states taken
+# from the analytic solution (check_transcritical_bump.py --boundary-states).
+# The steady state is checked by check_transcritical_bump.py.
+
+physics:
+  flow:
+    mode: swe
+    well_balancing: augmented_roe
+
+numerics:
+  spatial: fv
+  temporal: euler
+  riemann: roe
+
+logging:
+  level: debug
+
+time:
+  stop: 200.0
+  unit: seconds
+  stop_n: 20000
+
+output:
+  format: xdmf
+  output_interval: 20000
+  fields:
+    - Height
+    - MomentumX
+    - MomentumY
+
+grid:
+  file: bump_channel.exo
+
+regions:
+  - name: domain
+    grid_region_id: 1
+
+boundaries:
+  - name: inflow
+    grid_boundary_id: 1
+  - name: outflow
+    grid_boundary_id: 2
+
+surface_composition:
+  - region: domain
+    material: frictionless
+
+materials:
+  - name: frictionless
+    properties:
+      manning:
+        value: 0.0
+
+initial_conditions:
+  - region: domain
+    flow: still_water
+
+boundary_conditions:
+  - boundaries: [inflow]
+    flow: inflow_bc
+  - boundaries: [outflow]
+    flow: outflow_bc
+
+flow_conditions:
+  - name: still_water
+    type: dirichlet
+    file: bump_channel_shock.ic.${PETSC_ID_TYPE}.bin
+    format: binary
+  - name: inflow_bc
+    type: dirichlet
+    height: 0.413763458346
+    x_momentum: 0.18
+    y_momentum: 0.0
+  - name: outflow_bc
+    type: dirichlet
+    height: 0.33
+    x_momentum: 0.18
+    y_momentum: 0.0
