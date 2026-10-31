@@ -17,3 +17,12 @@ foreach(exe_name
     add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${CMAKE_CURRENT_BINARY_DIR}/${exe_name})
   endforeach()
 endforeach()
+
+# unit tests that don't need a mesh or multiple processes
+foreach(exe_name
+        test_augmented_roe)
+  set(exe_source ${exe_name}.c)
+  add_executable(${exe_name} ${exe_source})
+  target_link_libraries(${exe_name} PRIVATE rdycore_c cmocka)
+  add_test(${exe_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n 1 ${CMAKE_CURRENT_BINARY_DIR}/${exe_name})
+endforeach()
