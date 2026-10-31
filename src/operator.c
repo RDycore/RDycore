@@ -191,6 +191,9 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
         PetscCall(CreateCeedFluxHROperator(op->config, op->mesh, op->num_boundaries, op->boundaries, op->boundary_conditions, &op->ceed.flux));
         PetscCall(CreateCeedSourceHROperator(op->config, op->mesh, &op->ceed.source));
         break;
+      case WELL_BALANCING_AUGMENTED_ROE:
+        PetscCheck(PETSC_FALSE, comm, PETSC_ERR_SUP, "The augmented_roe well balancing method is not yet implemented for the CEED backend");
+        break;
     }
   } else {
     switch (op->config->physics.flow.well_balancing) {
@@ -213,6 +216,9 @@ static PetscErrorCode CreateOperatorSubOperators(Operator* op) {
                                             op->petsc.boundary_values, op->petsc.boundary_fluxes, op->petsc.boundary_fluxes_accum, &op->diagnostics,
                                             &op->petsc.flux));
         PetscCall(CreatePetscSourceHROperator(op->config, op->mesh, op->petsc.external_sources, op->petsc.material_properties, &op->petsc.source));
+        break;
+      case WELL_BALANCING_AUGMENTED_ROE:
+        PetscCheck(PETSC_FALSE, comm, PETSC_ERR_SUP, "The augmented_roe well balancing method is not yet implemented for the PETSc backend");
         break;
     }
   }
@@ -388,6 +394,8 @@ PetscErrorCode CreateOperator(RDyConfig* config, DM domain_dm, RDyMesh* domain_m
   if (use_slope_reconstruction) {
     PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_HR, comm, PETSC_ERR_USER,
                "-second_order cannot be used with well_balancing = HR simultaneously (not yet implemented)");
+    PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_AUGMENTED_ROE, comm, PETSC_ERR_USER,
+               "-second_order cannot be used with well_balancing = augmented_roe simultaneously (not yet implemented)");
     if (CeedEnabled()) {
       // Limiter is ON by default when MUSCL is active.
       // Disable via YAML (numerics.no_limiter: true) or CLI (-no_limiter).

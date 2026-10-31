@@ -647,7 +647,7 @@ PetscErrorCode RDyPerformAMR(RDy rdy) {
   // destroy and recreate mesh
   PetscCall(RDyMeshDestroy(rdy->mesh));
   PetscCall(RDyMeshCreateFromDM(rdy->dm, rdy->amr.num_refinements, &rdy->mesh));
-  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+  if (UsesEdgeBedSource(&rdy->config)) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
   if (rdy->config.grid.cell_elevation.file[0]) {

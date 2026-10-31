@@ -1597,7 +1597,7 @@ PetscErrorCode RDySetup(RDy rdy) {
 
   RDyLogDebug(rdy, "Creating FV mesh...");
   PetscCall(RDyMeshCreateFromDM(rdy->dm, 0, &rdy->mesh));
-  if (rdy->config.physics.flow.well_balancing == WELL_BALANCING_HR) {
+  if (UsesEdgeBedSource(&rdy->config)) {
     PetscCall(RDyMeshOverride2DProjection(&rdy->mesh));
   }
   if (rdy->config.grid.cell_elevation.file[0]) {
