@@ -29,12 +29,7 @@ from netCDF4 import Dataset
 from pyproj import Transformer
 
 HERE = Path(__file__).parent
-MESH = Path(sys.argv[1]) if len(sys.argv) > 1 else (
-    Path(__file__).parent.parent.parent /
-    "rescued-from-main-checkout" /
-    "share" / "meshes" /
-    "Turning_30m_with_z.updated.with_sidesets.exo"
-)
+MESH = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "../../share/meshes/Turning_30m_with_z.updated.with_sidesets.exo"
 HWM_JSON = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE / "hwm_raw.json"
 OUTDIR = Path(sys.argv[3]) if len(sys.argv) > 3 else HERE
 
@@ -180,7 +175,7 @@ def main():
         print(f"  {datum}: {count}")
 
     # Check the gauge CSV to confirm mesh vertical datum
-    gauge_csv = HERE / "turning30m_gauges_cells.csv"
+    gauge_csv = HERE.parent / "harvey_gauges/turning30m_gauges_cells.csv"
     if gauge_csv.exists():
         with open(gauge_csv) as f:
             gauges = list(csv.DictReader(f))
