@@ -1,37 +1,3 @@
-% =====================================================================
-% ASKING CLAUDE FOR SOMETHING IN THIS PAPER
-%
-% Write your request as a LaTeX comment, in the TEXT, on the line above
-% the passage it is about, and sign it:
-%
-%     % [CLAUDE/GB: is the 12 h window defensible, or should it be 24?]
-%
-% Claude answers in place, leaving both lines for you to find:
-%
-%     % [CLAUDE-REPLY: crest times are bimodal (h29-42, h60-72) with an
-%     %  empty gap, so 24 h integrates marks that already peaked. Kept.]
-%
-% Delete the pair once you are satisfied.
-%
-% Three things to know:
-%
-%   1. Overleaf MARGIN COMMENTS DO NOT REACH CLAUDE. They are stored
-%      outside the document and never appear in the git history Claude
-%      reads. A request left in a comment thread will not be seen.
-%      Use the code editor, not the visual editor, which hides % lines.
-%
-%   2. Nothing notifies Claude. Mark triggers the read, so expect the
-%      latency to be "next working session", not minutes.
-%
-%   3. Claude acts directly on editorial requests -- wording, structure,
-%      notation, citations, captions. Anything that would change a
-%      NUMBER, a SCIENTIFIC CLAIM, an attribution, or the author list is
-%      routed to Mark instead of executed: those come from runs, and a
-%      comment cannot change what a run produced.
-%
-% Sign your marker. The answer often depends on who is asking.
-% =====================================================================
-
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath}
@@ -46,7 +12,7 @@
 \pgfplotsset{compat=1.18}
 
 \title{Adjoint measurement and calibration of Manning roughness in
-E3SM's river dynamical core\\[4pt]\large DRAFT for internal review}
+E3SM's river dynamical core}
 \author{Mark Adams$^1$, Gautam Bisht$^2$, Donghui Xu$^2$, Jeffrey
 Johnson$^3$, Jed Brown$^4$, Matthew Knepley$^5$\\[2pt]
 \footnotesize $^1$Applied Mathematics \& Computational Research Division,
@@ -990,7 +956,7 @@ A stored trajectory for a full 36-hour Hurricane Harvey window
 at the 30\,m mesh's explicit gravity-wave (CFL) limit of
 $\Delta t = 0.25$\,s (518{,}400 steps, 2.93M cells) would occupy tens
 of terabytes, far beyond device memory. PETSc's checkpointing
-trajectory (\texttt{-ts\_trajectory\_type memory} with the revolve
+trajectory (\texttt{-ts\char`\_trajectory\char`\_type memory} with the revolve
 optimal-schedule library) replaces storage with recomputation. We
 validated it across the full hierarchy. On the dam-break twin it
 reproduces the disk-trajectory calibration and gradient gates
@@ -2447,22 +2413,36 @@ supported by the Office of Science of the U.S.\ Department of Energy
 under Contract No.\ DE-AC02-05CH11231 using NERSC award
 ASCR-ERCAP0039362.
 
+\section*{Use of AI}
+Claude (Anthropic) was used throughout the preparation of this work: in
+developing the capability described here, in writing and running the
+analysis scripts behind its figures and tables, and in drafting and
+revising the manuscript. Every number reported comes from the runs
+recorded in the Artifact Description. The authors verified the results
+against those run logs and are responsible for the content of this
+paper.
+
 \section*{Code and data availability}
-RDycore is open source at \url{https://github.com/RDycore/RDycore}; the
-adjoint, Jacobian, implicit-stepping and calibration capability of this
-paper is on the \texttt{adams/gpu-implicit} branch behind the
-\texttt{numerics.jacobian} and \texttt{adjoint} configuration flags, and
+RDycore is open source at \url{https://github.com/RDycore/RDycore}. The
+analytic Jacobian, Kokkos GPU assembly, implicit-stepping, discrete-adjoint,
+and calibration capability of this paper is on its
+\texttt{adams/gpu-implicit} branch, at the tag
+\texttt{manning-calibration-arxiv-v1}, behind the
+\texttt{numerics.jacobian} and \texttt{adjoint} configuration flags;
 the verification gates of Table~\ref{tab:verification} run in its
-\texttt{ctest} suite. The exact revision, the campaign scripts, the
-observation tables, and the per-mark peak dumps behind
-Figures~\ref{fig:authority} and~\ref{fig:spectrum} will be archived on
-Zenodo at submission \textbf{[DOI to be minted]}. Hurricane Harvey
+\texttt{ctest} suite. The Artifact Description,
+\texttt{papers/manning-calibration/README.md} at that tag, maps each
+figure and table to the campaign scripts (\texttt{plans/campaigns/}) and
+to the archived output logs and per-mark peak dumps (\texttt{logs/})
+behind it. Hurricane Harvey
 high-water marks are the USGS Short-Term Network survey, retrieved
 through the STN Flood Event Viewer API (\url{https://stn.wim.usgs.gov})
-with the retrieval script and the filtered mark table in the archive;
-stage records are from the USGS National Water Information System
-(NWIS); rainfall is the Multi-Radar Multi-Sensor (MRMS) product. \textbf{[Mesh, checkpoint, and rainfall archive: location to be
-stated.]}
+with the retrieval script and the filtered mark table in
+\texttt{data/harvey\char`\_hwm/}; stage records are from the USGS National
+Water Information System (NWIS), processed in
+\texttt{data/harvey\char`\_gauges/}; land-cover roughness tables and sampling
+scripts are in \texttt{data/nlcd/}; rainfall is the Multi-Radar
+Multi-Sensor (MRMS) product.
 
 \bibliographystyle{unsrt}
 \bibliography{manning-calibration}
