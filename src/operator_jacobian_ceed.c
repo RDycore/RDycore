@@ -1,5 +1,6 @@
 // libCEED evaluation of the analytic Jacobian dF/dU of the SWE right-hand side for
-// a fully implicit flow TS.
+// a fully implicit flow TS (plain Roe, hydrostatic reconstruction, or augmented Roe
+// interior fluxes; see swe/swe_edge_flux_jacobian_ceed.h).
 //
 // A composite CeedOperator evaluates the 3x3 Jacobian blocks of every interior edge,
 // boundary edge and cell (Q-functions in swe/swe_jacobian_ceed.h) into one
@@ -141,7 +142,19 @@ static PetscErrorCode CreateCeedJacobianOperator(Operator *op) {
     CeedInt             ncomp_geom;
     PetscCall(GetField(interior, "geom", &rstr_geom, &geom));
     PetscCallCEED(CeedElemRestrictionGetNumComponents(rstr_geom, &ncomp_geom));
-    PetscCall(CreateJacobianQFunction(ceed, op->config, SWEFluxJacobian_Roe, SWEFluxJacobian_Roe_loc, &qf));
+    switch (op->config->physics.flow.well_balancing) {
+      case WELL_BALANCING_HR:
+        PetscCall(CreateJacobianQFunction(ceed, op->config, SWEFluxJacobian_HydroRecon, SWEFluxJacobian_HydroRecon_loc, &qf));
+        break;
+      case WELL_BALANCING_AUGMENTED_ROE:
+        PetscCall(CreateJacobianQFunction(ceed, op->config, SWEFluxJacobian_AugmentedRoe, SWEFluxJacobian_AugmentedRoe_loc, &qf));
+        break;
+      case WELL_BALANCING_NONE:
+        PetscCall(CreateJacobianQFunction(ceed, op->config, SWEFluxJacobian_Roe, SWEFluxJacobian_Roe_loc, &qf));
+        break;
+      default:
+        SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "The analytic Jacobian does not support this well_balancing method");
+    }
     PetscCallCEED(CeedQFunctionAddInput(qf, "geom", ncomp_geom, CEED_EVAL_NONE));
     PetscCallCEED(CeedQFunctionAddInput(qf, "q_left", num_comp, CEED_EVAL_NONE));
     PetscCallCEED(CeedQFunctionAddInput(qf, "q_right", num_comp, CEED_EVAL_NONE));
@@ -235,7 +248,13 @@ static PetscErrorCode CreateCeedJacobianOperator(Operator *op) {
     PetscCall(GetField(source, "mat_props", &rstr_mat, &mat_props));
     PetscCallCEED(CeedElemRestrictionGetNumComponents(rstr_geom, &ncomp_geom));
     PetscCallCEED(CeedElemRestrictionGetNumComponents(rstr_mat, &ncomp_mat));
-    PetscCall(CreateJacobianQFunction(ceed, op->config, SWESourceJacobian_FullyImplicit, SWESourceJacobian_FullyImplicit_loc, &qf));
+    // HR and augmented Roe carry the bed slope in the edge flux, not in the cell source
+    if (UsesEdgeBedSource(op->config)) {
+      PetscCall(
+          CreateJacobianQFunction(ceed, op->config, SWESourceJacobian_FullyImplicitNoBedSlope, SWESourceJacobian_FullyImplicitNoBedSlope_loc, &qf));
+    } else {
+      PetscCall(CreateJacobianQFunction(ceed, op->config, SWESourceJacobian_FullyImplicit, SWESourceJacobian_FullyImplicit_loc, &qf));
+    }
     PetscCallCEED(CeedQFunctionAddInput(qf, "geom", ncomp_geom, CEED_EVAL_NONE));
     PetscCallCEED(CeedQFunctionAddInput(qf, "mat_props", ncomp_mat, CEED_EVAL_NONE));
     PetscCallCEED(CeedQFunctionAddInput(qf, "q", num_comp, CEED_EVAL_NONE));

@@ -5,7 +5,8 @@ Plan and laptop results: `plans/swe_implicit_ts_plan.md` (Section 4, "Status")
 
 ## 1. What is on the branch
 
-A fully implicit flow TS for first-order Roe SWE (no tracers), selected in the YAML:
+A fully implicit flow TS for first-order SWE (no tracers) with the plain Roe, hydrostatic
+reconstruction (HR) or augmented Roe edge fluxes, selected in the YAML:
 
 ```yaml
 numerics:
@@ -15,7 +16,8 @@ numerics:
 
 - `physics.flow.source.method` defaults to `fully_implicit` (friction `S_f(U)` with no `dt`).
 - Supported scope (checked in `ValidateConfig`): `riemann: roe`, `well_balancing: none`,
-  first-order (no `second_order`), no sediment/salinity/heat, no adaptive dt.
+  `hydrostatic_reconstruction` or `augmented_roe` (not `bradford_sanders_2002`), first-order (no
+  `second_order`), no sediment/salinity/heat, no adaptive dt.
 - Fixed time step by default (`-ts_adapt_type none` is set; options still override).
 - Default nonlinear tolerances: `-snes_atol 1e-12 -snes_rtol 1e-10`, max 50 its.
 
@@ -25,7 +27,7 @@ Jacobian (`-rdy_jacobian analytic|fd|mf`, default `analytic`):
 |---|---|---|
 | PETSc (no `-ceed`) | host loop, `MatSetValuesLocal` | `src/operator_jacobian_petsc.c` |
 | CEED (`-ceed ...`) | libCEED Q-functions write 3×3 blocks into a COO-values CeedVector; one `MatSetValuesCOO` in the state vector's memory space (device on GPU) | `src/operator_jacobian_ceed.c`, `src/swe/swe_jacobian_ceed.h` |
-| both | pointwise derivatives (Roe flux incl. entropy fix and `h_anuga`; bed slope; friction; reflecting / critical-outflow BC maps) | `src/swe/swe_roe_flux_jacobian_ceed.h`, `src/swe/swe_sources_jacobian_ceed.h` |
+| both | pointwise derivatives (Roe flux incl. entropy fix and `h_anuga`; HR and augmented Roe edge fluxes; bed slope; friction; reflecting / critical-outflow BC maps) | `src/swe/swe_roe_flux_jacobian_ceed.h`, `src/swe/swe_edge_flux_jacobian_ceed.h`, `src/swe/swe_sources_jacobian_ceed.h` |
 
 The CEED path does **not** use `CeedOperatorLinearAssemble`, so any libCEED that RDycore
 already builds with works (the preinstalled PETSc 3.24.1 libCEED is fine).
@@ -50,6 +52,9 @@ macOS, `~/.rdycore-petsc` (petsc_main, debug), CPU backends `/cpu/self/ref|opt`:
 | T1 time-only MMS, L1 rate h | BE 0.98, CN 2.00, BDF2 2.01 |
 | T3 space-time MMS (dt ∝ dx), L1 rate h | BE 0.93 (CN 0.94) |
 | Newton its/step, BE, sinusoidal MMS, 4096 cells, LU | CFL 1.6: 2.9; CFL 6.6: 2.9; CFL 26: 5.9 |
+| HR / augmented Roe space-time MMS, L1 rate h | 0.90 / 0.90 (CEED = PETSc errors) |
+| HR / augmented Roe `-rdy_jacobian_compare` | 5e-17 / 6e-17 |
+| HR / augmented Roe implicit lake at rest (submerged, island) | preserved to 1e-12 |
 
 The default serial linear solver (GMRES + ILU(0)) failed at CFL ≈ 26; LU works.
 
@@ -94,7 +99,8 @@ Run from the build directory (ctest copies the YAML and mesh into
 ctest -R "swe_implicit|test_swe_roe_jacobian" --output-on-failure
 ```
 
-Expect 20/20 pass (19 implicit ctests + the unit test), same rates as Section 2. Note: in
+Expect 63/63 pass (implicit MMS, Jacobian checks and lake-at-rest tests for plain Roe, HR and augmented
+Roe, plus the unit test), same rates as Section 2. Note: in
 `ctest -j N`, the existing `swe_roe_ex2b_*chkpt*` tests interfere with each other (they share
 output directories); on the laptop they fail at random under `-j6` and pass with `-j1`, on both the
 baseline and this branch. That is not caused by this work.
@@ -105,8 +111,10 @@ From `build/driver/tests/swe_roe`:
 
 ```bash
 for be in /gpu/cuda/ref /gpu/cuda/shared /gpu/cuda/gen; do
-  srun -n 1 -G 1 ../../rdycore_mms mms_implicit_jacobian_check.yaml -ceed $be -rdy_jacobian_compare -snes_converged_reason
-  srun -n 2 -G 2 ../../rdycore_mms mms_implicit_jacobian_check.yaml -ceed $be -rdy_jacobian_compare -snes_converged_reason
+  for cfg in mms_implicit_jacobian_check mms_implicit_jacobian_check_hr mms_implicit_jacobian_check_augroe; do
+    srun -n 1 -G 1 ../../rdycore_mms $cfg.yaml -ceed $be -rdy_jacobian_compare -snes_converged_reason
+    srun -n 2 -G 2 ../../rdycore_mms $cfg.yaml -ceed $be -rdy_jacobian_compare -snes_converged_reason
+  done
 done
 ```
 
@@ -121,8 +129,14 @@ from `physics_ceed.h`.
 for m in beuler cn bdf; do
   srun -n 1 -G 1 ../../rdycore_mms mms_implicit_time_$m.yaml -ceed /gpu/cuda/gen
 done
-srun -n 4 -G 4 ../../rdycore_mms mms_implicit_spacetime_beuler.yaml -ceed /gpu/cuda/gen
+for wb in "" _hr _augroe; do
+  srun -n 4 -G 4 ../../rdycore_mms mms_implicit_spacetime_beuler$wb.yaml -ceed /gpu/cuda/gen
+done
 ```
+
+Well-balancing on the GPU: run the generated `swe_implicit_lake_at_rest_tris_*.yaml` inputs from
+`build/driver/tests/swe_roe` with `-ceed /gpu/cuda/gen` and compare the first and last outputs
+(the `_compare` ctests show the `h5diff` command).
 
 Expect `PASS` and the Section 2 rates. A linear solver is needed that works with CUSPARSE
 matrices; the defaults (GMRES + block Jacobi/ILU) run on the GPU via cuSPARSE ILU. If a solve fails, try
@@ -161,12 +175,14 @@ Preconditioners worth trying: `bjacobi`+`ilu` (default), `asm -pc_asm_overlap 1`
 
 ## 5. Known limitations / things to watch
 
-- Wet/dry: not exercised. The Jacobian zeroes dry cells (`h ≤ tiny_h`) and uses one-sided
+- Wet/dry: only exercised at rest (island lake-at-rest test) and in the unit tests. The Jacobian zeroes dry cells (`h ≤ tiny_h`) and uses one-sided
   derivatives at kinks; Newton may leave `h < 0`. Phase 6 in the plan (positivity post-check or
   SNESVI) is not done.
 - `h_anuga_regular > 0` is differentiated (unit-tested), but not run in a full simulation.
 - The PETSc backend's friction uses `u = hu/h` while CEED uses the desingularized velocity; they
   agree when `h_anuga_regular = 0` (the default).
+- The augmented Roe Jacobian has the most branches (wave sets, entropy fix, bed-step clipping,
+  wet/dry fronts); expect slower Newton near transcritical flow and moving shorelines.
 - Plain Roe uses 3D edge lengths/areas, so a uniform state on a sloped bed is not exactly
   steady (O(slope²)). This is why the time-only MMS uses a flat bed.
 - The MMS step count fix: `stop / time_step` is now rounded up with a tolerance (it was truncated,

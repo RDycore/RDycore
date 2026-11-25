@@ -390,7 +390,8 @@ foreach(case subcritical transcritical shock)
   endforeach()
 endforeach()
 
-# Fully implicit Roe solver (TS beuler/cn/bdf with the analytic Jacobian)
+# Fully implicit Roe-type solvers (TS beuler/cn/bdf with the analytic Jacobian;
+# plain Roe, hydrostatic reconstruction, augmented Roe)
 #  - time-only MMS (spatially uniform state, mesh fixed, dt halved per level):
 #    expected temporal orders 1 (beuler) and 2 (cn, bdf)
 #  - space-time MMS (sinusoidal state with bed slope and friction, dt ~ dx)
@@ -401,6 +402,10 @@ file(COPY
      ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_time_bdf.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_spacetime_beuler.yaml
      ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_jacobian_check.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_spacetime_beuler_hr.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_spacetime_beuler_augroe.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_jacobian_check_hr.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_jacobian_check_augroe.yaml
      ${MESH_DIR}/mms_triangles_dx1.exo
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 foreach(np 1 2)
@@ -414,4 +419,43 @@ foreach(np 1 2)
   endforeach()
   add_test(swe_implicit_jacobian_ceed_vs_host_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_c_driver}
            mms_implicit_jacobian_check.yaml -ceed /cpu/self -rdy_jacobian_compare)
+  # hydrostatic reconstruction and augmented Roe interior fluxes
+  foreach(wb hr augroe)
+    foreach(config basic ceed)
+      add_test(swe_implicit_mms_spacetime_beuler_${wb}_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_c_driver}
+               mms_implicit_spacetime_beuler_${wb}.yaml ${${config}_args})
+    endforeach()
+    add_test(swe_implicit_jacobian_ceed_vs_host_${wb}_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_c_driver}
+             mms_implicit_jacobian_check_${wb}.yaml -ceed /cpu/self -rdy_jacobian_compare)
+  endforeach()
+endforeach()
+
+# Implicit (backward Euler, 4 steps of 0.25 s) lake at rest over a smooth bump,
+# submerged and as an island with a still shoreline, for hydrostatic
+# reconstruction and augmented Roe: the state must be preserved to round-off.
+# The inputs are generated from the explicit lake-at-rest YAML files.
+foreach(case submerged island)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/lake_at_rest_tris_${case}.yaml yaml_contents)
+  foreach(wb hydrostatic_reconstruction augmented_roe)
+    foreach(np 1 2)
+      foreach(config basic ceed)
+        set(test_name swe_implicit_lake_at_rest_tris_${case}_${wb}_np_${np}_${config})
+        set(output_dir output_${test_name})
+        string(REPLACE "well_balancing: augmented_roe" "well_balancing: ${wb}" test_yaml "${yaml_contents}")
+        string(REPLACE "temporal: euler" "temporal: beuler" test_yaml "${test_yaml}")
+        string(REPLACE "stop_n: 200" "stop_n: 4" test_yaml "${test_yaml}")
+        string(REPLACE "output_interval: 200" "output_interval: 4" test_yaml "${test_yaml}")
+        string(REPLACE "level: debug" "level: none" test_yaml "${test_yaml}")
+        string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${test_yaml}")
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+        add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_c_driver} ${test_name}.yaml ${${config}_args})
+        set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+        add_test(${test_name}_compare ${CMAKE_COMMAND} -DH5DIFF=${H5DIFF} -DTOL=1e-12
+                 -DINITIAL=${output_dir}/${test_name}-0.h5 -DFINAL=${output_dir}/${test_name}-4.h5
+                 "-DINITIAL_GROUP=/0 0.000000E+00 sec" "-DFINAL_GROUP=/4 1.000000E+00 sec"
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/compare_lake_at_rest.cmake)
+        set_tests_properties(${test_name}_compare PROPERTIES FIXTURES_REQUIRED ${test_name})
+      endforeach()
+    endforeach()
+  endforeach()
 endforeach()

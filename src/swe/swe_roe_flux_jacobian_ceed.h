@@ -120,23 +120,12 @@ CEED_QFUNCTION_HELPER SWEDual SWEDualVelocity(SWEDual h, SWEDual hu, CeedScalar 
   return SWEDualConst(0.0);
 }
 
-/// Computes the Roe flux of SWERiemannFlux_Roe (with dhv = 0, i.e. no BS2002 well balancing)
-/// and its Jacobians with respect to the left and right conservative states.
-/// @param [in]  gravity  acceleration due to gravity
-/// @param [in]  tiny_h   water height at or below which a state is dry
-/// @param [in]  h_anuga  ANUGA velocity desingularization height
-/// @param [in]  qL, qR   left and right states (h, hu, hv)
-/// @param [in]  sn, cn   sine and cosine of the edge normal angle
-/// @param [out] flux     the Roe flux (3 components)
-/// @param [out] dF_dqL   dF_i/dqL_j
-/// @param [out] dF_dqR   dF_i/dqR_j
-/// @param [out] amax     maximum wave speed
-CEED_QFUNCTION_HELPER void SWERiemannFluxJacobian_Roe(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL,
-                                                      SWEState qR, CeedScalar sn, CeedScalar cn, CeedScalar flux[3], CeedScalar dF_dqL[3][3],
-                                                      CeedScalar dF_dqR[3][3], CeedScalar *amax) {
-  const SWEDual hl = SWEDualVar(qL.h, 0), hul = SWEDualVar(qL.hu, 1), hvl = SWEDualVar(qL.hv, 2);
-  const SWEDual hr = SWEDualVar(qR.h, 3), hur = SWEDualVar(qR.hu, 4), hvr = SWEDualVar(qR.hv, 5);
-
+/// Roe flux of SWERiemannFlux_Roe (with dhv = 0, i.e. no BS2002 well balancing) for states
+/// given as dual numbers, so that callers can chain the Roe flux with a state reconstruction
+/// (e.g. hydrostatic reconstruction). Returns F (with derivatives) and the maximum wave speed.
+CEED_QFUNCTION_HELPER void SWEDualRoeFlux(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEDual hl, SWEDual hul,
+                                          SWEDual hvl, SWEDual hr, SWEDual hur, SWEDual hvr, CeedScalar sn, CeedScalar cn, SWEDual F[3],
+                                          CeedScalar *amax) {
   const SWEDual ul = SWEDualVelocity(hl, hul, tiny_h, h_anuga);
   const SWEDual vl = SWEDualVelocity(hl, hvl, tiny_h, h_anuga);
   const SWEDual ur = SWEDualVelocity(hr, hur, tiny_h, h_anuga);
@@ -207,11 +196,30 @@ CEED_QFUNCTION_HELPER void SWERiemannFluxJacobian_Roe(const CeedScalar gravity, 
   const SWEDual B1 = SWEDualAdd(SWEDualAdd(SWEDualMul(R10, w0), SWEDualScale(-sn, w1)), SWEDualMul(R12, w2));
   const SWEDual B2 = SWEDualAdd(SWEDualAdd(SWEDualMul(R20, w0), SWEDualScale(cn, w1)), SWEDualMul(R22, w2));
 
-  SWEDual F[3];
   F[0] = SWEDualScale(0.5, SWEDualSub(SWEDualAdd(FL0, FR0), B0));
   F[1] = SWEDualScale(0.5, SWEDualSub(SWEDualAdd(FL1, FR1), B1));
   F[2] = SWEDualScale(0.5, SWEDualSub(SWEDualAdd(FL2, FR2), B2));
 
+  *amax = chat.v + fabs(uperp.v);
+}
+
+/// Computes the Roe flux of SWERiemannFlux_Roe (with dhv = 0, i.e. no BS2002 well balancing)
+/// and its Jacobians with respect to the left and right conservative states.
+/// @param [in]  gravity  acceleration due to gravity
+/// @param [in]  tiny_h   water height at or below which a state is dry
+/// @param [in]  h_anuga  ANUGA velocity desingularization height
+/// @param [in]  qL, qR   left and right states (h, hu, hv)
+/// @param [in]  sn, cn   sine and cosine of the edge normal angle
+/// @param [out] flux     the Roe flux (3 components)
+/// @param [out] dF_dqL   dF_i/dqL_j
+/// @param [out] dF_dqR   dF_i/dqR_j
+/// @param [out] amax     maximum wave speed
+CEED_QFUNCTION_HELPER void SWERiemannFluxJacobian_Roe(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL,
+                                                      SWEState qR, CeedScalar sn, CeedScalar cn, CeedScalar flux[3], CeedScalar dF_dqL[3][3],
+                                                      CeedScalar dF_dqR[3][3], CeedScalar *amax) {
+  SWEDual F[3];
+  SWEDualRoeFlux(gravity, tiny_h, h_anuga, SWEDualVar(qL.h, 0), SWEDualVar(qL.hu, 1), SWEDualVar(qL.hv, 2), SWEDualVar(qR.h, 3), SWEDualVar(qR.hu, 4),
+                 SWEDualVar(qR.hv, 5), sn, cn, F, amax);
   for (CeedInt i = 0; i < 3; i++) {
     flux[i] = F[i].v;
     for (CeedInt j = 0; j < 3; j++) {
@@ -219,7 +227,6 @@ CEED_QFUNCTION_HELPER void SWERiemannFluxJacobian_Roe(const CeedScalar gravity, 
       dF_dqR[i][j] = F[i].d[3 + j];
     }
   }
-  *amax = chat.v + fabs(uperp.v);
 }
 
 #pragma GCC diagnostic   pop

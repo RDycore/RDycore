@@ -39,6 +39,10 @@ static PetscErrorCode CreateHRSourceQFunction(Ceed ceed, const RDyConfig config,
       case SOURCE_ARK_IMEX:
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithoutBedFriction, SWESourcesHydroReconWithoutBedFriction_loc, qf));
         break;
+      case SOURCE_FULLY_IMPLICIT:
+        PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesHydroReconWithFullyImplicitBedFriction,
+                                                  SWESourcesHydroReconWithFullyImplicitBedFriction_loc, qf));
+        break;
       default:
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "Unsupported source-term method for HR");
         break;

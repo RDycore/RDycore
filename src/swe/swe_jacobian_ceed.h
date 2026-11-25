@@ -22,6 +22,7 @@
 //   boundary edge : [J_LL]                    (9 values)
 //   cell source   : [J_cc]                    (9 values)
 
+#include "swe_edge_flux_jacobian_ceed.h"
 #include "swe_sources_jacobian_ceed.h"
 
 #pragma GCC diagnostic   push
@@ -36,9 +37,18 @@
 #define SWE_JAC_INTERIOR_NCOMP 36
 #define SWE_JAC_BLOCK_NCOMP 9
 
-/// Interior edges: in[0] geom (sn, cn, w_L = -L/A_L, w_R = L/A_R, z_beg, z_end), in[1] q_L, in[2] q_R;
-/// out[0] blocks (36 = J_LL, J_LR, J_RL, J_RR)
-CEED_QFUNCTION(SWEFluxJacobian_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+// interior-edge flux schemes supported by the Jacobian
+typedef enum {
+  SWE_EDGE_FLUX_ROE = 0,        // plain Roe (well_balancing: none)
+  SWE_EDGE_FLUX_HYDRO_RECON,    // hydrostatic reconstruction
+  SWE_EDGE_FLUX_AUGMENTED_ROE,  // augmented Roe
+} SWEEdgeFluxType;
+
+/// Interior edges: in[0] geom, in[1] q_L, in[2] q_R; out[0] blocks (36 = w_L dG_L/dU_L, w_L dG_L/dU_R,
+/// w_R dG_R/dU_L, w_R dG_R/dU_R). geom components 0..3 are (sn, cn, w_L = -L/A_L, w_R = L/A_R) for
+/// every scheme; HR and augmented Roe also read the cell bed elevations (z_L, z_R) at 4, 5
+/// (HRInteriorGeomIndex). For plain Roe, 4 and 5 hold vertex elevations and are not used.
+CEED_QFUNCTION_HELPER int SWEFluxJacobian_Edge(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[], SWEEdgeFluxType type) {
   const CeedScalar(*geom)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0];
   const CeedScalar(*q_L)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q_R)[CEED_Q_VLA]  = (const CeedScalar(*)[CEED_Q_VLA])in[2];
@@ -46,25 +56,45 @@ CEED_QFUNCTION(SWEFluxJacobian_Roe)(void *ctx, CeedInt Q, const CeedScalar *cons
   const SWEContext context            = (SWEContext)ctx;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
-    SWEState qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
-    if (qL.h > context->tiny_h || qR.h > context->tiny_h) {
-      CeedScalar flux[3], dFL[3][3], dFR[3][3], amax;
-      SWERiemannFluxJacobian_Roe(context->gravity, context->tiny_h, context->h_anuga_regular, qL, qR, geom[0][i], geom[1][i], flux, dFL, dFR, &amax);
-      const CeedScalar wL = geom[2][i], wR = geom[3][i];
-      for (CeedInt r = 0; r < 3; r++) {
-        for (CeedInt c = 0; c < 3; c++) {
-          blocks[0 + 3 * r + c][i]  = wL * dFL[r][c];
-          blocks[9 + 3 * r + c][i]  = wL * dFR[r][c];
-          blocks[18 + 3 * r + c][i] = wR * dFL[r][c];
-          blocks[27 + 3 * r + c][i] = wR * dFR[r][c];
-        }
+    SWEState         qL = {q_L[0][i], q_L[1][i], q_L[2][i]};
+    SWEState         qR = {q_R[0][i], q_R[1][i], q_R[2][i]};
+    const CeedScalar sn = geom[0][i], cn = geom[1][i], wL = geom[2][i], wR = geom[3][i];
+    CeedScalar       GL[3], GR[3], J[4][3][3];
+    switch (type) {
+      case SWE_EDGE_FLUX_HYDRO_RECON:
+        SWEEdgeFluxJacobian_HydroRecon(context->gravity, context->tiny_h, context->h_anuga_regular, qL, qR, geom[4][i], geom[5][i], sn, cn, GL, GR,
+                                       J);
+        break;
+      case SWE_EDGE_FLUX_AUGMENTED_ROE:
+        SWEEdgeFluxJacobian_AugmentedRoe(context->gravity, context->tiny_h, context->h_anuga_regular, qL, qR, geom[4][i], geom[5][i], sn, cn, GL, GR,
+                                         J);
+        break;
+      default:
+        SWEEdgeFluxJacobian_Roe(context->gravity, context->tiny_h, context->h_anuga_regular, qL, qR, sn, cn, GL, GR, J);
+        break;
+    }
+    for (CeedInt r = 0; r < 3; r++) {
+      for (CeedInt c = 0; c < 3; c++) {
+        blocks[0 + 3 * r + c][i]  = wL * J[0][r][c];
+        blocks[9 + 3 * r + c][i]  = wL * J[1][r][c];
+        blocks[18 + 3 * r + c][i] = wR * J[2][r][c];
+        blocks[27 + 3 * r + c][i] = wR * J[3][r][c];
       }
-    } else {
-      for (CeedInt k = 0; k < SWE_JAC_INTERIOR_NCOMP; k++) blocks[k][i] = 0.0;
     }
   }
   return 0;
+}
+
+CEED_QFUNCTION(SWEFluxJacobian_Roe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFluxJacobian_Edge(ctx, Q, in, out, SWE_EDGE_FLUX_ROE);
+}
+
+CEED_QFUNCTION(SWEFluxJacobian_HydroRecon)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFluxJacobian_Edge(ctx, Q, in, out, SWE_EDGE_FLUX_HYDRO_RECON);
+}
+
+CEED_QFUNCTION(SWEFluxJacobian_AugmentedRoe)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWEFluxJacobian_Edge(ctx, Q, in, out, SWE_EDGE_FLUX_AUGMENTED_ROE);
 }
 
 /// Dirichlet boundary edges: in[0] geom (sn, cn, w_L, z_beg, z_end), in[1] q_L, in[2] q_dirichlet;
@@ -146,8 +176,10 @@ CEED_QFUNCTION(SWEBoundaryFluxJacobian_Outflow_Roe)(void *ctx, CeedInt Q, const 
   return SWEBoundaryFluxJacobian_Mapped(ctx, Q, in, out, 1);
 }
 
-/// Cell sources: in[0] geom (dz/dx, dz/dy), in[1] mat_props, in[2] q; out[0] block dS/dq (9)
-CEED_QFUNCTION(SWESourceJacobian_FullyImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+/// Cell sources: in[0] geom (dz/dx, dz/dy), in[1] mat_props, in[2] q; out[0] block dS/dq (9).
+/// With include_bed_slope = 0 (HR, augmented Roe) the bed slope lives in the edge flux.
+CEED_QFUNCTION_HELPER int SWESourceJacobian_Cells(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[],
+                                                  CeedInt include_bed_slope) {
   const CeedScalar(*geom)[CEED_Q_VLA]      = (const CeedScalar(*)[CEED_Q_VLA])in[0];
   const CeedScalar(*mat_props)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   const CeedScalar(*q)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[2];
@@ -155,14 +187,22 @@ CEED_QFUNCTION(SWESourceJacobian_FullyImplicit)(void *ctx, CeedInt Q, const Ceed
   const SWEContext context                 = (SWEContext)ctx;
 
   for (CeedInt i = 0; i < Q; i++) {
-    SWEState   state = {q[0][i], q[1][i], q[2][i]};
-    CeedScalar dS[3][3];
-    SWESourceJacobian(context->gravity, context->tiny_h, context->h_anuga_regular, state, geom[0][i], geom[1][i],
-                      mat_props[MATERIAL_PROPERTY_MANNINGS][i], dS);
+    SWEState         state = {q[0][i], q[1][i], q[2][i]};
+    const CeedScalar zx = include_bed_slope ? geom[0][i] : 0.0, zy = include_bed_slope ? geom[1][i] : 0.0;
+    CeedScalar       dS[3][3];
+    SWESourceJacobian(context->gravity, context->tiny_h, context->h_anuga_regular, state, zx, zy, mat_props[MATERIAL_PROPERTY_MANNINGS][i], dS);
     for (CeedInt r = 0; r < 3; r++)
       for (CeedInt c = 0; c < 3; c++) block[3 * r + c][i] = dS[r][c];
   }
   return 0;
+}
+
+CEED_QFUNCTION(SWESourceJacobian_FullyImplicit)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWESourceJacobian_Cells(ctx, Q, in, out, 1);
+}
+
+CEED_QFUNCTION(SWESourceJacobian_FullyImplicitNoBedSlope)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWESourceJacobian_Cells(ctx, Q, in, out, 0);
 }
 
 #pragma GCC diagnostic   pop

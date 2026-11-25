@@ -1435,8 +1435,11 @@ PetscErrorCode CreatePetscSWESourceHROperator(RDyMesh *mesh, const RDyConfig con
     case SOURCE_IMPLICIT_XQ2018:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
       break;
+    case SOURCE_FULLY_IMPLICIT:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceFullyImplicit, DestroySource, petsc_op));
+      break;
     default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit, implicit_xq2018 and fully_implicit are supported in the PETSc version");
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);

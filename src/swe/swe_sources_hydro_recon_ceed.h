@@ -65,6 +65,9 @@ CEED_QFUNCTION_HELPER int SWESourcesHydroRecon(void *ctx, CeedInt Q, const CeedS
         case SWE_BED_FRICTION_IMPLICIT_XQ2018:
           SWEImplicitBedFrictionRoughnessXQ2018(context, state, mannings_n, Fsum_x, Fsum_y, bedx, bedy, &tbx, &tby);
           break;
+        case SWE_BED_FRICTION_FULLY_IMPLICIT:
+          SWEFullyImplicitBedFrictionRoughness(context, state, mannings_n, &tbx, &tby);
+          break;
         default:
           break;
       }
@@ -98,6 +101,10 @@ CEED_QFUNCTION(SWESourcesHydroReconWithSemiImplicitBedFriction)(void *ctx, CeedI
 
 CEED_QFUNCTION(SWESourcesHydroReconWithImplicitBedFrictionXQ2018)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return SWESourcesHydroRecon(ctx, Q, in, out, SWE_BED_FRICTION_IMPLICIT_XQ2018);
+}
+
+CEED_QFUNCTION(SWESourcesHydroReconWithFullyImplicitBedFriction)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWESourcesHydroRecon(ctx, Q, in, out, SWE_BED_FRICTION_FULLY_IMPLICIT);
 }
 
 #pragma GCC diagnostic   pop

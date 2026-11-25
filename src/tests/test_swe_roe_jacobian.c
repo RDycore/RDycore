@@ -1,5 +1,7 @@
 // Unit tests for the analytic Jacobians used by the fully implicit SWE solver:
 //   - SWERiemannFluxJacobian_Roe (src/swe/swe_roe_flux_jacobian_ceed.h)
+//   - SWEEdgeFluxJacobian_HydroRecon / _AugmentedRoe (src/swe/swe_edge_flux_jacobian_ceed.h),
+//     checked against the residual Q-functions SWEFlux_HydroRecon_Roe / SWEFlux_AugmentedRoe
 //   - SWESourceJacobian, SWEReflectingStateJacobian, SWECriticalOutflowStateJacobian
 //     (src/swe/swe_sources_jacobian_ceed.h)
 // The references are (a) the residual kernels themselves (flux values must match
@@ -22,6 +24,9 @@
 // clang-format off
 #include "../swe/swe_roe_flux_ceed.h"
 // clang-format on
+#include "../swe/swe_edge_flux_jacobian_ceed.h"
+#include "../swe/swe_fluxes_augmented_roe_ceed.h"
+#include "../swe/swe_fluxes_hydro_recon_ceed.h"
 #include "../swe/swe_sources_jacobian_ceed.h"
 #include "rdycore_tests.h"
 
@@ -278,6 +283,115 @@ static void TestBoundaryJacobianVsFD(void **state) {
   assert_true(checked > 600);
 }
 
+// Evaluates the left/right edge fluxes G_L, G_R of the HR (scheme 1) or augmented Roe (scheme 2)
+// residual Q-function for one edge, using weights w_L = -1, w_R = +1 so that
+// cell_L = -G_L and cell_R = G_R.
+static void EdgeFluxesFromQFunction(int scheme, SWEState qL, SWEState qR, PetscReal zL, PetscReal zR, PetscReal sn, PetscReal cn, PetscReal h_anuga,
+                                    PetscReal GL[3], PetscReal GR[3]) {
+  struct SWEContext_ ctx     = {.dtime = 1.0, .tiny_h = TINY_H, .h_anuga_regular = h_anuga, .gravity = G, .xq2018_threshold = 0.0};
+  CeedScalar         geom[6] = {sn, cn, -1.0, 1.0, zL, zR};
+  CeedScalar         ql[3] = {qL.h, qL.hu, qL.hv}, qr[3] = {qR.h, qR.hu, qR.hv};
+  CeedScalar         cl[3], cr[3], fl[3], cnum[2];
+  const CeedScalar  *in[3]  = {geom, ql, qr};
+  CeedScalar        *out[4] = {cl, cr, fl, cnum};
+  if (scheme == 1) SWEFlux_HydroRecon_Roe(&ctx, 1, in, out);
+  else SWEFlux_AugmentedRoe(&ctx, 1, in, out);
+  for (int i = 0; i < 3; i++) {
+    GL[i] = -cl[i];
+    GR[i] = cr[i];
+  }
+}
+
+static void EdgeJacobian(int scheme, SWEState qL, SWEState qR, PetscReal zL, PetscReal zR, PetscReal sn, PetscReal cn, PetscReal h_anuga,
+                         PetscReal GL[3], PetscReal GR[3], PetscReal J[4][3][3]) {
+  if (scheme == 1) SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, h_anuga, qL, qR, zL, zR, sn, cn, GL, GR, J);
+  else SWEEdgeFluxJacobian_AugmentedRoe(G, TINY_H, h_anuga, qL, qR, zL, zR, sn, cn, GL, GR, J);
+}
+
+// HR and augmented Roe: the Jacobian routine reproduces the residual Q-function's fluxes, and its
+// four blocks agree with central differences of that Q-function away from kinks
+static void TestEdgeSchemeJacobianVsFD(int scheme) {
+  const char *name    = scheme == 1 ? "hydrostatic reconstruction" : "augmented Roe";
+  int         checked = 0, total = 0;
+  for (int a = 0; a < 2; a++) {
+    PetscReal h_anuga = a ? 0.05 : 0.0;
+    for (int trial = 0; trial < 400; trial++) {
+      SWEState qL, qR;
+      RandomWetState(&qL);
+      RandomWetState(&qR);
+      PetscReal zL = RandRange(-0.5, 0.5), zR = RandRange(-0.5, 0.5);
+      if (trial % 4 == 0) zR = zL;                               // flat edge
+      if (trial % 7 == 0) zR = zL + qL.h + RandRange(0.1, 1.0);  // step above the left surface
+      if (trial % 9 == 0) qR = (SWEState){0.0, 0.0, 0.0};        // dry right neighbor (wet/dry front)
+      if (trial % 11 == 0) qL = (SWEState){0.0, 0.0, 0.0};       // dry left neighbor
+      PetscReal theta = RandRange(0.0, 2.0 * PETSC_PI), sn = sin(theta), cn = cos(theta);
+
+      PetscReal GL[3], GR[3], GLref[3], GRref[3], J[4][3][3];
+      EdgeJacobian(scheme, qL, qR, zL, zR, sn, cn, h_anuga, GL, GR, J);
+      EdgeFluxesFromQFunction(scheme, qL, qR, zL, zR, sn, cn, h_anuga, GLref, GRref);
+      for (int i = 0; i < 3; i++) {
+        if (fabs(GL[i] - GLref[i]) > 1e-12 * fmax(1.0, fabs(GLref[i])) || fabs(GR[i] - GRref[i]) > 1e-12 * fmax(1.0, fabs(GRref[i]))) {
+          print_message("%s flux value mismatch, component %d: G_L %.15e vs %.15e, G_R %.15e vs %.15e\n", name, i, GL[i], GLref[i], GR[i], GRref[i]);
+          fail();
+        }
+      }
+
+      for (PetscInt side = 0; side < 2; side++) {
+        for (PetscInt k = 0; k < 3; k++) {
+          total++;
+          SWEState  q   = side ? qR : qL;
+          PetscReal x   = GetComp(q, k);
+          PetscReal eps = 1e-6 * fmax(1.0, fabs(x)) * (k == 0 ? fmax(q.h, 1e-3) : 1.0);
+          SWEState  qp = q, qm = q;
+          SetComp(&qp, k, x + eps);
+          SetComp(&qm, k, x - eps);
+          PetscReal GLp[3], GRp[3], GLm[3], GRm[3];
+          EdgeFluxesFromQFunction(scheme, side ? qL : qp, side ? qp : qR, zL, zR, sn, cn, h_anuga, GLp, GRp);
+          EdgeFluxesFromQFunction(scheme, side ? qL : qm, side ? qm : qR, zL, zR, sn, cn, h_anuga, GLm, GRm);
+          PetscBool kink = PETSC_FALSE;
+          for (int i = 0; i < 3; i++) {
+            PetscReal f[2] = {(GLp[i] - GLref[i]) / eps, (GRp[i] - GRref[i]) / eps}, b[2] = {(GLref[i] - GLm[i]) / eps, (GRref[i] - GRm[i]) / eps};
+            for (int t = 0; t < 2; t++)
+              if (fabs(f[t] - b[t]) > 1e-4 * fmax(1.0, fabs(f[t]))) kink = PETSC_TRUE;
+          }
+          if (kink) continue;
+          checked++;
+          for (int i = 0; i < 3; i++) {
+            PetscReal fdL = (GLp[i] - GLm[i]) / (2.0 * eps), fdR = (GRp[i] - GRm[i]) / (2.0 * eps);
+            PetscReal aL = J[side][i][k], aR = J[2 + side][i][k];
+            if (fabs(fdL - aL) > 1e-6 * fmax(1.0, fabs(fdL)) || fabs(fdR - aR) > 1e-6 * fmax(1.0, fabs(fdR))) {
+              print_message("%s Jacobian mismatch: side %d, row %d, col %d: dG_L analytic %.12e FD %.12e; dG_R analytic %.12e FD %.12e\n", name,
+                            (int)side, i, (int)k, aL, fdL, aR, fdR);
+              fail();
+            }
+          }
+        }
+      }
+    }
+  }
+  print_message("%s Jacobian: %d of %d columns checked against FD (rest straddle a kink)\n", name, checked, total);
+  assert_true(checked > total / 2);
+}
+
+static void TestHydroReconJacobianVsFD(void **state) { TestEdgeSchemeJacobianVsFD(1); }
+static void TestAugmentedRoeJacobianVsFD(void **state) { TestEdgeSchemeJacobianVsFD(2); }
+
+// on a flat edge, HR reduces to plain Roe (identical blocks)
+static void TestHydroReconFlatBedIsRoe(void **state) {
+  for (int trial = 0; trial < 100; trial++) {
+    SWEState qL, qR;
+    RandomWetState(&qL);
+    RandomWetState(&qR);
+    PetscReal theta = RandRange(0.0, 2.0 * PETSC_PI), sn = sin(theta), cn = cos(theta), z = RandRange(-1.0, 1.0);
+    PetscReal GL[3], GR[3], J[4][3][3], GL0[3], GR0[3], J0[4][3][3];
+    SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, 0.0, qL, qR, z, z, sn, cn, GL, GR, J);
+    SWEEdgeFluxJacobian_Roe(G, TINY_H, 0.0, qL, qR, sn, cn, GL0, GR0, J0);
+    for (int k = 0; k < 4; k++)
+      for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) assert_true(fabs(J[k][i][j] - J0[k][i][j]) <= 1e-12 * fmax(1.0, fabs(J0[k][i][j])));
+  }
+}
+
 static int    argc_ = 0;
 static char **argv_ = NULL;
 
@@ -288,10 +402,9 @@ int main(int argc, char *argv[]) {
   argc_                           = argc;
   argv_                           = argv;
   const struct CMUnitTest tests[] = {
-      cmocka_unit_test(TestRoeFluxJacobianVsFD),
-      cmocka_unit_test(TestRoeFluxJacobianConsistency),
-      cmocka_unit_test(TestSourceJacobianVsFD),
-      cmocka_unit_test(TestBoundaryJacobianVsFD),
+      cmocka_unit_test(TestRoeFluxJacobianVsFD),      cmocka_unit_test(TestRoeFluxJacobianConsistency), cmocka_unit_test(TestSourceJacobianVsFD),
+      cmocka_unit_test(TestBoundaryJacobianVsFD),     cmocka_unit_test(TestHydroReconJacobianVsFD),     cmocka_unit_test(TestHydroReconFlatBedIsRoe),
+      cmocka_unit_test(TestAugmentedRoeJacobianVsFD),
   };
   return cmocka_run_group_tests(tests, Setup, Teardown);
 }

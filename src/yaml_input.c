@@ -1004,8 +1004,8 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
     PetscCheck(config->physics.sediment.num_classes == 0 && !config->physics.salinity && !config->physics.heat, comm, PETSC_ERR_USER,
                "Implicit temporal methods currently support flow without tracers only (no sediment, salinity, or heat)");
     PetscCheck(config->numerics.riemann == RIEMANN_ROE, comm, PETSC_ERR_USER, "Implicit temporal methods currently require riemann: roe");
-    PetscCheck(config->physics.flow.well_balancing == WELL_BALANCING_NONE, comm, PETSC_ERR_USER,
-               "Implicit temporal methods currently require well_balancing: none");
+    PetscCheck(config->physics.flow.well_balancing != WELL_BALANCING_BS2002, comm, PETSC_ERR_USER,
+               "Implicit temporal methods support well_balancing: none, hydrostatic_reconstruction or augmented_roe (not bradford_sanders_2002)");
     PetscCheck(!config->numerics.second_order, comm, PETSC_ERR_USER,
                "Implicit temporal methods currently require first-order spatial reconstruction");
     PetscCheck(!config->time.adaptive.enable, comm, PETSC_ERR_USER, "Adaptive time stepping is not supported with implicit temporal methods");

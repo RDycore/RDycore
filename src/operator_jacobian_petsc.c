@@ -17,6 +17,7 @@
 #include <private/rdycoreimpl.h>
 #include <private/rdyoperatorimpl.h>
 
+#include "swe/swe_edge_flux_jacobian_ceed.h"
 #include "swe/swe_sources_jacobian_ceed.h"
 #include "swe/swe_types_petsc.h"
 
@@ -35,7 +36,8 @@ static PetscErrorCode AddBlock(Mat J, PetscInt row_cell, PetscInt col_cell, Pets
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/// Assembles the analytic Jacobian of the first-order Roe SWE right-hand side on the host.
+/// Assembles the analytic Jacobian of the first-order SWE right-hand side on the host (plain Roe,
+/// hydrostatic reconstruction, or augmented Roe interior fluxes).
 /// @param [in]    op       the operator (mesh, boundaries, conditions, material data)
 /// @param [in]    u_local  local solution vector (owned + ghost cells)
 /// @param [inout] J        Jacobian matrix created by DMCreateMatrix
@@ -50,6 +52,16 @@ PetscErrorCode ComputeSWEJacobianHost(Operator *op, Vec u_local, Mat J) {
   const PetscReal gravity = GRAVITY;
 
   PetscCheck(op->num_components == 3, PETSC_COMM_SELF, PETSC_ERR_SUP, "The analytic Jacobian supports SWE without tracers only");
+  const RDyWellBalanceMethod wb = op->config->physics.flow.well_balancing;
+  PetscCheck(wb == WELL_BALANCING_NONE || wb == WELL_BALANCING_HR || wb == WELL_BALANCING_AUGMENTED_ROE, PETSC_COMM_SELF, PETSC_ERR_SUP,
+             "The analytic Jacobian supports well_balancing none, hydrostatic_reconstruction and augmented_roe");
+
+  // cell bed elevations used by HR and augmented Roe (same as their residual operators)
+  PetscReal *zc;
+  PetscCall(PetscCalloc1(mesh->num_cells, &zc));
+  if (UsesEdgeBedSource(op->config)) {
+    PetscCall(RDyMeshGetCellBedElevations(mesh, op->config->grid.cell_elevation.file[0] ? PETSC_TRUE : PETSC_FALSE, zc));
+  }
 
   PetscCall(MatZeroEntries(J));
 
@@ -69,21 +81,33 @@ PetscErrorCode ComputeSWEJacobianHost(Operator *op, Vec u_local, Mat J) {
     SWEState qR = {u_ptr[3 * r], u_ptr[3 * r + 1], u_ptr[3 * r + 2]};
     if (qL.h < tiny_h && qR.h < tiny_h) continue;  // both dry: no flux
 
-    PetscReal flux[3], dFL[3][3], dFR[3][3], amax;
-    SWERiemannFluxJacobian_Roe(gravity, tiny_h, h_anuga, qL, qR, edges->sn[edge_id], edges->cn[edge_id], flux, dFL, dFR, &amax);
+    // left/right fluxes G_L, G_R and blocks J = [dG_L/dU_L, dG_L/dU_R, dG_R/dU_L, dG_R/dU_R]
+    PetscReal GL[3], GR[3], Jb[4][3][3], sn = edges->sn[edge_id], cn = edges->cn[edge_id];
+    switch (op->config->physics.flow.well_balancing) {
+      case WELL_BALANCING_HR:
+        SWEEdgeFluxJacobian_HydroRecon(gravity, tiny_h, h_anuga, qL, qR, zc[l], zc[r], sn, cn, GL, GR, Jb);
+        break;
+      case WELL_BALANCING_AUGMENTED_ROE:
+        SWEEdgeFluxJacobian_AugmentedRoe(gravity, tiny_h, h_anuga, qL, qR, zc[l], zc[r], sn, cn, GL, GR, Jb);
+        break;
+      default:
+        SWEEdgeFluxJacobian_Roe(gravity, tiny_h, h_anuga, qL, qR, sn, cn, GL, GR, Jb);
+        break;
+    }
 
     PetscReal len = edges->lengths[edge_id];
     if (own_l) {
       PetscReal w = -len / cells->areas[l];
-      PetscCall(AddBlock(J, l, l, w, dFL));
-      PetscCall(AddBlock(J, l, r, w, dFR));
+      PetscCall(AddBlock(J, l, l, w, Jb[0]));
+      PetscCall(AddBlock(J, l, r, w, Jb[1]));
     }
     if (own_r) {
       PetscReal w = len / cells->areas[r];
-      PetscCall(AddBlock(J, r, l, w, dFL));
-      PetscCall(AddBlock(J, r, r, w, dFR));
+      PetscCall(AddBlock(J, r, l, w, Jb[2]));
+      PetscCall(AddBlock(J, r, r, w, Jb[3]));
     }
   }
+  PetscCall(PetscFree(zc));
 
   // boundary edges
   for (PetscInt b = 0; b < op->num_boundaries; b++) {
@@ -148,7 +172,9 @@ PetscErrorCode ComputeSWEJacobianHost(Operator *op, Vec u_local, Mat J) {
     SWEState  q        = {u_ptr[3 * c], u_ptr[3 * c + 1], u_ptr[3 * c + 2]};
     PetscReal n        = mat_props.values[MATERIAL_PROPERTY_MANNINGS][owned_id];
     PetscReal dS[3][3];
-    SWESourceJacobian(gravity, tiny_h, h_anuga, q, cells->dz_dx[c], cells->dz_dy[c], n, dS);
+    // HR and augmented Roe carry the bed slope in the edge flux, not in the cell source
+    PetscReal zx = UsesEdgeBedSource(op->config) ? 0.0 : cells->dz_dx[c], zy = UsesEdgeBedSource(op->config) ? 0.0 : cells->dz_dy[c];
+    SWESourceJacobian(gravity, tiny_h, h_anuga, q, zx, zy, n, dS);
     PetscCall(AddBlock(J, c, c, 1.0, dS));
   }
   PetscCall(RestoreOperatorDomainMaterialProperties(op, &mat_props));
