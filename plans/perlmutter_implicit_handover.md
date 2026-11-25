@@ -1,209 +1,238 @@
-# Handover: testing the fully implicit SWE solver on Perlmutter (CPU and GPU, libCEED)
+# Handover: testing the implicit SWE solver on Perlmutter (CPU and GPU, libCEED)
 
-Branch: `bishtgautam/swe-implicit-ts` (based on `bishtgautam/augmented-roe`)
-Plan and laptop results: `plans/swe_implicit_ts_plan.md` (Section 4, "Status")
+| | |
+|---|---|
+| Branch | `bishtgautam/swe-implicit-ts` on `github.com/rdycore/rdycore` (based on `bishtgautam/augmented-roe`) |
+| Design notes and laptop history | `plans/swe_implicit_ts_plan.md` |
+| Equations | Sections 7 and 8 of `papers/RDycore_SWE_Equations/main.tex` |
+| One-command GPU checks | `driver/tests/swe_roe/run_implicit_checks.sh` (Section 4.2) |
+
+**Goal on Perlmutter:** confirm that the implicit solver gives the laptop results on CPU and GPU
+nodes (Section 2), that the libCEED Jacobian runs on the GPU with no host↔device copies, and measure
+whether implicit steps beat explicit ones in wall time.
+
+---
 
 ## 1. What is on the branch
 
-A fully implicit flow TS for first-order SWE (no tracers) with the plain Roe, hydrostatic
-reconstruction (HR) or augmented Roe edge fluxes, selected in the YAML:
+A fully implicit flow TS (backward Euler, Crank–Nicolson or BDF2) for first-order shallow water
+equations without tracers, with an analytic Jacobian on both the PETSc and libCEED backends.
 
 ```yaml
+physics:
+  flow:
+    mode: swe
+    well_balancing: none            # or hydrostatic_reconstruction, augmented_roe
+    # h_anuga_reg_parameter: 1e-3   # implicit default; a non-zero value here wins
 numerics:
-  temporal: beuler   # or cn, bdf  (-ts_type overrides; -ts_bdf_order for bdf)
+  temporal: beuler                  # or cn, bdf  (-ts_type overrides; -ts_bdf_order for bdf)
   riemann : roe
 ```
 
-- `physics.flow.source.method` defaults to `fully_implicit` (friction `S_f(U)` with no `dt`).
-- `physics.flow.h_anuga_reg_parameter` defaults to 1e-3 (velocity desingularization needed at wet/dry fronts).
-- Supported scope (checked in `ValidateConfig`): `riemann: roe`, `well_balancing: none`,
-  `hydrostatic_reconstruction` or `augmented_roe` (not `bradford_sanders_2002`), first-order (no
-  `second_order`), no sediment/salinity/heat, no adaptive dt.
-- Fixed time step by default (`-ts_adapt_type none` is set; options still override).
-- Default nonlinear tolerances: `-snes_atol 1e-12 -snes_rtol 1e-10`, max 50 its.
+Defaults and limits for implicit runs (checked in `ValidateConfig`, `src/yaml_input.c`):
+- `physics.flow.source.method` defaults to `fully_implicit` (friction from the current state, no `dt`).
+- `physics.flow.h_anuga_reg_parameter` defaults to `1e-3` (explicit runs keep 0). Needed for Newton at
+  moving wet/dry fronts above CFL 1. A value of 0 in the YAML counts as unset.
+- Supported: `riemann: roe`; `well_balancing: none | hydrostatic_reconstruction | augmented_roe`;
+  first order only; no sediment, salinity or heat; fixed time step (`-ts_adapt_type none` is set).
+- Newton: `-snes_atol 1e-12 -snes_rtol 1e-10`, at most 50 iterations; negative depths in a Newton
+  iterate are set to a dry state (`-rdy_positivity clip`).
 
-Jacobian (`-rdy_jacobian analytic|fd|mf`, default `analytic`):
+Where the Jacobian is built:
 
-| Backend | Where the Jacobian is built | Files |
+| Backend | How | Files |
 |---|---|---|
 | PETSc (no `-ceed`) | host loop, `MatSetValuesLocal` | `src/operator_jacobian_petsc.c` |
-| CEED (`-ceed ...`) | libCEED Q-functions write 3×3 blocks into a COO-values CeedVector; one `MatSetValuesCOO` in the state vector's memory space (device on GPU) | `src/operator_jacobian_ceed.c`, `src/swe/swe_jacobian_ceed.h` |
-| both | pointwise derivatives (Roe flux incl. entropy fix and `h_anuga`; HR and augmented Roe edge fluxes; bed slope; friction; reflecting / critical-outflow BC maps) | `src/swe/swe_roe_flux_jacobian_ceed.h`, `src/swe/swe_edge_flux_jacobian_ceed.h`, `src/swe/swe_sources_jacobian_ceed.h` |
+| libCEED (`-ceed ...`) | Q-functions write each edge's and cell's 3×3 blocks into one COO-values `CeedVector`; the COO pattern is built once on the host; each evaluation is one `CeedOperatorApply` + one `MatSetValuesCOO` in the state vector's memory space (device on GPU) | `src/operator_jacobian_ceed.c`, `src/swe/swe_jacobian_ceed.h` |
+| both | pointwise derivatives: Roe, HR and augmented Roe edge fluxes; bed slope; friction; reflecting and critical-outflow boundaries | `src/swe/swe_roe_flux_jacobian_ceed.h`, `src/swe/swe_edge_flux_jacobian_ceed.h`, `src/swe/swe_sources_jacobian_ceed.h` |
 
-The CEED path does **not** use `CeedOperatorLinearAssemble`, so any libCEED that RDycore
-already builds with works (the preinstalled PETSc 3.24.1 libCEED is fine).
+The libCEED path does not call `CeedOperatorLinearAssemble`, so the libCEED in the preinstalled
+PETSc 3.24.1 is enough. With `-ceed /gpu/cuda/*`, RDycore sets CUDA vectors and an AIJCUSPARSE
+matrix on the DM, so the Jacobian is assembled on the device.
 
-Debug options:
-- `-rdy_jacobian_host` — with `-ceed`, build the Jacobian on the host instead (reference).
-- `-rdy_jacobian_compare` — with `-ceed`, build both at every Jacobian evaluation, print
-  `||J_ceed - J_host||_F / ||J_host||_F`, and error if it exceeds 1e-12. Slow (host copy each time).
+---
 
-When `-ceed /gpu/cuda/*` is used, RDycore already sets `VECCUDA` / `MATAIJCUSPARSE` on the DM
-(`src/rdydm.c`), so the Jacobian matrix is a CUSPARSE matrix and the COO values are passed from
-device memory.
+## 2. Laptop results to compare against
 
-## 2. Laptop baseline (what to compare against)
+macOS, `~/.rdycore-petsc` (petsc_main, debug build), CPU libCEED backends.
 
-macOS, `~/.rdycore-petsc` (petsc_main, debug), CPU backends `/cpu/self/ref|opt`:
-
-| Check | Laptop result |
+| Check | Result |
 |---|---|
-| `test_swe_roe_jacobian` (unit) | 4/4 pass; 4799/4800 flux-Jacobian columns match FD |
-| `-rdy_jacobian_compare`, np 1/2, ref/opt/gen | 5e-17 |
-| T1 time-only MMS, L1 rate h | BE 0.98, CN 2.00, BDF2 2.01 |
-| T3 space-time MMS (dt ∝ dx), L1 rate h | BE 0.93 (CN 0.94) |
-| Newton its/step, BE, sinusoidal MMS, 4096 cells, LU | CFL 1.6: 2.9; CFL 6.6: 2.9; CFL 26: 5.9 |
-| HR / augmented Roe space-time MMS, L1 rate h | 0.90 / 0.90 (CEED = PETSc errors) |
-| HR / augmented Roe `-rdy_jacobian_compare` | 5e-17 / 6e-17 |
-| HR / augmented Roe implicit lake at rest (submerged, island) | preserved to 1e-12 |
-| Dry-bed dam break, dt = 0.1 s (CFL 2.5), all three schemes | rel. L1 1.3–1.4%, 5.4–5.5 Newton/step, h ≥ 0 |
+| `test_swe_roe_jacobian` (8 unit tests) | all pass; analytic vs finite differences agree in 4799/4800 (Roe), 4739/4800 (HR), 4800/4800 (augmented Roe) columns; the rest sit on kinks |
+| libCEED vs host Jacobian (`-rdy_jacobian_compare`), np 1 and 2, ref/opt/gen | 5e-17 to 6e-17 |
+| Time-only MMS (uniform state), L1 rate of h | BE 0.98, CN 2.00, BDF2 2.01 |
+| Space-time MMS (dt ∝ dx), L1 rate of h, default h_anuga | Roe 0.898, HR 0.891 (PETSc) / 0.872 (libCEED), augmented Roe 0.887; 2.5–2.7 Newton/step |
+| Lake at rest (HR, augmented Roe; submerged and island), dt = 0.25 s | preserved to 1e-12; 0–1 Newton/step |
+| Dry-bed dam break (Ritter), BE, Roe / HR / augmented Roe | dt 0.02 s (CFL 0.5): 1.04 / 1.04 / 1.09%, 3 Newton/step; dt 0.1 s (CFL 2.5): 1.34 / 1.34 / 1.40%, 5.4–6.0; dt 0.2 s (CFL 5): 1.64 / 1.64 / 1.72%, 8.5–10; min h = 0 |
+| Dry-bed dam break, CN / BDF2, plain Roe | dt 0.1 s: 0.93% / 0.94%; dt 0.2 s: CN 0.89%, BDF2 Newton fails at step 18 |
+| Wet-bed dam break (Stoker), BE | dt 0.02 / 0.1 / 0.2 s: 1.0 / 1.5 / 2.1%, 3–6 Newton/step |
+| Newton/step vs CFL, sinusoidal MMS, 4096 cells, LU | CFL 1.6: 2.9; CFL 6.6: 2.9 (FD Jacobian 3.8); CFL 26: 5.9 |
+| `run_implicit_checks.sh /cpu/self` | 22/22 pass in 70 s |
 
-The default serial linear solver (GMRES + ILU(0)) failed at CFL ≈ 26; LU works.
+Note: the default serial linear solver (GMRES + ILU(0)) failed at CFL ≈ 26; LU worked.
+
+---
 
 ## 3. Build on Perlmutter
 
-```bash
-git clone git@github.com:rdycore/rdycore.git && cd rdycore
-git checkout bishtgautam/swe-implicit-ts
-git submodule update --init --recursive
-```
-
-GPU node build (preinstalled PETSc, config 1 = opt, 64-bit; use config 2 for debug first):
+Same recipe as `docs/common/installation.md`, on the branch:
 
 ```bash
-source config/set_petsc_settings.sh --mach pm-gpu --config 2
-mkdir build-pm-gpu-debug && cd build-pm-gpu-debug
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=cc -DCMAKE_Fortran_COMPILER=ftn ..
-ninja
+git clone -b bishtgautam/swe-implicit-ts git@github.com:rdycore/rdycore.git rdycore-implicit
+cd rdycore-implicit && git submodule update --init --recursive
 ```
 
-CPU node build: same with `--mach pm-cpu` into `build-pm-cpu-*`.
-
-Before anything else, check which libCEED backends exist in that PETSc:
+GPU nodes (config 1 = optimized, 64-bit indices; config 2 = debug):
 
 ```bash
-salloc -N 1 -C gpu -G 4 -q interactive -t 00:30:00 -A <account>
-srun -n 1 -G 1 ./driver/rdycore_mms driver/tests/swe_roe/mms_implicit_jacobian_check.yaml -ceed /gpu/cuda/ref -ts_max_steps 1
+source config/set_petsc_settings.sh --mach pm-gpu --config 1
+cmake -S . -B build-$PETSC_ARCH -DCMAKE_INSTALL_PREFIX=$PWD/build-$PETSC_ARCH -G Ninja
+cd build-$PETSC_ARCH && ninja -j8 install
 ```
 
-(`/gpu/cuda/gen`, `/gpu/cuda/shared`, `/gpu/cuda/ref` should all be tried; on the laptop the
-petsc_main libCEED had no `/cpu/self/gen`, so do not assume a backend exists.)
+CPU nodes: the same with `--mach pm-cpu`, which gives a separate `build-$PETSC_ARCH` directory.
 
-## 4. Test plan
-
-Run from the build directory (ctest copies the YAML and mesh into
-`driver/tests/swe_roe/`). Use `srun` with the GPU binding you normally use, e.g.
-`srun -n 4 -G 4 --gpu-bind=single:1`.
-
-### Step 1 — CPU correctness (pm-cpu or the CPU path on a GPU node)
+Interactive allocations:
 
 ```bash
-ctest -R "swe_implicit|test_swe_roe_jacobian" --output-on-failure
+salloc --nodes 1 --qos interactive --time 01:00:00 --constraint gpu --gpus 4 --account=<project>_g
+salloc --nodes 1 --qos interactive --time 01:00:00 --constraint cpu --account=<project>
 ```
 
-Expect all `swe_implicit_*` tests (110: MMS, Jacobian checks, lake at rest and dam breaks for plain Roe,
-HR and augmented Roe) and `test_swe_roe_jacobian` to pass, with the numbers in Section 2. Note: in
-`ctest -j N`, the existing `swe_roe_ex2b_*chkpt*` tests interfere with each other (they share
-output directories); on the laptop they fail at random under `-j6` and pass with `-j1`, on both the
-baseline and this branch. That is not caused by this work.
-
-### Step 2 — GPU Jacobian correctness
-
-From `build/driver/tests/swe_roe`:
+First, find out which libCEED GPU backends this PETSc has (run in `build-$PETSC_ARCH/driver/tests/swe_roe`).
+Don't assume `gen` exists: the laptop's petsc_main libCEED had no `/cpu/self/gen`.
 
 ```bash
 for be in /gpu/cuda/ref /gpu/cuda/shared /gpu/cuda/gen; do
-  for cfg in mms_implicit_jacobian_check mms_implicit_jacobian_check_hr mms_implicit_jacobian_check_augroe; do
-    srun -n 1 -G 1 ../../rdycore_mms $cfg.yaml -ceed $be -rdy_jacobian_compare -snes_converged_reason
-    srun -n 2 -G 2 ../../rdycore_mms $cfg.yaml -ceed $be -rdy_jacobian_compare -snes_converged_reason
-  done
+  srun -N 1 -n 1 -c 32 -G 1 ../../rdycore_mms mms_implicit_jacobian_check.yaml -ceed $be -dm_vec_type cuda > be_check.log 2>&1 \
+    && echo "$be: ok" || { echo "$be: failed"; grep -m2 -i "backend\|error" be_check.log; }
 done
 ```
 
-Expect `Jacobian check: ... = O(1e-16)` (GPU FMA may give up to ~1e-15; the run errors above 1e-12)
-and 2–3 Newton iterations per step. If the JIT fails, the error names the Q-function header; the
-new headers only use `sqrt`, `pow`, `fabs`, structs returned by value, and `MATERIAL_PROPERTY_MANNINGS`
-from `physics_ceed.h`.
+---
 
-### Step 3 — GPU convergence rates
+## 4. Test plan
+
+Run everything from `build-$PETSC_ARCH/driver/tests/swe_roe`, where ctest has generated the inputs.
+
+### 4.1 CPU correctness (CPU node, or the CPU path on a GPU node)
 
 ```bash
-for m in beuler cn bdf; do
-  srun -n 1 -G 1 ../../rdycore_mms mms_implicit_time_$m.yaml -ceed /gpu/cuda/gen
-done
-for wb in "" _hr _augroe; do
-  srun -n 4 -G 4 ../../rdycore_mms mms_implicit_spacetime_beuler$wb.yaml -ceed /gpu/cuda/gen
-done
+cd build-$PETSC_ARCH
+ctest -R "swe_implicit|test_swe_roe_jacobian|test_yaml_input" -j 8 --output-on-failure
 ```
 
-Wet/dry fronts on the GPU: run the generated `swe_implicit_dam_break_*.yaml` inputs with
-`-ceed /gpu/cuda/gen` and check them with the matching `_check` ctest command (`check_dam_break.py`).
+Expect all 113 tests to pass: 110 `swe_implicit_*` tests, `test_swe_roe_jacobian`, and
+`test_yaml_input` on 1 and 2 ranks. The rates and errors should match Section 2. The "ceed" ctests here use `-ceed /cpu/self`.
 
-Well-balancing on the GPU: run the generated `swe_implicit_lake_at_rest_tris_*.yaml` inputs from
-`build/driver/tests/swe_roe` with `-ceed /gpu/cuda/gen` and compare the first and last outputs
-(the `_compare` ctests show the `h5diff` command).
+If you run the whole suite with `ctest -j N`, the existing `swe_roe_ex2b_*chkpt*`, `*_ic_file*` and some mesh
+tests fail at random: they write to shared output directories. They pass with `-j 1`. This
+happens on the unchanged branch too and is not caused by this work.
 
-Expect `PASS` and the Section 2 rates. A linear solver is needed that works with CUSPARSE
-matrices; the defaults (GMRES + block Jacobi/ILU) run on the GPU via cuSPARSE ILU. If a solve fails, try
-`-pc_type bjacobi -sub_pc_type ilu` explicitly, or `-pc_type gamg`.
-
-### Step 4 — No host↔device traffic in the Jacobian
-
-Use a larger, non-MMS-dominated run (the MMS driver evaluates manufactured sources on the host
-with muParser at every stage, which costs host work and copies). For a quick check the MMS case
-is still useful: increase `base_refinement` to 4–5 in a copy of `mms_implicit_jacobian_check.yaml`.
+### 4.2 GPU correctness: one command per backend
 
 ```bash
-srun -n 1 -G 1 ../../rdycore_mms big.yaml -ceed /gpu/cuda/gen -log_view -log_view_gpu_time
+cd build-$PETSC_ARCH/driver/tests/swe_roe
+bash ../../../../driver/tests/swe_roe/run_implicit_checks.sh /gpu/cuda/gen \
+  "srun -N 1 -c 32 -G 2 --gpu-bind=single:1 -n" -dm_vec_type cuda
 ```
 
-In `-log_view` look at `TSJacobianEval`/`SNESJacobianEval`, `MatSetValuesCOO`, `TSFunctionEval`:
-the `CpuToGpu` / `GpuToCpu` count columns should be 0 for the Jacobian events (apart from the
-first call, which builds the COO pattern on the host). Expected nonzero copies elsewhere: MMS
-forcing, and (in the current code) `GetOperatorDomainMaterialProperties` is **not** used on the
-CEED Jacobian path, so it should not appear.
+It runs 22 checks (at most 2 ranks) and prints one PASS/FAIL line each, with logs in
+`implicit_checks_gpu_cuda_gen/`:
 
-### Step 5 — CPU vs GPU performance and solver choice
+| Checks | What passes |
+|---|---|
+| `jacobian_{roe,hr,augroe}_np{1,2}` | libCEED (GPU) Jacobian = host Jacobian to < 1e-12 relative (expect ~1e-16; GPU FMA may give ~1e-15) |
+| `mms_time_{beuler,cn,bdf}` | time-only MMS rates above 0.95 / 1.95 / 1.95 |
+| `mms_spacetime_beuler_{roe,hr,augroe}` | space-time MMS rates above 0.8 |
+| `dam_break_{dry,wet}_{none,hydrostatic_reconstruction,augmented_roe}` | relative L1 depth error ≤ 2% vs Ritter/Stoker and h ≥ 0 |
+| `lake_at_rest_{submerged,island}_{hydrostatic_reconstruction,augmented_roe}` | state preserved to 1e-12 |
 
-For a fixed mesh (e.g. `base_refinement` 5–6) and BE at CFL ≈ 5 and 20, record wall time,
-Newton its/step, KSP its/step for:
+Repeat with `/gpu/cuda/shared` and `/gpu/cuda/ref` if they exist. The numbers should match the laptop
+table to several digits, and the Newton iterations per step should match closely.
+
+If a GPU linear solve fails, add for example `-pc_type bjacobi -sub_pc_type ilu` or `-pc_type gamg` as extra options.
+If the libCEED JIT fails, the error names the Q-function header. The new headers use only `sqrt`,
+`pow`, `fabs`, small structs passed by value, and `MATERIAL_PROPERTY_MANNINGS` from `physics_ceed.h`.
+
+### 4.3 No host↔device copies in the Jacobian
+
+The MMS driver evaluates its manufactured sources on the host at every stage, which adds copies. So use a
+dam break, which has no MMS forcing (here at dt = 0.2 s, i.e. 30 steps):
+
+```bash
+sed 's/stop_n: 60/stop_n: 30/' swe_implicit_dam_break_dry_none_np_2_ceed.yaml > big_db.yaml
+srun -N 1 -n 1 -c 32 -G 1 ../../rdycore big_db.yaml -ceed /gpu/cuda/gen -dm_vec_type cuda \
+  -log_view -log_view_gpu_time > big_db.log 2>&1
+```
+
+In `-log_view`, check `TSJacobianEval` / `SNESJacobianEval` and `MatSetValuesCOO`. Their `CpuToGpu` and
+`GpuToCpu` counts should be 0, apart from the first evaluation, which builds the COO pattern on the host.
+Note anything that does copy; the residual path and the linear solver are the candidates.
+On the laptop (`/cpu/self`, this case), a Jacobian evaluation took about 11× a residual evaluation
+(7.2 ms vs 0.65 ms per call, 258 vs 352 calls), so the Jacobian kernel is the one to time on the GPU.
+For a bigger mesh, use one of the existing large cases (`docs/user/example-cases/dam-break`) with
+`numerics.temporal: beuler`.
+
+### 4.4 CPU vs GPU performance and solver choice
+
+Use a fixed, larger mesh (for example the 5120x2560 dam break in `docs/user/example-cases/dam-break`)
+with `temporal: beuler` at front CFL ≈ 2, 5 and 20 (scale `stop_n` down from the explicit run).
+For each, record wall time, time steps, Newton iterations/step and Krylov iterations/step:
 
 | Run | Options |
 |---|---|
-| pm-cpu, PETSc backend | `-n 64` (no `-ceed`) |
-| pm-cpu, CEED | `-n 64 -ceed /cpu/self/opt` |
-| pm-gpu, CEED | `-n 4 -G 4 -ceed /gpu/cuda/gen` |
-| explicit Euler reference | same mesh, `temporal: euler`, CFL ≈ 0.5 |
+| CPU node, PETSc backend | `srun -N 1 -n 64 -c 2 ../../rdycore ... ` |
+| CPU node, libCEED | add `-ceed /cpu/self` |
+| GPU node, libCEED | `srun -N 1 -n 4 -c 32 -G 4 ... -ceed /gpu/cuda/gen -dm_vec_type cuda` |
+| explicit reference | same mesh with `temporal: euler`, CFL ≈ 0.5 |
 
-Preconditioners worth trying: `bjacobi`+`ilu` (default), `asm -pc_asm_overlap 1`, `gamg`,
-`hypre` (BoomerAMG, if built with CUDA). Large CFL is where ILU(0) failed on the laptop.
+Preconditioners worth comparing: `bjacobi` + `ilu` (default), `asm -pc_asm_overlap 1`, `gamg`, and
+`hypre` (BoomerAMG) if the PETSc build has it. Add `-ksp_converged_reason -snes_converged_reason -log_view`.
+Large CFL is where ILU(0) failed on the laptop.
 
-## 5. Known limitations / things to watch
+### 4.5 What to bring back
 
-- Wet/dry: moving fronts are tested with the dry/wet dam breaks (CFL up to 5). Implicit runs default to
-  `h_anuga_reg_parameter = 1e-3` (explicit runs keep 0); with 0, Newton stalls at moving fronts for CFL > 1.
-  A non-zero value in the YAML overrides the default.
-- `-rdy_positivity clip|vi|none` (default clip) projects negative depths of a Newton iterate to a dry
-  state; `vi` (SNESVINEWTONRSLS) failed for augmented Roe. The Jacobian zeroes dry cells (`h ≤ tiny_h`)
-  and uses the derivative of the active branch at kinks.
-- With `h_anuga > 0` (the implicit default) the PETSc and CEED HR residuals differ slightly (PETSc passes
-  the cell velocities to the Roe solver, CEED rebuilds them from h*(1, u, v)); the Jacobian matches each
-  backend. The `fully_implicit` friction uses the desingularized velocity on both backends.
-- The augmented Roe Jacobian has the most branches (wave sets, entropy fix, bed-step clipping,
-  wet/dry fronts); expect slower Newton near transcritical flow and moving shorelines.
-- Plain Roe uses 3D edge lengths/areas, so a uniform state on a sloped bed is not exactly
-  steady (O(slope²)). This is why the time-only MMS uses a flat bed.
-- The MMS step count fix: `stop / time_step` is now rounded up with a tolerance (it was truncated,
-  which could hang `RDyAdvance`).
+- the output of `run_implicit_checks.sh` for each GPU backend;
+- the 4.3 `-log_view` lines for the Jacobian events;
+- the 4.4 table (wall time, steps, Newton/step, Krylov/step) for CPU vs GPU vs explicit.
 
-## 6. Useful options
+---
+
+## 5. Pitfalls
+
+- **Anything that stops the TS before the final time hangs the run.** `-ts_max_steps`, `-ts_max_time`,
+  or a `stop_n` too small for `stop / time_step` makes `RDyAdvance` loop forever. To shorten a run, change
+  `stop`/`stop_n` together in the YAML instead. (The branch fixed the `stop / time_step` rounding, but a manual
+  cap still loops.)
+- **Newton failure stops the run.** Time steps are fixed, and one SNES failure ends the run, since there
+  is no adaptive dt yet. If a step fails, lower dt or try a stronger preconditioner.
+- **Wet/dry fronts need `h_anuga_reg_parameter > 0`.** It is the implicit default (1e-3). With 0, Newton
+  stalls at moving fronts above CFL 1. At CFL 5, plain Roe needs 1e-3 (1e-4 fails); augmented Roe is less
+  sensitive. Cost: a small consistency error where h ≈ h_anuga (the 5–15 mm deep MMS rate drops from 0.914 to 0.898).
+- **PETSc and libCEED HR residuals differ slightly when h_anuga > 0.** PETSc passes the cell velocities to the Roe
+  solver; libCEED rebuilds them from h*(1, u, v). The Jacobian matches each backend, but the two backends give
+  slightly different HR answers (space-time MMS rate 0.891 with PETSc vs 0.872 with libCEED). This
+predates the branch.
+- **BDF2 at CFL 5 failed** on the dry dam break (step 18); not investigated. BE is the robust choice for wet/dry;
+  CN is more accurate on the dam break but has no positivity guarantee.
+- **`-rdy_positivity vi`** (bound-constrained Newton) failed for augmented Roe; keep the default `clip`.
+- **Plain Roe on a sloped bed** uses 3D edge lengths and areas, so a uniform state is not exactly steady
+  (O(slope²)). This is why the time-only MMS uses a flat bed.
+- **NERSC SSH certificates** last 24 h (`sshproxy.sh -u <user>` on the laptop).
+
+---
+
+## 6. Options
 
 ```text
--rdy_jacobian analytic|fd|mf     Jacobian type (fd = coloring, mf = JFNK without PC)
--rdy_jacobian_host               CEED runs: assemble the Jacobian on the host
--rdy_jacobian_compare            CEED runs: compare device vs host Jacobian each evaluation
--ts_type beuler|cn|bdf|theta     override the YAML temporal method
--ts_adapt_type basic             re-enable PETSc adaptivity (off by default for implicit)
--snes_monitor -snes_converged_reason -ksp_converged_reason
+-rdy_jacobian analytic|fd|mf     Jacobian (fd = finite differences with coloring, mf = Jacobian-free, no PC)
+-rdy_jacobian_host               libCEED runs: build the Jacobian on the host instead
+-rdy_jacobian_compare            libCEED runs: compare the libCEED and host Jacobians at every evaluation;
+                                 errors if they differ by more than 1e-12 (slow)
+-rdy_positivity clip|vi|none     keep depths >= 0 inside Newton (default clip)
+-ts_type beuler|cn|bdf|theta     override numerics.temporal
+-ts_adapt_type basic             re-enable PETSc time adaptivity (off by default; BE has no error estimate)
+-snes_monitor -snes_converged_reason -ksp_converged_reason -snes_linesearch_monitor
 -log_view -log_view_gpu_time
 ```
