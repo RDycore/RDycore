@@ -68,9 +68,13 @@ CEED_QFUNCTION_HELPER void SWEEdgeFluxJacobian_Roe(const CeedScalar gravity, con
 ///   h*_K = max(0, h_K + z_K - max(z_L, z_R)),  q*_K = (h*_K, h*_K u_K, h*_K v_K)   (K = L, R)
 ///   F    = F_Roe(q*_L, q*_R)
 ///   G_K  = F + (g/2)(h_K^2 - h*_K^2) (0, cn, sn)
+/// With h_anuga > 0 the two HR residuals differ: SWEFlux_HydroRecon (CEED) passes q*_K to the Roe
+/// solver, which desingularizes the velocity again, while the PETSc twin (ApplyInteriorFluxHR) passes
+/// u_K, v_K directly. velocity_input = 0 matches the CEED residual, 1 the PETSc residual; they agree
+/// for h_anuga = 0.
 CEED_QFUNCTION_HELPER void SWEEdgeFluxJacobian_HydroRecon(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEState qL,
-                                                          SWEState qR, CeedScalar zL, CeedScalar zR, CeedScalar sn, CeedScalar cn, CeedScalar GL[3],
-                                                          CeedScalar GR[3], CeedScalar J[4][3][3]) {
+                                                          SWEState qR, CeedScalar zL, CeedScalar zR, CeedScalar sn, CeedScalar cn,
+                                                          CeedInt velocity_input, CeedScalar GL[3], CeedScalar GR[3], CeedScalar J[4][3][3]) {
   SWEEdgeJacobianZero(GL, GR, J);
   if (!(qL.h > tiny_h || qR.h > tiny_h)) return;
 
@@ -87,8 +91,12 @@ CEED_QFUNCTION_HELPER void SWEEdgeFluxJacobian_HydroRecon(const CeedScalar gravi
   SWEDual F[3] = {SWEDualConst(0.0), SWEDualConst(0.0), SWEDualConst(0.0)};
   if (hL_rec.v > tiny_h || hR_rec.v > tiny_h) {
     CeedScalar amax;
-    SWEDualRoeFlux(gravity, tiny_h, h_anuga, hL_rec, SWEDualMul(hL_rec, uL), SWEDualMul(hL_rec, vL), hR_rec, SWEDualMul(hR_rec, uR),
-                   SWEDualMul(hR_rec, vR), sn, cn, F, &amax);
+    if (velocity_input) {  // PETSc residual: the cell velocities go straight to the Roe solver
+      SWEDualRoeFluxPrimitive(gravity, hL_rec, uL, vL, hR_rec, uR, vR, sn, cn, F, &amax);
+    } else {  // CEED residual: the Roe solver re-forms velocities from q* = h* (1, u, v)
+      SWEDualRoeFlux(gravity, tiny_h, h_anuga, hL_rec, SWEDualMul(hL_rec, uL), SWEDualMul(hL_rec, vL), hR_rec, SWEDualMul(hR_rec, uR),
+                     SWEDualMul(hR_rec, vR), sn, cn, F, &amax);
+    }
   }
 
   // hydrostatic pressure corrections, one per side

@@ -62,7 +62,7 @@ CEED_QFUNCTION_HELPER int SWEFluxJacobian_Edge(void *ctx, CeedInt Q, const CeedS
     CeedScalar       GL[3], GR[3], J[4][3][3];
     switch (type) {
       case SWE_EDGE_FLUX_HYDRO_RECON:
-        SWEEdgeFluxJacobian_HydroRecon(context->gravity, context->tiny_h, context->h_anuga_regular, qL, qR, geom[4][i], geom[5][i], sn, cn, GL, GR,
+        SWEEdgeFluxJacobian_HydroRecon(context->gravity, context->tiny_h, context->h_anuga_regular, qL, qR, geom[4][i], geom[5][i], sn, cn, 0, GL, GR,
                                        J);
         break;
       case SWE_EDGE_FLUX_AUGMENTED_ROE:

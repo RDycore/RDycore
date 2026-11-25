@@ -27,6 +27,7 @@
 #include "../swe/swe_edge_flux_jacobian_ceed.h"
 #include "../swe/swe_fluxes_augmented_roe_ceed.h"
 #include "../swe/swe_fluxes_hydro_recon_ceed.h"
+#include "../swe/swe_roe_flux_petsc.h"
 #include "../swe/swe_sources_jacobian_ceed.h"
 #include "rdycore_tests.h"
 
@@ -304,7 +305,7 @@ static void EdgeFluxesFromQFunction(int scheme, SWEState qL, SWEState qR, PetscR
 
 static void EdgeJacobian(int scheme, SWEState qL, SWEState qR, PetscReal zL, PetscReal zR, PetscReal sn, PetscReal cn, PetscReal h_anuga,
                          PetscReal GL[3], PetscReal GR[3], PetscReal J[4][3][3]) {
-  if (scheme == 1) SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, h_anuga, qL, qR, zL, zR, sn, cn, GL, GR, J);
+  if (scheme == 1) SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, h_anuga, qL, qR, zL, zR, sn, cn, 0, GL, GR, J);
   else SWEEdgeFluxJacobian_AugmentedRoe(G, TINY_H, h_anuga, qL, qR, zL, zR, sn, cn, GL, GR, J);
 }
 
@@ -384,12 +385,82 @@ static void TestHydroReconFlatBedIsRoe(void **state) {
     RandomWetState(&qR);
     PetscReal theta = RandRange(0.0, 2.0 * PETSC_PI), sn = sin(theta), cn = cos(theta), z = RandRange(-1.0, 1.0);
     PetscReal GL[3], GR[3], J[4][3][3], GL0[3], GR0[3], J0[4][3][3];
-    SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, 0.0, qL, qR, z, z, sn, cn, GL, GR, J);
+    SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, 0.0, qL, qR, z, z, sn, cn, 0, GL, GR, J);
     SWEEdgeFluxJacobian_Roe(G, TINY_H, 0.0, qL, qR, sn, cn, GL0, GR0, J0);
     for (int k = 0; k < 4; k++)
       for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++) assert_true(fabs(J[k][i][j] - J0[k][i][j]) <= 1e-12 * fmax(1.0, fabs(J0[k][i][j])));
   }
+}
+
+// PETSc twin of the HR edge (ApplyInteriorFluxHR in swe_petsc.c): the cell velocities go
+// straight to the PETSc Roe solver; G_K = F + (g/2)(h_K^2 - h*_K^2)(0, cn, sn)
+static void HydroReconFluxesPetsc(SWEState qL, SWEState qR, PetscReal zL, PetscReal zR, PetscReal sn, PetscReal cn, PetscReal h_anuga,
+                                  PetscReal GL[3], PetscReal GR[3]) {
+  PetscReal z_max = fmax(zL, zR), hLr = fmax(0.0, qL.h + zL - z_max), hRr = fmax(0.0, qR.h + zR - z_max);
+  PetscReal dL = qL.h * qL.h + h_anuga * h_anuga, dR = qR.h * qR.h + h_anuga * h_anuga;
+  PetscReal uL = (qL.h > TINY_H) ? qL.hu * qL.h / dL : 0.0, vL = (qL.h > TINY_H) ? qL.hv * qL.h / dL : 0.0;
+  PetscReal uR = (qR.h > TINY_H) ? qR.hu * qR.h / dR : 0.0, vR = (qR.h > TINY_H) ? qR.hv * qR.h / dR : 0.0;
+  PetscReal F[3] = {0.0, 0.0, 0.0};
+  if (hLr > TINY_H || hRr > TINY_H) {
+    PetscReal        h_l = hLr, h_r = hRr, hu0 = 0.0, amax;
+    RiemannStateData L = {1, &h_l, &hu0, &hu0, &uL, &vL}, R = {1, &h_r, &hu0, &hu0, &uR, &vR};
+    ComputeSWERoeFlux(&L, &R, &sn, &cn, F, &amax);
+  }
+  PetscReal cL = 0.5 * G * (qL.h * qL.h - hLr * hLr), cR = 0.5 * G * (qR.h * qR.h - hRr * hRr);
+  GL[0] = F[0];
+  GL[1] = F[1] + cL * cn;
+  GL[2] = F[2] + cL * sn;
+  GR[0] = F[0];
+  GR[1] = F[1] + cR * cn;
+  GR[2] = F[2] + cR * sn;
+}
+
+// HR with h_anuga > 0: the velocity_input = 1 Jacobian matches the PETSc HR residual
+static void TestHydroReconPetscVariantVsFD(void **state) {
+  const PetscReal h_anuga = 0.05;
+  int             checked = 0, total = 0;
+  for (int trial = 0; trial < 300; trial++) {
+    SWEState qL, qR;
+    RandomWetState(&qL);
+    RandomWetState(&qR);
+    PetscReal zL = RandRange(-0.5, 0.5), zR = RandRange(-0.5, 0.5);
+    if (trial % 9 == 0) qR = (SWEState){0.0, 0.0, 0.0};
+    PetscReal theta = RandRange(0.0, 2.0 * PETSC_PI), sn = sin(theta), cn = cos(theta);
+    PetscReal GL[3], GR[3], GL0[3], GR0[3], J[4][3][3];
+    SWEEdgeFluxJacobian_HydroRecon(G, TINY_H, h_anuga, qL, qR, zL, zR, sn, cn, 1, GL, GR, J);
+    HydroReconFluxesPetsc(qL, qR, zL, zR, sn, cn, h_anuga, GL0, GR0);
+    for (int i = 0; i < 3; i++)
+      assert_true(fabs(GL[i] - GL0[i]) <= 1e-12 * fmax(1.0, fabs(GL0[i])) && fabs(GR[i] - GR0[i]) <= 1e-12 * fmax(1.0, fabs(GR0[i])));
+    for (PetscInt side = 0; side < 2; side++) {
+      for (PetscInt k = 0; k < 3; k++) {
+        total++;
+        SWEState  q = side ? qR : qL, qp = q, qm = q;
+        PetscReal x = GetComp(q, k), eps = 1e-6 * fmax(1.0, fabs(x)) * (k == 0 ? fmax(q.h, 1e-3) : 1.0);
+        SetComp(&qp, k, x + eps);
+        SetComp(&qm, k, x - eps);
+        PetscReal GLp[3], GRp[3], GLm[3], GRm[3];
+        HydroReconFluxesPetsc(side ? qL : qp, side ? qp : qR, zL, zR, sn, cn, h_anuga, GLp, GRp);
+        HydroReconFluxesPetsc(side ? qL : qm, side ? qm : qR, zL, zR, sn, cn, h_anuga, GLm, GRm);
+        PetscBool kink = PETSC_FALSE;
+        for (int i = 0; i < 3; i++) {
+          if (fabs((GLp[i] - GL0[i]) - (GL0[i] - GLm[i])) / eps > 1e-4 * fmax(1.0, fabs((GLp[i] - GL0[i]) / eps))) kink = PETSC_TRUE;
+          if (fabs((GRp[i] - GR0[i]) - (GR0[i] - GRm[i])) / eps > 1e-4 * fmax(1.0, fabs((GRp[i] - GR0[i]) / eps))) kink = PETSC_TRUE;
+        }
+        if (kink) continue;
+        checked++;
+        for (int i = 0; i < 3; i++) {
+          PetscReal fdL = (GLp[i] - GLm[i]) / (2.0 * eps), fdR = (GRp[i] - GRm[i]) / (2.0 * eps);
+          if (fabs(fdL - J[side][i][k]) > 1e-6 * fmax(1.0, fabs(fdL)) || fabs(fdR - J[2 + side][i][k]) > 1e-6 * fmax(1.0, fabs(fdR))) {
+            print_message("PETSc HR Jacobian mismatch: side %d row %d col %d\n", (int)side, i, (int)k);
+            fail();
+          }
+        }
+      }
+    }
+  }
+  print_message("PETSc-variant HR Jacobian (h_anuga = 0.05): %d of %d columns checked against FD\n", checked, total);
+  assert_true(checked > total / 2);
 }
 
 static int    argc_ = 0;
@@ -404,7 +475,7 @@ int main(int argc, char *argv[]) {
   const struct CMUnitTest tests[] = {
       cmocka_unit_test(TestRoeFluxJacobianVsFD),      cmocka_unit_test(TestRoeFluxJacobianConsistency), cmocka_unit_test(TestSourceJacobianVsFD),
       cmocka_unit_test(TestBoundaryJacobianVsFD),     cmocka_unit_test(TestHydroReconJacobianVsFD),     cmocka_unit_test(TestHydroReconFlatBedIsRoe),
-      cmocka_unit_test(TestAugmentedRoeJacobianVsFD),
+      cmocka_unit_test(TestAugmentedRoeJacobianVsFD), cmocka_unit_test(TestHydroReconPetscVariantVsFD),
   };
   return cmocka_run_group_tests(tests, Setup, Teardown);
 }

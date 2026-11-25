@@ -85,7 +85,7 @@ PetscErrorCode ComputeSWEJacobianHost(Operator *op, Vec u_local, Mat J) {
     PetscReal GL[3], GR[3], Jb[4][3][3], sn = edges->sn[edge_id], cn = edges->cn[edge_id];
     switch (op->config->physics.flow.well_balancing) {
       case WELL_BALANCING_HR:
-        SWEEdgeFluxJacobian_HydroRecon(gravity, tiny_h, h_anuga, qL, qR, zc[l], zc[r], sn, cn, GL, GR, Jb);
+        SWEEdgeFluxJacobian_HydroRecon(gravity, tiny_h, h_anuga, qL, qR, zc[l], zc[r], sn, cn, CeedEnabled() ? 0 : 1, GL, GR, Jb);
         break;
       case WELL_BALANCING_AUGMENTED_ROE:
         SWEEdgeFluxJacobian_AugmentedRoe(gravity, tiny_h, h_anuga, qL, qR, zc[l], zc[r], sn, cn, GL, GR, Jb);

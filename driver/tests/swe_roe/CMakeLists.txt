@@ -355,6 +355,43 @@ foreach(case dry wet)
   endforeach()
 endforeach()
 
+# Implicit (backward Euler) dam breaks over dry (Ritter) and wet (Stoker) beds at
+# dt = 0.1 s (front CFL ~ 2.5, 5x the explicit test's dt) for plain Roe, hydrostatic
+# reconstruction and augmented Roe, checked against the analytic solutions
+# (relative L1 depth error, h >= 0). The moving wet/dry front needs the ANUGA
+# velocity desingularization (h_anuga_reg_parameter > 0) for Newton to converge
+# at CFL > 1; the inputs are generated from the explicit dam-break YAML files.
+foreach(case dry wet)
+  if (case STREQUAL "dry")
+    set(h_right 0)
+  else()
+    set(h_right 0.1)
+  endif()
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/dam_break_${case}.yaml yaml_contents)
+  foreach(wb none hydrostatic_reconstruction augmented_roe)
+    foreach(np 1 2)
+      foreach(config basic ceed)
+        set(test_name swe_implicit_dam_break_${case}_${wb}_np_${np}_${config})
+        set(output_dir output_${test_name})
+        string(REPLACE "well_balancing: augmented_roe" "well_balancing: ${wb}\n    h_anuga_reg_parameter: 1.0e-3" test_yaml "${yaml_contents}")
+        string(REPLACE "temporal: euler" "temporal: beuler" test_yaml "${test_yaml}")
+        string(REPLACE "stop_n: 300" "stop_n: 60" test_yaml "${test_yaml}")
+        string(REPLACE "output_interval: 300" "output_interval: 60" test_yaml "${test_yaml}")
+        string(REPLACE "level: debug" "level: none" test_yaml "${test_yaml}")
+        string(REPLACE "output:\n" "output:\n  directory: ${output_dir}\n" test_yaml "${test_yaml}")
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${test_name}.yaml "${test_yaml}")
+        add_test(${test_name} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${rdycore_c_driver} ${test_name}.yaml ${${config}_args})
+        set_tests_properties(${test_name} PROPERTIES FIXTURES_SETUP ${test_name})
+        add_test(NAME ${test_name}_check
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_dam_break.py ${H5DUMP} ${output_dir}/${test_name}-grid.h5
+                         ${output_dir}/${test_name}-60.h5 "/60 6.000000E+00 sec" 6 1 ${h_right} 50 0.02
+                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        set_tests_properties(${test_name}_check PROPERTIES FIXTURES_REQUIRED ${test_name})
+      endforeach()
+    endforeach()
+  endforeach()
+endforeach()
+
 # Steady flow over a bump (Goutal and Maurel) with the augmented Roe solver,
 # checked against the analytic solution: relative L1 depth error and largest
 # relative deviation of the discharge.

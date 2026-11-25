@@ -1250,6 +1250,51 @@ static PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal t, Vec U, Mat A, Mat 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Newton line-search post-check that keeps water depths non-negative: any cell whose
+/// updated depth is negative is set to a dry state (h = hu = hv = 0). Without it, a Newton
+/// iterate can carry a cell ahead of a wet/dry front to h < 0, where the Roe averages
+/// (sqrt(h)) are undefined. Used with -rdy_positivity clip (the default).
+static PetscErrorCode PositivityPostCheck(SNESLineSearch ls, Vec X, Vec Y, Vec W, PetscBool* changed_Y, PetscBool* changed_W, void* ctx) {
+  PetscFunctionBegin;
+  PetscInt     n, bs;
+  PetscScalar* w;
+  *changed_Y = PETSC_FALSE;
+  *changed_W = PETSC_FALSE;
+  PetscCall(VecGetLocalSize(W, &n));
+  PetscCall(VecGetBlockSize(W, &bs));
+  PetscCall(VecGetArray(W, &w));
+  for (PetscInt i = 0; i < n; i += bs) {
+    if (PetscRealPart(w[i]) < 0.0) {
+      for (PetscInt k = 0; k < bs; k++) w[i + k] = 0.0;
+      *changed_W = PETSC_TRUE;
+    }
+  }
+  PetscCall(VecRestoreArray(W, &w));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets bounds h >= 0 (momenta unbounded) for the bound-constrained Newton solver
+/// (-rdy_positivity vi, SNESVINEWTONRSLS).
+static PetscErrorCode SetPositivityBounds(RDy rdy, SNES snes) {
+  PetscFunctionBegin;
+  Vec      xl, xu;
+  PetscInt n, bs;
+  PetscCall(VecDuplicate(rdy->u_global, &xl));
+  PetscCall(VecDuplicate(rdy->u_global, &xu));
+  PetscCall(VecSet(xl, PETSC_NINFINITY));
+  PetscCall(VecSet(xu, PETSC_INFINITY));
+  PetscCall(VecGetLocalSize(xl, &n));
+  PetscCall(VecGetBlockSize(xl, &bs));
+  PetscScalar* l;
+  PetscCall(VecGetArray(xl, &l));
+  for (PetscInt i = 0; i < n; i += bs) l[i] = 0.0;
+  PetscCall(VecRestoreArray(xl, &l));
+  PetscCall(SNESVISetVariableBounds(snes, xl, xu));
+  PetscCall(VecDestroy(&xl));
+  PetscCall(VecDestroy(&xu));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /// Sets up the Jacobian matrix and nonlinear solver of an implicit flow TS.
 /// The Jacobian is selected with -rdy_jacobian <analytic|fd|mf>:
 ///   analytic: analytic Roe/source/boundary Jacobian (PETSc or CEED backend)
@@ -1298,6 +1343,24 @@ static PetscErrorCode InitImplicitSolver(RDy rdy) {
 
   // tight default nonlinear tolerances, so that MMS errors measure discretization error only
   PetscCall(SNESSetTolerances(snes, 1e-12, 1e-10, PETSC_DETERMINE, 50, PETSC_DETERMINE));
+
+  // keep depths non-negative inside Newton (wet/dry fronts):
+  //   clip: project negative depths of each Newton iterate to a dry state (default)
+  //   vi:   bound-constrained Newton (SNESVINEWTONRSLS) with h >= 0
+  //   none: unconstrained Newton
+  const char* pos_types[] = {"clip", "vi", "none"};
+  PetscInt    pos_type    = 0;
+  PetscOptionsBegin(rdy->comm, NULL, "RDycore implicit solver positivity", "");
+  PetscCall(PetscOptionsEList("-rdy_positivity", "Keep water depths non-negative in Newton", "", pos_types, 3, pos_types[pos_type], &pos_type, NULL));
+  PetscOptionsEnd();
+  if (pos_type == 0) {
+    SNESLineSearch ls;
+    PetscCall(SNESGetLineSearch(snes, &ls));
+    PetscCall(SNESLineSearchSetPostCheck(ls, PositivityPostCheck, rdy));
+  } else if (pos_type == 1) {
+    PetscCall(SNESSetType(snes, SNESVINEWTONRSLS));
+    PetscCall(SetPositivityBounds(rdy, snes));
+  }
 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

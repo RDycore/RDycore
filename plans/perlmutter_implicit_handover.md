@@ -55,6 +55,7 @@ macOS, `~/.rdycore-petsc` (petsc_main, debug), CPU backends `/cpu/self/ref|opt`:
 | HR / augmented Roe space-time MMS, L1 rate h | 0.90 / 0.90 (CEED = PETSc errors) |
 | HR / augmented Roe `-rdy_jacobian_compare` | 5e-17 / 6e-17 |
 | HR / augmented Roe implicit lake at rest (submerged, island) | preserved to 1e-12 |
+| Dry-bed dam break, dt = 0.1 s (CFL 2.5), all three schemes | rel. L1 1.3–1.4%, 5.4–5.5 Newton/step, h ≥ 0 |
 
 The default serial linear solver (GMRES + ILU(0)) failed at CFL ≈ 26; LU works.
 
@@ -99,8 +100,8 @@ Run from the build directory (ctest copies the YAML and mesh into
 ctest -R "swe_implicit|test_swe_roe_jacobian" --output-on-failure
 ```
 
-Expect 63/63 pass (implicit MMS, Jacobian checks and lake-at-rest tests for plain Roe, HR and augmented
-Roe, plus the unit test), same rates as Section 2. Note: in
+Expect all `swe_implicit_*` tests (110: MMS, Jacobian checks, lake at rest and dam breaks for plain Roe,
+HR and augmented Roe) and `test_swe_roe_jacobian` to pass, with the numbers in Section 2. Note: in
 `ctest -j N`, the existing `swe_roe_ex2b_*chkpt*` tests interfere with each other (they share
 output directories); on the laptop they fail at random under `-j6` and pass with `-j1`, on both the
 baseline and this branch. That is not caused by this work.
@@ -133,6 +134,9 @@ for wb in "" _hr _augroe; do
   srun -n 4 -G 4 ../../rdycore_mms mms_implicit_spacetime_beuler$wb.yaml -ceed /gpu/cuda/gen
 done
 ```
+
+Wet/dry fronts on the GPU: run the generated `swe_implicit_dam_break_*.yaml` inputs with
+`-ceed /gpu/cuda/gen` and check them with the matching `_check` ctest command (`check_dam_break.py`).
 
 Well-balancing on the GPU: run the generated `swe_implicit_lake_at_rest_tris_*.yaml` inputs from
 `build/driver/tests/swe_roe` with `-ceed /gpu/cuda/gen` and compare the first and last outputs
@@ -175,7 +179,9 @@ Preconditioners worth trying: `bjacobi`+`ilu` (default), `asm -pc_asm_overlap 1`
 
 ## 5. Known limitations / things to watch
 
-- Wet/dry: only exercised at rest (island lake-at-rest test) and in the unit tests. The Jacobian zeroes dry cells (`h ≤ tiny_h`) and uses one-sided
+- Wet/dry: moving fronts are tested with the dry/wet dam breaks (CFL up to 5). Implicit runs with moving
+  shorelines need `h_anuga_reg_parameter > 0` (1e-3 works); with 0, Newton stalls at the front for CFL > 1.
+- `-rdy_positivity clip|vi|none` (default clip) keeps Newton iterates at h ≥ 0. The Jacobian zeroes dry cells (`h ≤ tiny_h`) and uses one-sided
   derivatives at kinks; Newton may leave `h < 0`. Phase 6 in the plan (positivity post-check or
   SNESVI) is not done.
 - `h_anuga_regular > 0` is differentiated (unit-tested), but not run in a full simulation.

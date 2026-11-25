@@ -120,17 +120,11 @@ CEED_QFUNCTION_HELPER SWEDual SWEDualVelocity(SWEDual h, SWEDual hu, CeedScalar 
   return SWEDualConst(0.0);
 }
 
-/// Roe flux of SWERiemannFlux_Roe (with dhv = 0, i.e. no BS2002 well balancing) for states
-/// given as dual numbers, so that callers can chain the Roe flux with a state reconstruction
-/// (e.g. hydrostatic reconstruction). Returns F (with derivatives) and the maximum wave speed.
-CEED_QFUNCTION_HELPER void SWEDualRoeFlux(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEDual hl, SWEDual hul,
-                                          SWEDual hvl, SWEDual hr, SWEDual hur, SWEDual hvr, CeedScalar sn, CeedScalar cn, SWEDual F[3],
-                                          CeedScalar *amax) {
-  const SWEDual ul = SWEDualVelocity(hl, hul, tiny_h, h_anuga);
-  const SWEDual vl = SWEDualVelocity(hl, hvl, tiny_h, h_anuga);
-  const SWEDual ur = SWEDualVelocity(hr, hur, tiny_h, h_anuga);
-  const SWEDual vr = SWEDualVelocity(hr, hvr, tiny_h, h_anuga);
-
+/// Roe flux of SWERiemannFlux_Roe (with dhv = 0) in terms of depths and velocities given as dual
+/// numbers (the part of the kernel after the velocities are formed). Used directly when a caller
+/// supplies velocities (the PETSc hydrostatic-reconstruction residual), and by SWEDualRoeFlux.
+CEED_QFUNCTION_HELPER void SWEDualRoeFluxPrimitive(const CeedScalar gravity, SWEDual hl, SWEDual ul, SWEDual vl, SWEDual hr, SWEDual ur, SWEDual vr,
+                                                   CeedScalar sn, CeedScalar cn, SWEDual F[3], CeedScalar *amax) {
   // Roe averages (ComputeSWEEigenspectrum_Roe)
   const CeedScalar sqrt_gravity = sqrt(gravity);
   const SWEDual    duml         = SWEDualSqrt(hl);
@@ -201,6 +195,19 @@ CEED_QFUNCTION_HELPER void SWEDualRoeFlux(const CeedScalar gravity, const CeedSc
   F[2] = SWEDualScale(0.5, SWEDualSub(SWEDualAdd(FL2, FR2), B2));
 
   *amax = chat.v + fabs(uperp.v);
+}
+
+/// Roe flux of SWERiemannFlux_Roe (with dhv = 0, i.e. no BS2002 well balancing) for conservative
+/// states given as dual numbers, so that callers can chain the Roe flux with a state reconstruction
+/// (e.g. hydrostatic reconstruction). Returns F (with derivatives) and the maximum wave speed.
+CEED_QFUNCTION_HELPER void SWEDualRoeFlux(const CeedScalar gravity, const CeedScalar tiny_h, const CeedScalar h_anuga, SWEDual hl, SWEDual hul,
+                                          SWEDual hvl, SWEDual hr, SWEDual hur, SWEDual hvr, CeedScalar sn, CeedScalar cn, SWEDual F[3],
+                                          CeedScalar *amax) {
+  const SWEDual ul = SWEDualVelocity(hl, hul, tiny_h, h_anuga);
+  const SWEDual vl = SWEDualVelocity(hl, hvl, tiny_h, h_anuga);
+  const SWEDual ur = SWEDualVelocity(hr, hur, tiny_h, h_anuga);
+  const SWEDual vr = SWEDualVelocity(hr, hvr, tiny_h, h_anuga);
+  SWEDualRoeFluxPrimitive(gravity, hl, ul, vl, hr, ur, vr, sn, cn, F, amax);
 }
 
 /// Computes the Roe flux of SWERiemannFlux_Roe (with dhv = 0, i.e. no BS2002 well balancing)
