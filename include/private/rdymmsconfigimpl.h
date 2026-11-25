@@ -113,7 +113,12 @@ typedef struct {
   // splitting error dominate the finest meshes; 1 gives dt ~ dx, which measures
   // a joint space-time rate; 2 gives dt ~ dx^2, which is correct for an isolated
   // spatial rate but costs O(dx^-4) work.
-  PetscInt               timestep_refinement_exponent;
+  PetscInt timestep_refinement_exponent;
+  // If true, the mesh is held at base_refinement and only dt is halved per level
+  // (dt_r = dt_0 / 2^r); rates are regressed against dt, giving the temporal order
+  // directly. Use with a manufactured solution whose spatial error vanishes (e.g.
+  // a spatially uniform state), or the spatial error floor masks the temporal rate.
+  PetscBool              time_only;
   RDyMMSConvergenceRates expected_rates;
 } RDyMMSConvergence;
 

@@ -161,6 +161,14 @@ typedef struct Operator {
       // instantaneous external source snapshot and accumulation for time-averaged source output
       CeedVector ceed_src_inst;   // instantaneous source snapshot
       CeedVector ceed_src_accum;  // running sum for time averaging
+
+      // analytic Jacobian for implicit time integration (created on first use):
+      // composite operator writing 3x3 blocks into jac_coo_values, the COO pattern
+      // (local dof indices), and a passive state vector lent from u_local
+      CeedOperator jacobian;
+      CeedVector   jac_state, jac_coo_values;
+      CeedSize     jac_num_coo;
+      PetscInt    *jac_coo_rows, *jac_coo_cols;
     } ceed;
 
     // PETSc operator data
@@ -211,6 +219,12 @@ PETSC_INTERN PetscErrorCode DestroyOperator(Operator **);
 
 // operator timestepping function
 PETSC_INTERN PetscErrorCode ApplyOperator(Operator *, PetscReal, Vec, Vec);
+
+// assembles the Jacobian dF/dU of the operator's right-hand side at the local state u_local
+PETSC_INTERN PetscErrorCode ApplyOperatorJacobian(Operator *, Vec, Mat);
+PETSC_INTERN PetscErrorCode ComputeSWEJacobianHost(Operator *, Vec, Mat);
+PETSC_INTERN PetscErrorCode ComputeSWEJacobianCeed(Operator *, Vec, Mat);
+PETSC_INTERN PetscErrorCode DestroyCeedJacobian(Operator *);
 
 //--------------------------------------------------
 // CEED/PETSc Flux and Source Operator Constructors

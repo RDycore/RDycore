@@ -60,6 +60,7 @@ static const cyaml_strval_t physics_flow_modes[] = {
 static const cyaml_strval_t source_time_methods[] = {
     {"semi_implicit",   SOURCE_SEMI_IMPLICIT  },
     {"implicit_xq2018", SOURCE_IMPLICIT_XQ2018},
+    {"fully_implicit",  SOURCE_FULLY_IMPLICIT },
 };
 
 // mapping of treatment of "source" fields to members
@@ -120,6 +121,8 @@ static const cyaml_strval_t numerics_temporal_types[] = {
     {"euler",  TEMPORAL_EULER },
     {"rk4",    TEMPORAL_RK4   },
     {"beuler", TEMPORAL_BEULER},
+    {"cn",     TEMPORAL_CN    },
+    {"bdf",    TEMPORAL_BDF   },
 };
 
 // mapping of strings to numerics riemann solver types
@@ -775,6 +778,7 @@ static const cyaml_schema_field_t mms_convergence_fields_schema[] = {
     CYAML_FIELD_INT("num_refinements", CYAML_FLAG_DEFAULT, RDyMMSConvergence, num_refinements),
     CYAML_FIELD_INT("base_refinement", CYAML_FLAG_OPTIONAL, RDyMMSConvergence, base_refinement),
     CYAML_FIELD_INT("timestep_refinement_exponent", CYAML_FLAG_OPTIONAL, RDyMMSConvergence, timestep_refinement_exponent),
+    CYAML_FIELD_BOOL("time_only", CYAML_FLAG_OPTIONAL, RDyMMSConvergence, time_only),
     CYAML_FIELD_MAPPING("expected_rates", CYAML_FLAG_DEFAULT, RDyMMSConvergence,
                         expected_rates, mms_convergence_rates_fields_schema),
     CYAML_FIELD_END
@@ -905,6 +909,8 @@ static PetscErrorCode SetMissingValues(RDyConfig* config) {
   SET_MISSING_PARAMETER(config->physics.flow.h_anuga_regular, 0.0);
   if (config->numerics.temporal == TEMPORAL_ARK_IMEX) {
     SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_ARK_IMEX);
+  } else if (TemporalIsImplicit(config->numerics.temporal)) {
+    SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_FULLY_IMPLICIT);
   } else {
     SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_SEMI_IMPLICIT);
   }
@@ -991,8 +997,21 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
   if (config->numerics.spatial != SPATIAL_FV) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only the finite volume spatial method (FV) is currently implemented.");
   }
-  if (config->numerics.temporal == TEMPORAL_BEULER) {
-    PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "The backward euler temporal method (BEULER) is not implemented.");
+  if (TemporalIsImplicit(config->numerics.temporal)) {
+    // fully implicit flow TS: first implementation supports first-order Roe SWE without tracers
+    PetscCheck(config->physics.flow.source.method == SOURCE_FULLY_IMPLICIT, comm, PETSC_ERR_USER,
+               "Implicit temporal methods (beuler, cn, bdf) require physics.flow.source.method = fully_implicit");
+    PetscCheck(config->physics.sediment.num_classes == 0 && !config->physics.salinity && !config->physics.heat, comm, PETSC_ERR_USER,
+               "Implicit temporal methods currently support flow without tracers only (no sediment, salinity, or heat)");
+    PetscCheck(config->numerics.riemann == RIEMANN_ROE, comm, PETSC_ERR_USER, "Implicit temporal methods currently require riemann: roe");
+    PetscCheck(config->physics.flow.well_balancing == WELL_BALANCING_NONE, comm, PETSC_ERR_USER,
+               "Implicit temporal methods currently require well_balancing: none");
+    PetscCheck(!config->numerics.second_order, comm, PETSC_ERR_USER,
+               "Implicit temporal methods currently require first-order spatial reconstruction");
+    PetscCheck(!config->time.adaptive.enable, comm, PETSC_ERR_USER, "Adaptive time stepping is not supported with implicit temporal methods");
+  } else {
+    PetscCheck(config->physics.flow.source.method != SOURCE_FULLY_IMPLICIT, comm, PETSC_ERR_USER,
+               "physics.flow.source.method = fully_implicit requires an implicit temporal method (beuler, cn, bdf)");
   }
   if (config->numerics.riemann != RIEMANN_ROE && config->numerics.riemann != RIEMANN_UPWIND_ROE) {
     PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER,
@@ -1037,7 +1056,10 @@ static PetscErrorCode ValidateConfig(MPI_Comm comm, RDyConfig* config, PetscBool
   if (config->time.stop == INVALID_REAL) {
     config->time.stop = config->time.stop_n * config->time.time_step;
   } else if (config->time.stop_n == INVALID_INT) {
-    config->time.stop_n = (PetscInt)(config->time.stop / config->time.time_step);
+    // round up (with a relative tolerance for floating-point error, e.g. 0.3/0.1 = 2.9999...) so
+    // the step limit never stops the TS short of the final time, which would loop RDyAdvance forever
+    PetscReal nsteps    = config->time.stop / config->time.time_step;
+    config->time.stop_n = (PetscInt)PetscCeilReal(nsteps * (1.0 - 1.0e-10));
   } else {  // config->time.time_step == INVALID_REAL
     config->time.time_step = config->time.stop / config->time.stop_n;
   }

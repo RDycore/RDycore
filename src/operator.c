@@ -444,6 +444,7 @@ PetscErrorCode DestroyOperator(Operator** op) {
   PetscBool ceed_enabled = CeedEnabled();
 
   if (ceed_enabled) {
+    PetscCall(DestroyCeedJacobian(*op));
     PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.flux)));
     PetscCallCEED(CeedOperatorDestroy(&((*op)->ceed.source)));
     PetscCallCEED(CeedVectorDestroy(&((*op)->ceed.u_local)));
@@ -738,6 +739,40 @@ PetscErrorCode ApplyOperator(Operator* op, PetscReal dt, Vec u_local, Vec f_glob
     PetscCall(ApplyPetscOperator(op, dt, u_local, f_global));
   }
 
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Assembles the Jacobian dF/dU of the right-hand side F computed by ApplyOperator.
+/// @param [in]    op       the operator
+/// @param [in]    u_local  the solution Vec containing locally-owned and ghost cells
+/// @param [inout] J        the assembled Jacobian (global, block size = number of components)
+PetscErrorCode ApplyOperatorJacobian(Operator* op, Vec u_local, Mat J) {
+  PetscFunctionBegin;
+  PetscBool use_host = PETSC_FALSE, compare = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-rdy_jacobian_host", &use_host, NULL));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-rdy_jacobian_compare", &compare, NULL));
+
+  if (CeedEnabled() && !use_host) {
+    PetscCall(ComputeSWEJacobianCeed(op, u_local, J));
+  } else {
+    PetscCall(ComputeSWEJacobianHost(op, u_local, J));
+  }
+
+  // optional check: compare the CEED Jacobian with the host Jacobian
+  if (compare && CeedEnabled()) {
+    Mat J_host;
+    PetscCall(DMCreateMatrix(op->dm, &J_host));
+    PetscCall(ComputeSWEJacobianHost(op, u_local, J_host));
+    PetscReal norm_host, norm_diff;
+    PetscCall(MatNorm(J_host, NORM_FROBENIUS, &norm_host));
+    PetscCall(MatAXPY(J_host, -1.0, J, DIFFERENT_NONZERO_PATTERN));
+    PetscCall(MatNorm(J_host, NORM_FROBENIUS, &norm_diff));
+    PetscCall(PetscPrintf(PetscObjectComm((PetscObject)J), "Jacobian check: ||J_ceed - J_host||_F / ||J_host||_F = %g (||J_host||_F = %g)\n",
+                          (double)(norm_diff / norm_host), (double)norm_host));
+    PetscCall(MatDestroy(&J_host));
+    PetscCheck(norm_diff <= 1e-12 * norm_host, PetscObjectComm((PetscObject)J), PETSC_ERR_PLIB,
+               "CEED and host Jacobians differ: relative Frobenius difference %g", (double)(norm_diff / norm_host));
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

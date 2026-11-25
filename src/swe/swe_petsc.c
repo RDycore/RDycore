@@ -932,6 +932,14 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+// adds pointwise source terms (no time-step dependence) for a fully implicit flow TS.
+// With dt = 0, the semi-implicit friction reduces exactly to S_f(U) = -Cd |u| hu / h.
+static PetscErrorCode ApplySourceFullyImplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
+  PetscFunctionBeginUser;
+  PetscCall(ApplySourceSemiImplicit(context, fields, 0.0, u_local, f_global));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode DestroySource(void *context) {
   PetscFunctionBegin;
   SourceOperator *source_op = context;
@@ -971,8 +979,11 @@ PetscErrorCode CreatePetscSWESourceOperator(RDyMesh *mesh, const RDyConfig confi
     case SOURCE_IMPLICIT_XQ2018:
       PetscCall(PetscOperatorCreate(source_op, ApplySourceImplicitXQ2018, DestroySource, petsc_op));
       break;
+    case SOURCE_FULLY_IMPLICIT:
+      PetscCall(PetscOperatorCreate(source_op, ApplySourceFullyImplicit, DestroySource, petsc_op));
+      break;
     default:
-      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit and implicit_xq2018 are supported in the PETSc version");
+      PetscCheck(PETSC_FALSE, comm, PETSC_ERR_USER, "Only semi_implicit, implicit_xq2018 and fully_implicit are supported in the PETSc version");
       break;
   }
   PetscFunctionReturn(PETSC_SUCCESS);

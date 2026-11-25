@@ -579,7 +579,14 @@ PetscErrorCode RDyMMSSetup(RDy rdy) {
   RDyLogDebug(rdy, "Initializing solver...");
   PetscCall(InitSolver(rdy));
 
-  PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
+  if (TemporalIsImplicit(rdy->config.numerics.temporal)) {
+    // implicit TS: evaluate forcing at the stage times requested by the TS (see OperatorRHSFunction),
+    // which is needed for the multistage/multistep integrators to reach their design order
+    rdy->mms_stage_forcing = PETSC_TRUE;
+    rdy->mms_forcing_time  = PETSC_MIN_REAL;
+  } else {
+    PetscCall(TSSetPreStep(rdy->ts, MMSPreStep));
+  }
 
   if (rdy->config.physics.heat) {
     RDyLogDebug(rdy, "Initializing MMS heat TS...");
@@ -1227,7 +1234,12 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
   PetscInt  base_stop_n    = rdy->config.time.stop_n;
   PetscCheck(dt_exponent >= 0, rdy->comm, PETSC_ERR_USER, "mms.convergence.timestep_refinement_exponent (%" PetscInt_FMT ") must be non-negative",
              dt_exponent);
-  if (dt_exponent) {
+  PetscBool time_only = rdy->config.mms.convergence.time_only;
+  if (time_only) {
+    PetscCheck(dt_exponent == 0, rdy->comm, PETSC_ERR_USER, "mms.convergence.time_only cannot be combined with timestep_refinement_exponent");
+    dt_exponent = 1;  // halve dt per level on a fixed mesh
+    PetscPrintf(rdy->comm, "Temporal convergence study on a fixed mesh: dt_r = dt_0 / 2^r (dt_0 = %g s)\n", (double)base_dt);
+  } else if (dt_exponent) {
     PetscPrintf(rdy->comm, "Refining the timestep with the mesh: dt ~ dx^%" PetscInt_FMT " (dt_0 = %g s, stop_n_0 = %" PetscInt_FMT ")\n",
                 dt_exponent, (double)base_dt, base_stop_n);
   }
@@ -1238,7 +1250,7 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
   for (PetscInt r = 1; r <= num_refinements; ++r) {
     PetscCall(RDyCreate(rdy->comm, rdy->config_file, &rdys[r]));
     char num_refinements[5];
-    snprintf(num_refinements, 4, "%" PetscInt_FMT, r + base_refinement);
+    snprintf(num_refinements, 4, "%" PetscInt_FMT, (time_only ? 0 : r) + base_refinement);
     PetscCall(PetscOptionsSetValue(NULL, "-dm_refine", num_refinements));
     PetscCall(RDyMMSSetup(rdys[r]));
 
@@ -1255,7 +1267,8 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
   }
 
   for (PetscInt r = 0; r <= num_refinements; ++r) {
-    PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r + base_refinement);
+    if (time_only) PetscPrintf(rdys[r]->comm, "Timestep level %" PetscInt_FMT " (dt = %g s):\n", r, (double)rdys[r]->dt);
+    else PetscPrintf(rdys[r]->comm, "Refinement level %" PetscInt_FMT ":\n", r + base_refinement);
 
     // run the problem to completion
     PetscCall(TSSolve(rdys[r]->ts, rdys[r]->u_global));
@@ -1265,11 +1278,17 @@ PetscErrorCode RDyMMSEstimateConvergenceRates(RDy rdy, PetscReal* L1_conv_rates,
     PrintErrorNorms(rdys[r]->comm, final_time, num_comps, L1_norms[r], L2_norms[r], Linf_norms[r]);
   }
 
-  // calculate the spatial discretization parameter N, where h^{-dim} = N.
+  // calculate the spatial discretization parameter N, where h^{-dim} = N, or,
+  // for a time-only study, the timestep: log err = p log dt + b, so we store
+  // x = -dim log(dt) so that the rate below (-slope * dim) equals p
   PetscReal x[MAX_NUM_REFINEMENTS + 1];
   for (PetscInt r = 0; r <= num_refinements; ++r) {
-    PetscInt N = rdys[r]->mesh.num_cells_global;
-    x[r]       = PetscLog10Real(N);
+    if (time_only) {
+      x[r] = -dim * PetscLog10Real(rdys[r]->dt);
+    } else {
+      PetscInt N = rdys[r]->mesh.num_cells_global;
+      x[r]       = PetscLog10Real(N);
+    }
   }
 
   // fit convergence rates

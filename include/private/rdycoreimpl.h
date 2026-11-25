@@ -213,6 +213,14 @@ struct _p_RDy {
   // time₋stepping solver
   TS ts;
 
+  // Jacobian of the flow RHS (allocated only for implicit temporal methods)
+  Mat jacobian;
+
+  // MMS forcing for implicit TS: sources and Dirichlet values are evaluated at the
+  // time passed to the RHS function (stage time) rather than frozen at t + dt/2
+  PetscBool mms_stage_forcing;
+  PetscReal mms_forcing_time;
+
   // PETSc-only heat source correction
   TS      heat_ts;
   Mat     heat_jac;

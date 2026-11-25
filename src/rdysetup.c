@@ -1174,6 +1174,14 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
   PetscScalar dt;
   PetscCall(TSGetTimeStep(ts, &dt));
 
+  // implicit MMS runs: evaluate manufactured sources and Dirichlet values at the
+  // time requested by the TS (stage time), caching the last evaluation time
+  if (rdy->mms_stage_forcing && t != rdy->mms_forcing_time) {
+    PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t));
+    PetscCall(RDyMMSComputeSourceTerms(rdy, t));
+    rdy->mms_forcing_time = t;
+  }
+
   PetscCall(VecZeroEntries(F));
 
   // populate the local U vector
@@ -1218,6 +1226,82 @@ static PetscErrorCode OperatorRHSFunction(TS ts, PetscReal t, Vec U, Vec F, void
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/// Computes the Jacobian of the right-hand side, dF/dU, for implicit time integrators.
+/// TS forms the Newton matrix shift*I - dF/dU from it.
+static PetscErrorCode OperatorRHSJacobian(TS ts, PetscReal t, Vec U, Mat A, Mat B, void* ctx) {
+  PetscFunctionBegin;
+  RDy rdy = ctx;
+
+  // the Jacobian depends only on U (MMS forcing and Dirichlet values are independent of U),
+  // but keep Dirichlet values consistent with the stage time
+  if (rdy->mms_stage_forcing && t != rdy->mms_forcing_time) {
+    PetscCall(RDyMMSEnforceBoundaryConditions(rdy, t));
+    PetscCall(RDyMMSComputeSourceTerms(rdy, t));
+    rdy->mms_forcing_time = t;
+  }
+
+  PetscCall(DMGlobalToLocalBegin(rdy->dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(DMGlobalToLocalEnd(rdy->dm, U, INSERT_VALUES, rdy->u_local));
+  PetscCall(ApplyOperatorJacobian(rdy->operator, rdy->u_local, B));
+  if (A != B) {
+    PetscCall(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/// Sets up the Jacobian matrix and nonlinear solver of an implicit flow TS.
+/// The Jacobian is selected with -rdy_jacobian <analytic|fd|mf>:
+///   analytic: analytic Roe/source/boundary Jacobian (PETSc or CEED backend)
+///   fd:       finite differences with coloring (scaffolding / comparison only)
+///   mf:       Jacobian-free Newton-Krylov with no preconditioner (comparison only)
+static PetscErrorCode InitImplicitSolver(RDy rdy) {
+  PetscFunctionBegin;
+
+  PetscCall(MatDestroy(&rdy->jacobian));
+  PetscCall(DMCreateMatrix(rdy->dm, &rdy->jacobian));
+  PetscCall(MatSetOption(rdy->jacobian, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
+
+  const char* jac_types[] = {"analytic", "fd", "mf"};
+  PetscInt    jac_type    = 0;
+  PetscOptionsBegin(rdy->comm, NULL, "RDycore implicit solver options", "");
+  PetscCall(PetscOptionsEList("-rdy_jacobian", "Jacobian of the implicit flow TS", "", jac_types, 3, jac_types[jac_type], &jac_type, NULL));
+  PetscOptionsEnd();
+
+  SNES snes;
+  PetscCall(TSGetSNES(rdy->ts, &snes));
+  switch (jac_type) {
+    case 0:  // analytic
+      PetscCall(TSSetRHSJacobian(rdy->ts, rdy->jacobian, rdy->jacobian, OperatorRHSJacobian, rdy));
+      break;
+    case 1:  // finite differences with coloring of the TS-formed nonlinear residual
+      PetscCall(SNESSetJacobian(snes, rdy->jacobian, rdy->jacobian, SNESComputeJacobianDefaultColor, NULL));
+      break;
+    case 2: {  // matrix-free
+      Mat J_mf;
+      PetscCall(MatCreateSNESMF(snes, &J_mf));
+      PetscCall(SNESSetJacobian(snes, J_mf, J_mf, MatMFFDComputeJacobian, NULL));
+      PetscCall(MatDestroy(&J_mf));
+      KSP ksp;
+      PC  pc;
+      PetscCall(SNESGetKSP(snes, &ksp));
+      PetscCall(KSPGetPC(ksp, &pc));
+      PetscCall(PCSetType(pc, PCNONE));
+    } break;
+  }
+
+  // fixed time step by default (TSBDF otherwise enables error-based adaptivity, and
+  // the step limit stop_n assumes a fixed step); -ts_adapt_type overrides this
+  TSAdapt adapt;
+  PetscCall(TSGetAdapt(rdy->ts, &adapt));
+  PetscCall(TSAdaptSetType(adapt, TSADAPTNONE));
+
+  // tight default nonlinear tolerances, so that MMS errors measure discretization error only
+  PetscCall(SNESSetTolerances(snes, 1e-12, 1e-10, PETSC_DETERMINE, 50, PETSC_DETERMINE));
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode InitSolver(RDy rdy) {
   PetscFunctionBegin;
 
@@ -1238,6 +1322,12 @@ PetscErrorCode InitSolver(RDy rdy) {
     case TEMPORAL_BEULER:
       PetscCall(TSSetType(rdy->ts, TSBEULER));
       break;
+    case TEMPORAL_CN:
+      PetscCall(TSSetType(rdy->ts, TSCN));
+      break;
+    case TEMPORAL_BDF:
+      PetscCall(TSSetType(rdy->ts, TSBDF));
+      break;
     default:
       PetscCheck(PETSC_FALSE, rdy->comm, PETSC_ERR_USER, "Unsupported time discretization");
   }
@@ -1246,6 +1336,9 @@ PetscErrorCode InitSolver(RDy rdy) {
 
   PetscCheck(rdy->config.physics.flow.mode == FLOW_SWE, rdy->comm, PETSC_ERR_USER, "Only the 'swe' flow mode is currently supported.");
   PetscCall(TSSetRHSFunction(rdy->ts, rdy->rhs, OperatorRHSFunction, rdy));
+  if (TemporalIsImplicit(rdy->config.numerics.temporal)) {
+    PetscCall(InitImplicitSolver(rdy));
+  }
 
   if (!rdy->config.time.adaptive.enable) {
     PetscCall(TSSetMaxSteps(rdy->ts, rdy->config.time.stop_n));

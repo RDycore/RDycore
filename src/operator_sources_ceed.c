@@ -44,6 +44,11 @@ static PetscErrorCode CreateSourceQFunction(Ceed ceed, const RDyConfig config, C
         PetscCheck(PETSC_FALSE, PETSC_COMM_WORLD, PETSC_ERR_USER, "SOURCE_IMPLICIT_XQ2018 is not supported in sediment CEED version");
       }
       break;
+    case SOURCE_FULLY_IMPLICIT:  // pointwise friction for a fully implicit flow TS
+      PetscCheck(num_tracers == 0, PETSC_COMM_WORLD, PETSC_ERR_USER, "fully_implicit source method supports flow without tracers only");
+      PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesWithFullyImplicitBedFriction, SWESourcesWithFullyImplicitBedFriction_loc, qf));
+      PetscCall(CreateSWEQFunctionContext(ceed, config, &qf_context));
+      break;
     case SOURCE_ARK_IMEX:      // bed friction terms moved to LHS
       if (num_tracers == 0) {  // flow only
         PetscCallCEED(CeedQFunctionCreateInterior(ceed, 1, SWESourcesWithoutBedFriction, SWESourcesWithoutBedFriction_loc, qf));

@@ -389,3 +389,29 @@ foreach(case subcritical transcritical shock)
     endforeach()
   endforeach()
 endforeach()
+
+# Fully implicit Roe solver (TS beuler/cn/bdf with the analytic Jacobian)
+#  - time-only MMS (spatially uniform state, mesh fixed, dt halved per level):
+#    expected temporal orders 1 (beuler) and 2 (cn, bdf)
+#  - space-time MMS (sinusoidal state with bed slope and friction, dt ~ dx)
+#  - CEED vs host Jacobian check (-rdy_jacobian_compare errors if they differ)
+file(COPY
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_time_beuler.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_time_cn.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_time_bdf.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_spacetime_beuler.yaml
+     ${CMAKE_CURRENT_SOURCE_DIR}/mms_implicit_jacobian_check.yaml
+     ${MESH_DIR}/mms_triangles_dx1.exo
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+foreach(np 1 2)
+  foreach(config basic ceed)
+    foreach(method beuler cn bdf)
+      add_test(swe_implicit_mms_time_${method}_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_c_driver}
+               mms_implicit_time_${method}.yaml ${${config}_args})
+    endforeach()
+    add_test(swe_implicit_mms_spacetime_beuler_c_np_${np}_${config} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_c_driver}
+             mms_implicit_spacetime_beuler.yaml ${${config}_args})
+  endforeach()
+  add_test(swe_implicit_jacobian_ceed_vs_host_np_${np} ${MPIEXEC} ${MPIEXEC_FLAGS} -n ${np} ${mms_c_driver}
+           mms_implicit_jacobian_check.yaml -ceed /cpu/self -rdy_jacobian_compare)
+endforeach()

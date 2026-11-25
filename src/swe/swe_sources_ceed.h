@@ -15,6 +15,7 @@ typedef enum {
   SWE_BED_FRICTION_NONE,
   SWE_BED_FRICTION_SEMI_IMPLICIT,
   SWE_BED_FRICTION_IMPLICIT_XQ2018,
+  SWE_BED_FRICTION_FULLY_IMPLICIT,
 } SWEBedFrictionType;
 
 // we disable compiler warnings for implicitly-declared math functions known to
@@ -57,6 +58,31 @@ int CEED_QFUNCTION_HELPER SWESemiImplicitBedFrictionRoughness(SWEContext context
 
   *tbx = (hu + dt * (Fsum_x - bedx)) * factor;
   *tby = (hv + dt * (Fsum_y - bedy)) * factor;
+
+  return 0;
+}
+
+/// @brief Pointwise bed friction S_f(U) = -g n^2 q |q| / h^{7/3} with no time-step dependence,
+///        used when the flow TS is fully implicit (the TS evaluates it at the new time level).
+///        Returns the friction terms (tbx, tby) that are subtracted from the momentum RHS.
+int CEED_QFUNCTION_HELPER SWEFullyImplicitBedFrictionRoughness(SWEContext context, SWEState state, CeedScalar mannings_n, CeedScalar *tbx,
+                                                               CeedScalar *tby) {
+  const CeedScalar tiny_h  = context->tiny_h;
+  const CeedScalar h_anuga = context->h_anuga_regular;
+  const CeedScalar gravity = context->gravity;
+
+  const CeedScalar h     = state.h;
+  const CeedScalar denom = Square(h) + Square(h_anuga);
+
+  const CeedScalar u = SafeDiv(state.hu * h, denom, h, tiny_h);
+  const CeedScalar v = SafeDiv(state.hv * h, denom, h, tiny_h);
+
+  const CeedScalar Cd       = gravity * Square(mannings_n) * pow(h, -1.0 / 3.0);
+  const CeedScalar velocity = sqrt(Square(u) + Square(v));
+  const CeedScalar tb       = Cd * velocity / h;
+
+  *tbx = state.hu * tb;
+  *tby = state.hv * tb;
 
   return 0;
 }
@@ -144,6 +170,9 @@ CEED_QFUNCTION_HELPER int SWESources(void *ctx, CeedInt Q, const CeedScalar *con
         case SWE_BED_FRICTION_IMPLICIT_XQ2018:
           SWEImplicitBedFrictionRoughnessXQ2018(context, state, mannings_n, Fsum_x, Fsum_y, bedx, bedy, &tbx, &tby);
           break;
+        case SWE_BED_FRICTION_FULLY_IMPLICIT:
+          SWEFullyImplicitBedFrictionRoughness(context, state, mannings_n, &tbx, &tby);
+          break;
         default:
           break;
       }
@@ -177,6 +206,10 @@ CEED_QFUNCTION(SWESourcesWithSemiImplicitBedFriction)(void *ctx, CeedInt Q, cons
 
 CEED_QFUNCTION(SWESourcesWithImplicitBedFrictionXQ2018)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
   return SWESources(ctx, Q, in, out, SWE_BED_FRICTION_IMPLICIT_XQ2018);
+}
+
+CEED_QFUNCTION(SWESourcesWithFullyImplicitBedFriction)(void *ctx, CeedInt Q, const CeedScalar *const in[], CeedScalar *const out[]) {
+  return SWESources(ctx, Q, in, out, SWE_BED_FRICTION_FULLY_IMPLICIT);
 }
 
 #pragma GCC diagnostic   pop

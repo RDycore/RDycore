@@ -274,6 +274,7 @@ PetscErrorCode RDyDestroy(RDy* rdy) {
 
   // destroy solver
   if ((*rdy)->ts) TSDestroy(&((*rdy)->ts));
+  if ((*rdy)->jacobian) MatDestroy(&((*rdy)->jacobian));
   PetscCall(RDyHeatDestroy(*rdy));
 
   PetscCall(RDyDestroyVectors(rdy));

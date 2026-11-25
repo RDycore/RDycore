@@ -53,6 +53,7 @@ typedef enum {
   SOURCE_SEMI_IMPLICIT = 0,  // semi-implicit treatment
   SOURCE_IMPLICIT_XQ2018,    // implicit treatment using Xilin and Qiuhua (2018)
   SOURCE_ARK_IMEX,           // fully implicit treatment via ARK-IMEX method
+  SOURCE_FULLY_IMPLICIT,     // pointwise S(U) with no dt dependence, for implicit TS (beuler/cn/bdf)
 } RDyFlowSourceMethod;
 
 typedef enum {
@@ -112,8 +113,15 @@ typedef enum {
   TEMPORAL_EULER = 0,  // forward euler method
   TEMPORAL_RK4,        // 4th-order Runge-Kutta method
   TEMPORAL_ARK_IMEX,   // additive Runge Kutta implicit-explicit method (implicit treatment of stiff sources)
-  TEMPORAL_BEULER      // backward euler method
+  TEMPORAL_BEULER,     // backward euler method (fully implicit)
+  TEMPORAL_CN,         // Crank-Nicolson method (fully implicit)
+  TEMPORAL_BDF,        // BDF method (fully implicit, order set by -ts_bdf_order, default 2)
 } RDyNumericsTemporal;
+
+// returns true if the temporal method is a fully implicit TS that requires a Jacobian
+static inline PetscBool TemporalIsImplicit(RDyNumericsTemporal t) {
+  return (t == TEMPORAL_BEULER || t == TEMPORAL_CN || t == TEMPORAL_BDF) ? PETSC_TRUE : PETSC_FALSE;
+}
 
 // riemann solvers for horizontal flow
 typedef enum {

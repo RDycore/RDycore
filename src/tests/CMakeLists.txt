@@ -20,7 +20,8 @@ endforeach()
 
 # unit tests that don't need a mesh or multiple processes
 foreach(exe_name
-        test_augmented_roe)
+        test_augmented_roe
+        test_swe_roe_jacobian)
   set(exe_source ${exe_name}.c)
   add_executable(${exe_name} ${exe_source})
   target_link_libraries(${exe_name} PRIVATE rdycore_c cmocka)
