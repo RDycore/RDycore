@@ -43,7 +43,7 @@
 //   flow:
 //     mode: <swe|diffusion> # swe by default
 //     tiny_h: <value> # 1e-7 by default
-//     h_anuga_reg_parameter: <value> # 0.0 by default
+//     h_anuga_reg_parameter: <value> # 0.0 by default (1e-3 for implicit temporal methods)
 //     source:
 //       method: <semi_implicit|implicit_xq2018> # semi_implicit by default
 //       xq2018_threshold: <value> # 1e-10 by default
@@ -906,7 +906,15 @@ static PetscErrorCode SetMissingValues(RDyConfig* config) {
   PetscFunctionBegin;
 
   SET_MISSING_PARAMETER(config->physics.flow.tiny_h, 1e-7);
-  SET_MISSING_PARAMETER(config->physics.flow.h_anuga_regular, 0.0);
+  // ANUGA velocity desingularization height: 0 (none) for explicit methods. Implicit methods
+  // default to a non-zero value: without it, Newton stalls at moving wet/dry fronts for
+  // CFL > 1 (the residual is degenerate where h -> 0). A non-zero value in the YAML file is
+  // used as given (a value of 0 counts as "not set").
+  if (TemporalIsImplicit(config->numerics.temporal)) {
+    SET_MISSING_PARAMETER(config->physics.flow.h_anuga_regular, IMPLICIT_DEFAULT_H_ANUGA);
+  } else {
+    SET_MISSING_PARAMETER(config->physics.flow.h_anuga_regular, 0.0);
+  }
   if (config->numerics.temporal == TEMPORAL_ARK_IMEX) {
     SET_MISSING_PARAMETER(config->physics.flow.source.method, SOURCE_ARK_IMEX);
   } else if (TemporalIsImplicit(config->numerics.temporal)) {

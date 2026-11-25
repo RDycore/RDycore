@@ -118,6 +118,9 @@ typedef enum {
   TEMPORAL_BDF,        // BDF method (fully implicit, order set by -ts_bdf_order, default 2)
 } RDyNumericsTemporal;
 
+// default ANUGA velocity desingularization height [m] for implicit temporal methods
+#define IMPLICIT_DEFAULT_H_ANUGA 1.0e-3
+
 // returns true if the temporal method is a fully implicit TS that requires a Jacobian
 static inline PetscBool TemporalIsImplicit(RDyNumericsTemporal t) {
   return (t == TEMPORAL_BEULER || t == TEMPORAL_CN || t == TEMPORAL_BDF) ? PETSC_TRUE : PETSC_FALSE;

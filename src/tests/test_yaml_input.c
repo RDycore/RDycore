@@ -197,6 +197,64 @@ static void TestBadFlowBCSpec(void **state) {
   assert_int_equal(0, RDyDestroy(&rdy));
 }
 
+// Reads a minimal flow-only config with the given temporal method and optional
+// h_anuga_reg_parameter line, returning the resulting h_anuga value.
+static PetscReal ReadHAnuga(void **state, const char *temporal, const char *h_anuga_line) {
+  char config_string[2048];
+  snprintf(config_string, sizeof(config_string),
+           "physics:\n"
+           "  flow:\n"
+           "    mode: swe\n"
+           "%s"
+           "numerics:\n"
+           "  spatial: fv\n"
+           "  temporal: %s\n"
+           "  riemann: roe\n\n"
+           "time:\n"
+           "  stop: 1\n"
+           "  unit: seconds\n"
+           "  stop_n: 10\n\n"
+           "grid:\n"
+           "  file: planar_dam_10x5.msh\n\n"
+           "regions:\n"
+           "  - name: domain\n"
+           "    grid_region_id: 1\n\n"
+           "surface_composition:\n"
+           "  - region: domain\n"
+           "    material: smooth\n\n"
+           "materials:\n"
+           "  - name: smooth\n"
+           "    properties:\n"
+           "      manning:\n"
+           "        value: 0.018\n\n"
+           "initial_conditions:\n"
+           "  - region: domain\n"
+           "    flow: still\n\n"
+           "flow_conditions:\n"
+           "  - name: still\n"
+           "    type: dirichlet\n"
+           "    height: 1\n"
+           "    x_momentum: 0\n"
+           "    y_momentum: 0\n",
+           h_anuga_line, temporal);
+  RDy rdy;
+  assert_int_equal(0, RDyCreate(PETSC_COMM_WORLD, "h_anuga_spec", &rdy));
+  assert_int_equal(0, ReadConfigString(state, rdy, config_string));
+  PetscReal h_anuga = rdy->config.physics.flow.h_anuga_regular;
+  assert_int_equal(0, RDyDestroy(&rdy));
+  return h_anuga;
+}
+
+// Implicit temporal methods default to a non-zero ANUGA desingularization height;
+// a value in the YAML file is used as given; explicit methods keep 0 by default.
+static void TestImplicitHAnugaDefault(void **state) {
+  assert_true(ReadHAnuga(state, "euler", "") == 0.0);
+  assert_true(ReadHAnuga(state, "beuler", "") == IMPLICIT_DEFAULT_H_ANUGA);
+  assert_true(ReadHAnuga(state, "cn", "") == IMPLICIT_DEFAULT_H_ANUGA);
+  assert_true(ReadHAnuga(state, "beuler", "    h_anuga_reg_parameter: 0.05\n") == 0.05);
+  assert_true(ReadHAnuga(state, "euler", "    h_anuga_reg_parameter: 0.05\n") == 0.05);
+}
+
 int main(int argc, char *argv[]) {
   // Stash command line arguments for usage in tests.
   argc_ = argc;
@@ -206,6 +264,7 @@ int main(int argc, char *argv[]) {
   const struct CMUnitTest tests[] = {
       cmocka_unit_test(TestFullSpec),
       cmocka_unit_test(TestBadFlowBCSpec),
+      cmocka_unit_test(TestImplicitHAnugaDefault),
   };
 
   return cmocka_run_group_tests(tests, Setup, Teardown);

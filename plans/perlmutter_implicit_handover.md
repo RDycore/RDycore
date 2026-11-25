@@ -15,6 +15,7 @@ numerics:
 ```
 
 - `physics.flow.source.method` defaults to `fully_implicit` (friction `S_f(U)` with no `dt`).
+- `physics.flow.h_anuga_reg_parameter` defaults to 1e-3 (velocity desingularization needed at wet/dry fronts).
 - Supported scope (checked in `ValidateConfig`): `riemann: roe`, `well_balancing: none`,
   `hydrostatic_reconstruction` or `augmented_roe` (not `bradford_sanders_2002`), first-order (no
   `second_order`), no sediment/salinity/heat, no adaptive dt.
@@ -179,14 +180,15 @@ Preconditioners worth trying: `bjacobi`+`ilu` (default), `asm -pc_asm_overlap 1`
 
 ## 5. Known limitations / things to watch
 
-- Wet/dry: moving fronts are tested with the dry/wet dam breaks (CFL up to 5). Implicit runs with moving
-  shorelines need `h_anuga_reg_parameter > 0` (1e-3 works); with 0, Newton stalls at the front for CFL > 1.
-- `-rdy_positivity clip|vi|none` (default clip) keeps Newton iterates at h ≥ 0. The Jacobian zeroes dry cells (`h ≤ tiny_h`) and uses one-sided
-  derivatives at kinks; Newton may leave `h < 0`. Phase 6 in the plan (positivity post-check or
-  SNESVI) is not done.
-- `h_anuga_regular > 0` is differentiated (unit-tested), but not run in a full simulation.
-- The PETSc backend's friction uses `u = hu/h` while CEED uses the desingularized velocity; they
-  agree when `h_anuga_regular = 0` (the default).
+- Wet/dry: moving fronts are tested with the dry/wet dam breaks (CFL up to 5). Implicit runs default to
+  `h_anuga_reg_parameter = 1e-3` (explicit runs keep 0); with 0, Newton stalls at moving fronts for CFL > 1.
+  A non-zero value in the YAML overrides the default.
+- `-rdy_positivity clip|vi|none` (default clip) projects negative depths of a Newton iterate to a dry
+  state; `vi` (SNESVINEWTONRSLS) failed for augmented Roe. The Jacobian zeroes dry cells (`h ≤ tiny_h`)
+  and uses the derivative of the active branch at kinks.
+- With `h_anuga > 0` (the implicit default) the PETSc and CEED HR residuals differ slightly (PETSc passes
+  the cell velocities to the Roe solver, CEED rebuilds them from h*(1, u, v)); the Jacobian matches each
+  backend. The `fully_implicit` friction uses the desingularized velocity on both backends.
 - The augmented Roe Jacobian has the most branches (wave sets, entropy fix, bed-step clipping,
   wet/dry fronts); expect slower Newton near transcritical flow and moving shorelines.
 - Plain Roe uses 3D edge lengths/areas, so a uniform state on a sloped bed is not exactly

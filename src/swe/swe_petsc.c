@@ -699,6 +699,7 @@ typedef struct {
   PetscReal h_anuga_regular;    // ANUGA height parameter used for velocity regularization
   PetscReal xq2018_threshold;   // threshold for the XQ2018's implicit time integration of source term
   PetscBool include_bed_slope;  // if false, bed slope is zero (HR: handled by flux pressure correction)
+  PetscBool desingularize;      // if true, friction uses u = hu h / (h^2 + h_anuga^2) (as the CEED kernels do)
 } SourceOperator;
 
 // adds source terms to the right hand side vector F
@@ -763,8 +764,17 @@ static PetscErrorCode ApplySourceSemiImplicit(void *context, PetscOperatorFields
       PetscReal tbx = 0.0, tby = 0.0;
 
       if (h >= tiny_h) {  // wet conditions
-        PetscReal u = hu / h;
-        PetscReal v = hv / h;
+        // velocity: hu/h, or ANUGA-desingularized (fully implicit friction, matching the CEED
+        // kernel and the analytic Jacobian)
+        PetscReal u, v;
+        if (source_op->desingularize) {
+          PetscReal denom_u = Square(h) + Square(source_op->h_anuga_regular);
+          u                 = hu * h / denom_u;
+          v                 = hv * h / denom_u;
+        } else {
+          u = hu / h;
+          v = hv / h;
+        }
 
         // Manning's coefficient
         PetscReal N_mannings = mat_props_ptr[num_mat_props * owned_cell_id + MATERIAL_PROPERTY_MANNINGS];
@@ -933,9 +943,12 @@ static PetscErrorCode ApplySourceImplicitXQ2018(void *context, PetscOperatorFiel
 }
 
 // adds pointwise source terms (no time-step dependence) for a fully implicit flow TS.
-// With dt = 0, the semi-implicit friction reduces exactly to S_f(U) = -Cd |u| hu / h.
+// With dt = 0, the semi-implicit friction reduces exactly to S_f(U) = -Cd |u| hu / h, with the
+// ANUGA-desingularized velocity u as in the CEED kernel (SWEFullyImplicitBedFrictionRoughness).
 static PetscErrorCode ApplySourceFullyImplicit(void *context, PetscOperatorFields fields, PetscReal dt, Vec u_local, Vec f_global) {
   PetscFunctionBeginUser;
+  SourceOperator *source_op = context;
+  source_op->desingularize  = PETSC_TRUE;
   PetscCall(ApplySourceSemiImplicit(context, fields, 0.0, u_local, f_global));
   PetscFunctionReturn(PETSC_SUCCESS);
 }

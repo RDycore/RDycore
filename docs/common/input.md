@@ -393,9 +393,20 @@ RDycore. The parameters that define these discretizations are
   a finite volume method, or `fe` for a finite element method. Currently, only
   `fv` is implemented. Default value: `fv`
 * `temporal`: determines the method of time integration used. Can be `euler`
-  for the forward Euler method, `rk4` for a 4th-order Runge-Kutta method, or
-  `beuler` for the L-stable backward Euler method. Currently, only `euler` and
-  `rk4` are supported. Default value: `euler`
+  for the forward Euler method, `rk4` for a 4th-order Runge-Kutta method, or one
+  of the fully implicit methods `beuler` (L-stable backward Euler), `cn`
+  (Crank-Nicolson) and `bdf` (BDF, second order by default; `-ts_bdf_order`).
+  Default value: `euler`
+
+  The implicit methods solve the flow equations with Newton's method and an
+  analytic Jacobian on both the PETSc and the CEED backends. They currently
+  require `riemann: roe`, first-order spatial reconstruction, `well_balancing`
+  `none`, `hydrostatic_reconstruction` or `augmented_roe`, no sediment, salinity
+  or heat, and a fixed time step. They use the `fully_implicit` source method and
+  a non-zero `h_anuga_reg_parameter` by default (see `physics`). Useful options:
+  `-rdy_jacobian analytic|fd|mf` (default `analytic`), `-rdy_positivity
+  clip|vi|none` (keep depths non-negative inside Newton; default `clip`), and
+  the PETSc `-snes_*`, `-ksp_*` and `-pc_*` options.
 * `riemann`: determines the form of the Riemann solver used for the shallow
   water equations. Can be `roe` for the Roe solver or `hllc` for the HLLC solver.
   Currently, only `roe` is implemented. Default value: `roe`
@@ -492,7 +503,7 @@ physics:
   flow:
     mode: swe
     tiny_h: 1e-7
-    h_anuga_regular: 1.e-3
+    h_anuga_reg_parameter: 1.e-3
     source:
       method: implicit_xq2018
       xq2018_threshold: 1e-10
@@ -514,10 +525,13 @@ parameters in this subsection are:
    not yet supported). This parameter is required and has no default value.
 * `tiny_h`, which is the water height below which a given point is assumed to
   be dry. Default value: `1e-7`
-* `h_anuga_regular`: is the water height used in velocity regularization using the
+* `h_anuga_reg_parameter`: is the water height used in velocity regularization using the
   approach implemented in the ANUGA hydrodynamic model. e.g., the velocity in x-dir from the
-  momentum in x-dir is computed as `u = (hu) * h / (h^2 + h_anuga_regular^2)`. The
-  default value is `0.0`.
+  momentum in x-dir is computed as `u = (hu) * h / (h^2 + h_anuga_reg_parameter^2)`. The
+  default value is `0.0` for explicit time integration and `1e-3` for the implicit
+  methods (`beuler`, `cn`, `bdf`), where a non-zero value is needed for Newton's method
+  to converge at moving wet/dry fronts with time steps above the explicit CFL limit.
+  A non-zero value set here is always used; a value of `0` is treated as unset.
 * `well_balancing`: the treatment of the bed-slope source term. Options are
     * `none`: the bed slope is a cell source term (default value)
     * `bradford_sanders_2002`: the well-balancing method of Bradford and Sanders
@@ -538,6 +552,9 @@ parameters in this subsection are:
   * `method`: the method for integrating the flow source term. Options are
     * `semi_implicit`: a semi-implicit source treatment (default value)
     * `implicit_xq2018`: a fully implicit source treatment based on Xilin and Qiuhua (2018)
+    * `fully_implicit`: the source evaluated from the current state only, with no
+      time-step dependence; required by (and the default for) the implicit
+      temporal methods
   * `xq2018_threshold`: threshold for the implicit integration of the source
     (valid only for the `implicit_xq2018` method; default value: `1e-10`)
 

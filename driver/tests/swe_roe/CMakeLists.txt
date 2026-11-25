@@ -360,7 +360,8 @@ endforeach()
 # reconstruction and augmented Roe, checked against the analytic solutions
 # (relative L1 depth error, h >= 0). The moving wet/dry front needs the ANUGA
 # velocity desingularization (h_anuga_reg_parameter > 0) for Newton to converge
-# at CFL > 1; the inputs are generated from the explicit dam-break YAML files.
+# at CFL > 1, which implicit runs get by default (1e-3); the inputs are
+# generated from the explicit dam-break YAML files.
 foreach(case dry wet)
   if (case STREQUAL "dry")
     set(h_right 0)
@@ -373,7 +374,7 @@ foreach(case dry wet)
       foreach(config basic ceed)
         set(test_name swe_implicit_dam_break_${case}_${wb}_np_${np}_${config})
         set(output_dir output_${test_name})
-        string(REPLACE "well_balancing: augmented_roe" "well_balancing: ${wb}\n    h_anuga_reg_parameter: 1.0e-3" test_yaml "${yaml_contents}")
+        string(REPLACE "well_balancing: augmented_roe" "well_balancing: ${wb}" test_yaml "${yaml_contents}")
         string(REPLACE "temporal: euler" "temporal: beuler" test_yaml "${test_yaml}")
         string(REPLACE "stop_n: 300" "stop_n: 60" test_yaml "${test_yaml}")
         string(REPLACE "output_interval: 300" "output_interval: 60" test_yaml "${test_yaml}")
