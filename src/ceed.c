@@ -1,3 +1,4 @@
+#include <petscdevice.h>
 #include <petscdmceed.h>
 #include <private/rdycoreimpl.h>
 
@@ -55,7 +56,22 @@ PetscErrorCode SetCeedResource(char *resource) {
     ceed_context = NULL;
   }
   if (resource && resource[0]) {
-    PetscCallCEED(CeedInit(resource, &ceed_context));
+    // GPU backends: use the device PETSc chose for this rank, on which PETSc allocates the
+    // Vec/Mat arrays lent to libCEED. Without device_id, libCEED takes the current device
+    // (device 0) when a rank sees several GPUs (e.g. srun --gpu-bind=none), and ranks > 0
+    // fail with CUDA_ERROR_INVALID_VALUE.
+    char full[PETSC_MAX_PATH_LEN];
+    PetscCall(PetscStrncpy(full, resource, sizeof(full)));
+    if (!strncmp(resource, "/gpu/", 5) && !strchr(resource, ':')) {
+      PetscDeviceContext dctx;
+      PetscDevice        dev;
+      PetscInt           id;
+      PetscCall(PetscDeviceContextGetCurrentContext(&dctx));
+      PetscCall(PetscDeviceContextGetDevice(dctx, &dev));
+      PetscCall(PetscDeviceGetDeviceId(dev, &id));
+      PetscCall(PetscSNPrintf(full, sizeof(full), "%s:device_id=%" PetscInt_FMT, resource, id));
+    }
+    PetscCallCEED(CeedInit(full, &ceed_context));
     strncpy(ceed_resource, resource, PETSC_MAX_PATH_LEN);
 
     static bool firstTime = true;

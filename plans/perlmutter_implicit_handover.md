@@ -134,7 +134,7 @@ happens on the unchanged branch too and is not caused by this work.
 ```bash
 cd build-$PETSC_ARCH/driver/tests/swe_roe
 bash ../../../../driver/tests/swe_roe/run_implicit_checks.sh /gpu/cuda/gen \
-  "srun -N 1 -c 32 -G 2 --gpu-bind=single:1 -n" -dm_vec_type cuda
+  "srun -N 1 -c 32 --gpus-per-task=1 --gpu-bind=none -n" -dm_vec_type cuda
 ```
 
 It runs 22 checks (at most 2 ranks) and prints one PASS/FAIL line each, with logs in

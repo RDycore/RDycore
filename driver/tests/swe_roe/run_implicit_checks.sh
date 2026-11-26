@@ -8,7 +8,8 @@
 #   bash <repo>/driver/tests/swe_roe/run_implicit_checks.sh <ceed-resource> "<launcher>" [extra options]
 #
 # <launcher> must end with the option that takes the number of ranks, e.g.
-#   Perlmutter GPU: "srun -N 1 -c 32 -G 2 --gpu-bind=single:1 -n"   (2 ranks are used at most)
+#   Perlmutter GPU: "srun -N 1 -c 32 --gpus-per-task=1 --gpu-bind=none -n"  (2 ranks at most;
+#                   --gpu-bind=single:1 hangs: Cray MPICH cannot open CUDA IPC handles)
 #   laptop:         "mpiexec -n"
 # Extra options are passed to every run, e.g. "-dm_vec_type cuda -pc_type bjacobi".
 #
