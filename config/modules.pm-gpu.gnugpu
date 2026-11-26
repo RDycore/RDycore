@@ -1,4 +1,6 @@
-. /usr/share/lmod/8.3.1/init/sh
-module -q unload cpe cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf cray-netcdf cray-hdf5 PrgEnv-gnu PrgEnv-intel PrgEnv-nvidia PrgEnv-cray PrgEnv-aocc gcc-native intel intel-oneapi nvidia aocc cudatoolkit climate-utils cray-libsci matlab craype-accel-nvidia80 craype-accel-host perftools-base perftools darshan 
-module load PrgEnv-gnu/8.5.0 gcc-native/13.2 cudatoolkit/12.9 craype-accel-nvidia80 cray-libsci/24.07.0 craype/2.7.32 cray-mpich/8.1.30 cray-hdf5-parallel/1.14.3.1 cray-netcdf-hdf5parallel/4.9.0.13 cray-parallel-netcdf/1.12.3.13 cmake/3.30.2
+. /opt/cray/pe/lmod/lmod/init/sh
+
+module -q unload cpe cray-hdf5-parallel cray-netcdf-hdf5parallel cray-parallel-netcdf cray-netcdf cray-hdf5 PrgEnv-gnu PrgEnv-intel PrgEnv-nvidia PrgEnv-cray PrgEnv-aocc gcc-native intel intel-oneapi nvidia aocc cudatoolkit climate-utils cray-libsci matlab craype-accel-nvidia80 craype-accel-host perftools-base perftools darshan
+
+module load PrgEnv-gnu/8.7.0 gcc-native/14 cudatoolkit/13.2 craype-accel-nvidia80 cray-libsci/26.03.0 craype/2.7.36 cray-mpich/9.1.0 cray-hdf5-parallel/1.14.3.7 cray-netcdf-hdf5parallel/4.9.2.1 cray-parallel-netcdf/1.12.3.19 cmake/3.30.2
 
