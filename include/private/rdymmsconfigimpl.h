@@ -99,12 +99,21 @@ typedef struct {
 } RDyMMSErrorNorms;
 
 typedef struct {
-  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_SEDIMENT_CLASSES], S, T;
+  // NOTE: hT holds thresholds for the prognostic (conservative) heat DOF that
+  // NOTE: the solver actually advances; T holds them for the derived
+  // NOTE: temperature hT/h. The two are distinct whenever h is not identically 1.
+  RDyMMSErrorNorms h, hu, hv, c[MAX_NUM_SEDIMENT_CLASSES], S, hT, T;
 } RDyMMSConvergenceRates;
 
 typedef struct {
-  PetscInt               num_refinements;
-  PetscInt               base_refinement;
+  PetscInt num_refinements;
+  PetscInt base_refinement;
+  // Exponent p in dt_r = dt_0 / 2^(p*r), applied as each refinement level halves
+  // dx. 0 (the default) holds dt fixed across levels, which lets temporal and
+  // splitting error dominate the finest meshes; 1 gives dt ~ dx, which measures
+  // a joint space-time rate; 2 gives dt ~ dx^2, which is correct for an isolated
+  // spatial rate but costs O(dx^-4) work.
+  PetscInt               timestep_refinement_exponent;
   RDyMMSConvergenceRates expected_rates;
 } RDyMMSConvergence;
 

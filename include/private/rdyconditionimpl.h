@@ -11,10 +11,10 @@
 // * a boundary condition associated with a boundary
 typedef struct {
   // flow and tracer conditions (NULL for none)
-  RDyFlowCondition        *flow;
-  RDySedimentCondition    *sediment;
-  RDySalinityCondition    *salinity;
-  RDyTemperatureCondition *temperature;
+  RDyFlowCondition     *flow;
+  RDySedimentCondition *sediment;
+  RDySalinityCondition *salinity;
+  RDyHeatCondition     *heat;
 
   // value(s) associated with the condition
   PetscReal value;

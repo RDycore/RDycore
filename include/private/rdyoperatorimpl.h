@@ -252,6 +252,7 @@ typedef struct {
 PETSC_INTERN PetscErrorCode DestroyOperatorData(OperatorData *);
 
 PETSC_INTERN PetscErrorCode SetOperatorBoundaryValues(Operator *, RDyBoundary, PetscInt, PetscInt, PetscInt, PetscReal *);
+PETSC_INTERN PetscErrorCode GetOperatorBoundaryValues(Operator *, RDyBoundary, PetscInt, PetscInt, PetscInt, PetscReal *);
 
 PETSC_INTERN PetscErrorCode ExtractOperatorBoundaryFluxes(Operator *, RDyBoundary *, OperatorData *);
 

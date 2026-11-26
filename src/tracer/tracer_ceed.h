@@ -15,6 +15,8 @@
 
 // tracer transport
 #define MAX_NUM_TRACERS 7
+#define MAX_NUM_SEDIMENT_CLASSES 5
+#define MAX_NUM_FIELD_COMPONENTS 10
 
 // convenience macros
 

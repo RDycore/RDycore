@@ -30,6 +30,7 @@ nav:
     - 'Shallow Water Equations': 'theory/swe.md'
     - 'Second-Order MUSCL Reconstruction': 'theory/muscl.md'
     - 'Sediment Transport': 'theory/sediment.md'
+    - 'Heat Transport and Atmospheric Coupling': 'theory/heat.md'
 
 edit_uri: ""
 

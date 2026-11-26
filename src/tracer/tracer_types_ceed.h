@@ -2,7 +2,8 @@
 #define TRACER_TYPES_CEED_H
 
 #include <ceed.h>
-#include <private/config.h>
+
+#include "tracer_ceed.h"
 
 // Q-function context with data attached
 typedef struct TracerContext_ *TracerContext;
@@ -18,6 +19,7 @@ struct TracerContext_ {
   CeedScalar tau_critical_deposition;
   CeedScalar rhow;
   CeedInt    tracer_ndof;
+  CeedInt    num_sediment_classes;
   CeedInt    flow_ndof;
 };
 

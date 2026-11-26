@@ -72,10 +72,10 @@ if [ "$mach" = "pm-cpu" ]; then
 elif [ "$mach" = "pm-gpu" ]; then
 
     MODULE_FILE=$DIR/modules.pm-gpu.gnugpu
-    export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_v3.24.1/
+    export PETSC_DIR=/global/cfs/projectdirs/m4267/petsc/petsc_v3.26.0
 
     if [ "$config" -eq 1 ]; then
-      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-13-2-1-b522cb8c110
+      export PETSC_ARCH=pm-gpu-hdf5_1_14_3-opt-64bit-gcc-14-3-0-1136c0bd63c
     elif [ "$config" -eq 2 ]; then
       export PETSC_ARCH=pm-gpu-hdf5_1_14_3-debug-64bit-gcc-13-2-1-b522cb8c110
     elif [ "$config" -eq 3 ]; then
